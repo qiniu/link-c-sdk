@@ -23,6 +23,7 @@ typedef struct {
         bool IsTestMove;
         bool IsTwoUpload;
         bool IsTwoFileUpload;
+        bool IsWriteVideoFrame;
         int nSleeptime;
         int nFirstFrameSleeptime;
         int64_t nRolloverTestBase;
@@ -244,6 +245,7 @@ static int is_h265_picture(int t)
         }
 }
 
+static int gnVideoFrameCount=50;
 int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callback, void *opaque)
 {
         assert(!(_pAudioFile == NULL && _pVideoFile == NULL));
@@ -345,6 +347,15 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
 						 	IsFirst = 0;
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
+                                                if (cmdArg.IsWriteVideoFrame) {
+                                                        char fn[15] = {0};
+                                                        sprintf(fn, "video%04d.bin", gnVideoFrameCount++);
+                                                        FILE *f = fopen(fn, "wb+");
+                                                        if (f != NULL) {
+                                                                fwrite(sendp, 1, end - sendp, f);
+                                                                fclose(f);
+                                                        }
+                                                }
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
                                                 if (cbRet != 0) {
                                                         bVideoOk = 0;
@@ -804,6 +815,7 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
         flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+        flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
