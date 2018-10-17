@@ -90,7 +90,8 @@ is_negated(const char *s) {
 static int
 largest_flag_name(flagset_t *self) {
   int max = 0;
-  for (int i = 0; i < self->nflags; ++i) {
+  int i = 0;
+  for ( i = 0; i < self->nflags; ++i) {
     flag_t *flag = &self->flags[i];
     size_t len = strlen(flag->name);
     max = len > max ? len : max;
@@ -125,7 +126,8 @@ flagset_free(flagset_t *self) {
 
 static flag_t *
 flagset_find(flagset_t *self, const char *arg) {
-  for (int i = 0; i < self->nflags; ++i) {
+  int i = 0;
+  for (i = 0; i < self->nflags; ++i) {
     flag_t *flag = &self->flags[i];
 
     if (strcmp(arg+2, flag->name) == 0) {
@@ -145,7 +147,8 @@ flagset_find(flagset_t *self, const char *arg) {
 
 flag_error
 flagset_parse(flagset_t *self, int argc, const char **args) {
-  for (int i = 0; i < argc; ++i) {
+  int i = 0;
+  for (i = 0; i < argc; ++i) {
     const char *arg = args[i];
 
     // Regular argument
@@ -198,8 +201,9 @@ flagset_write_usage(flagset_t *self, FILE *fp, const char *name) {
   fprintf(fp, "\n  Options:\n");
 
   int max = largest_flag_name(self);
+  int i = 0;
 
-  for (int i = 0; i < self->nflags; ++i) {
+  for ( i = 0; i < self->nflags; ++i) {
     flag_t *flag = &self->flags[i];
     fprintf(fp, "    --%-*s %s", max+1, flag->name, flag->help);
     switch (flag->type) {
