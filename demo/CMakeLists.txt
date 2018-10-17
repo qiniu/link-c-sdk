@@ -4,7 +4,9 @@ project(testupload)
 
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
-link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl-7.61.1/lib/.libs")
+#link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl-7.61.1/lib/.libs")
+message( "line-8 HOST is " ${HOST} )
+link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl-7.61.1/output/${HOST}/lib")
 
 
 if (TEST_WITH_FFMPEG) 
@@ -42,7 +44,7 @@ if(APPLE)
 else()
     if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
-        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools)
+        	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
         else()
         	target_link_libraries(testupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread devsdk tools)
         endif()
