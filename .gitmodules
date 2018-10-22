@@ -2,3 +2,6 @@
 	path = libtsuploader/c-sdk
 	url = https://github.com/qiniu/c-sdk.git
 	branch = master
+[submodule "third_party/curl"]
+	path = third_party/curl
+	url = https://github.com/curl/curl.git
