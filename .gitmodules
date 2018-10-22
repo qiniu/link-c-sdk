@@ -1,0 +1,4 @@
+[submodule "libtsuploader/c-sdk"]
+	path = libtsuploader/c-sdk
+	url = https://github.com/qiniu/c-sdk.git
+	branch = master

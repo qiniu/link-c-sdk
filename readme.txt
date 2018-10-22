@@ -1,5 +1,7 @@
 
 一、编译
+0. 初始化子模块
+    * git submodule update --init --recursive
 1. linux平台
     * mkdir build-linux
     * cd build-linux
