@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8)
 
 project(tsuploader)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl-7.61.1/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/output/${HOST}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 

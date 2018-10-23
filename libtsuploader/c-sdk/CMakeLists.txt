@@ -12,11 +12,11 @@ if(NOT DISABLE_OPENSSL)
 	message("openssl include:${OPENSSL_ROOT_DIR}/include")
 	include_directories("${OPENSSL_ROOT_DIR}/include")
 endif()
-include_directories("/Users/liuye/source/curl-7.61.1/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/curl/output/${HOST}/include")
 
 #添加C99支持
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g")
-#添加GNU99支持 
+#添加GNU99支持
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99 -g")
 
 if(APPLE)
