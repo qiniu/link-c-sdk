@@ -95,7 +95,7 @@ QINIU_DLLAPI extern Qiniu_Auth Qiniu_NoAuth;
 
 /*============================================================================*/
 /* type Qiniu_Client */
-typedef int (*ProgressCallback)(void *clientp,   curl_off_t dltotal,   curl_off_t dlnow,   curl_off_t ultotal,   curl_off_t ulnow);
+typedef int (*ProgressCallback)(void *clientp,   int64_t dltotal,   int64_t dlnow,   int64_t ultotal,   int64_t ulnow);
 typedef struct _Qiniu_Client {
 	void* curl;
 	Qiniu_Auth auth;
