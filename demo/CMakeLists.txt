@@ -11,7 +11,7 @@ link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 
 if (WITH_OPENSSL)
     set(DISABLE_OPENSSL OFF)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl-3.15.3")
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
 else()
     set(DISABLE_OPENSSL ON)
     add_definitions(-DDISABLE_OPENSSL)
