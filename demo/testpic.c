@@ -28,8 +28,8 @@ static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
         return LINK_SUCCESS;
 }
 
-void justTestSyncUploadPicture() {
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), "http://47.105.118.51:8086/qiniu/upload/token/testdvice009");
+void justTestSyncUploadPicture(char *pTokenUrl) {
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
@@ -55,8 +55,8 @@ void justTestSyncUploadPicture() {
         
 }
 
-void justTestAsyncUploadPicture() {
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), "http://47.105.118.51:8086/qiniu/upload/token/testdvice009");
+void justTestAsyncUploadPicture(char *pTokenUrl) {
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);

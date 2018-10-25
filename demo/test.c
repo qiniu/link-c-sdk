@@ -872,10 +872,10 @@ int main(int argc, const char** argv)
         checkCmdArg(argv[0]);
         
         if (cmdArg.IsJustTestSyncUploadPicture) {
-                justTestSyncUploadPicture();
+                justTestSyncUploadPicture(cmdArg.pTokenUrl);
                 return;
         }else if (cmdArg.IsJustTestAsyncUploadPicture) {
-                justTestAsyncUploadPicture();
+                justTestAsyncUploadPicture(cmdArg.pTokenUrl);
                 return;
         }
 
