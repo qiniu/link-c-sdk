@@ -82,4 +82,6 @@ typedef struct _LinkMediaArg{
 
 int LinkIsProcStatusQuit();
 
+#define LINK_DEFINE_HANDLE(object) typedef struct object##_T* object;
+
 #endif
