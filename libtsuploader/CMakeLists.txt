@@ -48,6 +48,8 @@ add_library(tsuploader STATIC
     mpegts.h
     fixjson.h
     fixjson.c
+    picuploader.h
+    picuploader.c
     localkey.h
 )
 

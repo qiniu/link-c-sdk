@@ -14,6 +14,7 @@
 #endif
 
 static int volatile nProcStatus = 0;
+static LinkUploadZone gUploadZone;
 
 int LinkInitUploader()
 {
@@ -143,6 +144,14 @@ int LinkIsProcStatusQuit()
                 return 1;
         }
         return 0;
+}
+
+void LinkSetuploadZone(LinkUploadZone zone) {
+        gUploadZone = zone;
+}
+
+LinkUploadZone LinkGetuploadZone() {
+        return gUploadZone;
 }
 
 void LinkUninitUploader()
