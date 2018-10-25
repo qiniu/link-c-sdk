@@ -30,6 +30,7 @@ add_executable(testupload
     test.c
     flag.h
     flag.c
+    testpic.c
 )
 
 if(APPLE)
