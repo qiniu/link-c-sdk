@@ -9,6 +9,7 @@
 #include "servertime.h"
 #include <time.h>
 #include <curl/curl.h>
+#include "fixjson.h"
 #ifdef __ARM
 #include "./demo/socket_logging.h"
 #endif
@@ -100,32 +101,6 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
                 pUploader->nUlnowRecTime = nNow;
         }
         return 0;
-}
-
-static char * getErrorMsg(const char *_pJson, char *_pBuf, int _nBufLen)
-{
-        const char * pStart = _pJson;
-        pStart = strstr(pStart, "\\\"error\\\"");
-        printf("\\\"error\\\"");
-        if (pStart == NULL)
-                return NULL;
-        pStart += strlen("\\\"error\\\"");
-        
-        while(*pStart != '"') {
-                pStart++;
-        }
-        pStart++;
-        
-        const char * pEnd = strchr(pStart+1, '\\');
-        if (pEnd == NULL)
-                return NULL;
-        int nLen = pEnd - pStart;
-        if(nLen > _nBufLen - 1) {
-                nLen = _nBufLen - 1;
-        }
-        memcpy(_pBuf, pStart, nLen);
-        _pBuf[nLen] = 0;
-        return _pBuf;
 }
 
 static const unsigned char pr2six[256] = {
@@ -331,7 +306,7 @@ static void * streamUpload(void *_pOpaque)
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
-                        char *pMsg = getErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
+                        char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
                         if (pMsg) {
                                 LinkLogError("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
                         }else {

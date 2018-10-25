@@ -46,6 +46,8 @@ add_library(tsuploader STATIC
     tsmux.c
     mpegts.c
     mpegts.h
+    fixjson.h
+    fixjson.c
     localkey.h
 )
 
