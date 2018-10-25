@@ -15,11 +15,6 @@ enum LinkPicUploadSignalType {
         LinkPicUploadSignalUpload
 };
 
-enum LinkGetPictureSyncMode {
-        LinkGetPictureModeSync = 1,
-        LinkGetPictureModeAsync = 2
-};
-
 typedef struct {
         LinkAsyncInterface asyncWait_;
         pthread_t workerId_;
@@ -38,7 +33,6 @@ typedef struct {
         pthread_t uploadPicThread;
         char deviceId[64];
         PicUploader *pPicUploader;
-        enum LinkGetPictureSyncMode syncMode_;
 }LinkPicUploadSignal;
 
 
@@ -50,27 +44,11 @@ static int pushUploadSignal(PicUploader *pPicUploader, LinkPicUploadSignal *pSig
         return pPicUploader->pSignalQueue_->Push(pPicUploader->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
 }
 
-int LinkSendSyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
+int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(LinkPicUploadSignal));
         sig.signalType_ = LinkPicUploadGetPicSignalCallback;
         sig.nTimestamp = nTimestamp;
-        sig.syncMode_ = LinkGetPictureModeSync;
-        if( nDeviceIdLen > sizeof(sig.deviceId)) {
-                LinkLogWarn("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
-                nDeviceIdLen = sizeof(sig.deviceId)-1;
-        }
-        memcpy(sig.deviceId, pDeviceId, nDeviceIdLen);
-        PicUploader *pPicUp = (PicUploader*)pPicUploader;
-        return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
-}
-
-int LinkSendAsyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
-        LinkPicUploadSignal sig;
-        memset(&sig, 0, sizeof(LinkPicUploadSignal));
-        sig.signalType_ = LinkPicUploadGetPicSignalCallback;
-        sig.nTimestamp = nTimestamp;
-        sig.syncMode_ = LinkGetPictureModeAsync;
         if( nDeviceIdLen > sizeof(sig.deviceId)) {
                 LinkLogWarn("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
                 nDeviceIdLen = sizeof(sig.deviceId)-1;
@@ -87,7 +65,9 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *
         pSig->signalType_ = LinkPicUploadSignalUpload;
         pSig->pData = pBuf;
         pSig->nDataLen = nBuflen;
-        return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
+        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
+        free(pSig);
+        return ret;
 }
 
 static void * listenPicUpload(void *_pOpaque)
@@ -128,15 +108,15 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 void *pSigBackup = NULL;
-                                                if (sig.syncMode_ == LinkGetPictureModeAsync) {
-                                                        pSigBackup = malloc(sizeof(sig));
-                                                        memcpy(pSigBackup, &sig, sizeof(sig));
-                                                }
-                                                int ret = pPicUploader->picUpSettings_.getPicCallback(
+                                                pSigBackup = malloc(sizeof(sig));
+                                                memcpy(pSigBackup, &sig, sizeof(sig));
+                                                enum LinkGetPictureSyncMode syncMode = pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
                                                                                             pSigBackup, &sig.pData, &sig.nDataLen, &sig.upType_);
-                                                if (sig.syncMode_ == LinkGetPictureModeSync && ret == 0)
+                                                if (syncMode == LinkGetPictureModeSync) {
+                                                        free(pSigBackup);
                                                         pushUploadSignal(pPicUploader, &sig);
+                                                }
                                         }
                                         break;
                         }

@@ -2,8 +2,9 @@
 #include "servertime.h"
 
 static void *gSvaeWhenAsync; //may race risk. but for test is enough
+enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
 
-static int getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
+static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
         const char *file = "./material/3c.jpg";
         int n = strlen(file)+1;
         char * pFile = (char *)malloc(n);
@@ -11,12 +12,13 @@ static int getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf,
         *pBuf = pFile;
         *pType = LinkPicUploadTypeFile;
         gSvaeWhenAsync = pSvaeWhenAsync;
-        return 0;
+        return gSyncMode;
 }
 
 static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
         fprintf(stderr, "free data\n");
         free(pBuf);
+        return 0;
 }
 
 static char gtestToken[1024] = {0};
@@ -48,7 +50,7 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendSyncGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
+                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
                 ts += 4990;
                 sleep(5);
         }
@@ -56,6 +58,7 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
 }
 
 void justTestAsyncUploadPicture(char *pTokenUrl) {
+        gSyncMode = LinkGetPictureModeAsync;
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
@@ -75,7 +78,7 @@ void justTestAsyncUploadPicture(char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendAsyncGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
+                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
                 
                 sleep(1);
                 
