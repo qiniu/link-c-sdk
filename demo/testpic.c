@@ -37,7 +37,7 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
         assert(ret == LINK_SUCCESS);
         fprintf(stderr, "token:%s\n", gtestToken);
         
-        LinkPicUploadArg arg;
+        LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
         arg.getTokenCallback = getTokenCallback;
         arg.getPictureFreeCallback = getPictureFreeCallback;
@@ -65,7 +65,7 @@ void justTestAsyncUploadPicture(char *pTokenUrl) {
         assert(ret == LINK_SUCCESS);
         fprintf(stderr, "token:%s\n", gtestToken);
         
-        LinkPicUploadArg arg;
+        LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
         arg.getTokenCallback = getTokenCallback;
         arg.getPictureFreeCallback = getPictureFreeCallback;

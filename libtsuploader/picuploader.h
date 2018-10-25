@@ -25,9 +25,9 @@ typedef struct {
         LinkGetPictureFreeCallback getPictureFreeCallback;
         LinkUploadPictureGetTokenCallback getTokenCallback;
         void *pGetTokenCallbackOpaque;
-}LinkPicUploadArg;
+}LinkPicUploadFullArg;
 
-int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadArg *pArg);
+int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadFullArg *pArg);
 
 int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp);
 

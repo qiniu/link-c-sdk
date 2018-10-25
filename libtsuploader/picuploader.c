@@ -20,7 +20,7 @@ typedef struct {
         pthread_t workerId_;
         LinkCircleQueue *pSignalQueue_;
         int nQuit_;
-        LinkPicUploadArg picUpSettings_;
+        LinkPicUploadFullArg picUpSettings_;
 }PicUploader;
 
 typedef struct {
@@ -135,7 +135,7 @@ static int waitUploadMgrThread(void * _pOpaque) {
         return 0;
 }
 
-int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadArg *pArg) {
+int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg *pArg) {
         PicUploader * pPicUploader = (PicUploader *) malloc(sizeof(PicUploader));
         if (pPicUploader == NULL) {
                 return LINK_NO_MEMORY;
