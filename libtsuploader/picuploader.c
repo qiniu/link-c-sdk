@@ -250,6 +250,10 @@ static void * uploadPicture(void *_pOpaque) {
                 LinkLogDebug("upload picture key:%s success", key);
         }
         
+        if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
+                pSig->pPicUploader->picUpSettings_.getPictureFreeCallback(pSig->pData, pSig->nDataLen);
+        }
+        
         Qiniu_Client_Cleanup(&client);
         LinkPushFunction(pSig);
         

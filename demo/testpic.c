@@ -12,6 +12,7 @@ static int getPicCallback (void *pOpaque, OUT char **pBuf, OUT int *pBufSize, OU
 }
 
 static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
+        fprintf(stderr, "free data\n");
         free(pBuf);
 }
 
@@ -25,8 +26,9 @@ static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
 }
 
 void justTestUploadPicture() {
-        
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), "http://47.105.118.51:8086/qiniu/upload/token/testdvice009");
+        assert(ret == LINK_SUCCESS);
+        ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
         fprintf(stderr, "token:%s\n", gtestToken);
         
