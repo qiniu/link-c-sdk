@@ -15,6 +15,11 @@ enum LinkPicUploadSignalType {
         LinkPicUploadSignalUpload
 };
 
+enum LinkGetPictureSyncMode {
+        LinkGetPictureModeSync = 1,
+        LinkGetPictureModeAsync = 2
+};
+
 typedef struct {
         LinkAsyncInterface asyncWait_;
         pthread_t workerId_;
@@ -33,6 +38,7 @@ typedef struct {
         pthread_t uploadPicThread;
         char deviceId[64];
         PicUploader *pPicUploader;
+        enum LinkGetPictureSyncMode syncMode_;
 }LinkPicUploadSignal;
 
 
@@ -44,11 +50,12 @@ static int pushUploadSignal(PicUploader *pPicUploader, LinkPicUploadSignal *pSig
         return pPicUploader->pSignalQueue_->Push(pPicUploader->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
 }
 
-int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
+int LinkSendSyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(LinkPicUploadSignal));
         sig.signalType_ = LinkPicUploadGetPicSignalCallback;
         sig.nTimestamp = nTimestamp;
+        sig.syncMode_ = LinkGetPictureModeSync;
         if( nDeviceIdLen > sizeof(sig.deviceId)) {
                 LinkLogWarn("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
                 nDeviceIdLen = sizeof(sig.deviceId)-1;
@@ -56,6 +63,31 @@ int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, con
         memcpy(sig.deviceId, pDeviceId, nDeviceIdLen);
         PicUploader *pPicUp = (PicUploader*)pPicUploader;
         return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+}
+
+int LinkSendAsyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
+        LinkPicUploadSignal sig;
+        memset(&sig, 0, sizeof(LinkPicUploadSignal));
+        sig.signalType_ = LinkPicUploadGetPicSignalCallback;
+        sig.nTimestamp = nTimestamp;
+        sig.syncMode_ = LinkGetPictureModeAsync;
+        if( nDeviceIdLen > sizeof(sig.deviceId)) {
+                LinkLogWarn("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
+                nDeviceIdLen = sizeof(sig.deviceId)-1;
+        }
+        memcpy(sig.deviceId, pDeviceId, nDeviceIdLen);
+        PicUploader *pPicUp = (PicUploader*)pPicUploader;
+        return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+}
+
+int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type) {
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        LinkPicUploadSignal* pSig = (LinkPicUploadSignal*)pOpaque;
+        pSig->pPicUploader = (char *)pPicUp;
+        pSig->signalType_ = LinkPicUploadSignalUpload;
+        pSig->pData = pBuf;
+        pSig->nDataLen = nBuflen;
+        return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
 }
 
 static void * listenPicUpload(void *_pOpaque)
@@ -95,9 +127,16 @@ static void * listenPicUpload(void *_pOpaque)
                                         break;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
-                                                pPicUploader->picUpSettings_.getPicCallback(pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
-                                                                                            &sig.pData, &sig.nDataLen, &sig.upType_);
-                                                pushUploadSignal(pPicUploader, &sig);
+                                                void *pSigBackup = NULL;
+                                                if (sig.syncMode_ == LinkGetPictureModeAsync) {
+                                                        pSigBackup = malloc(sizeof(sig));
+                                                        memcpy(pSigBackup, &sig, sizeof(sig));
+                                                }
+                                                int ret = pPicUploader->picUpSettings_.getPicCallback(
+                                                                                            pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
+                                                                                            pSigBackup, &sig.pData, &sig.nDataLen, &sig.upType_);
+                                                if (sig.syncMode_ == LinkGetPictureModeSync && ret == 0)
+                                                        pushUploadSignal(pPicUploader, &sig);
                                         }
                                         break;
                         }

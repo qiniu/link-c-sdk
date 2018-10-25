@@ -53,7 +53,8 @@ typedef struct {
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
         
-        bool IsJustTestUploadPicture;
+        bool IsJustTestSyncUploadPicture;
+        bool IsJustTestAsyncUploadPicture;
 }CmdArg;
 
 typedef struct {
@@ -818,7 +819,8 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
         flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
-        flag_bool(&cmdArg.IsJustTestUploadPicture, "jpic", "just test upload picture");
+        flag_bool(&cmdArg.IsJustTestSyncUploadPicture, "jpicsync", "just test upload picture");
+        flag_bool(&cmdArg.IsJustTestAsyncUploadPicture, "jpicasync", "just test upload picture");
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
@@ -869,8 +871,11 @@ int main(int argc, const char** argv)
 
         checkCmdArg(argv[0]);
         
-        if (cmdArg.IsJustTestUploadPicture) {
-                justTestUploadPicture();
+        if (cmdArg.IsJustTestSyncUploadPicture) {
+                justTestSyncUploadPicture();
+                return;
+        }else if (cmdArg.IsJustTestAsyncUploadPicture) {
+                justTestAsyncUploadPicture();
                 return;
         }
 

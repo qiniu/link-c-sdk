@@ -9,7 +9,7 @@ enum LinkPicUploadType {
         LinkPicUploadTypeBuffer
 };
 
-typedef int (*LinkGetPictureCallback)(void *pOpaque, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType);
+typedef int (*LinkGetPictureCallback)(void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType);
 typedef int (*LinkGetPictureFreeCallback)(char *pBuf, int nNameBufSize);
 typedef int (*LinkUploadPictureGetTokenCallback)(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
@@ -23,7 +23,12 @@ typedef struct {
 
 int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadArg *pArg);
 
-int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp);
+int LinkSendSyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp);
+int LinkSendAsyncGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp);
+
+// when LinkSendAsync signal, should invoke this function to notify picuploader to upload picture
+int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type);
+
 
 void LinkSetGetPictureCallback(PictureUploader *pPicUploader, LinkGetPictureCallback cb, LinkGetPictureCallback freeCbArg);
 
