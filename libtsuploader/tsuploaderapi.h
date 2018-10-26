@@ -10,8 +10,8 @@ int LinkInitUploader();
 int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg, IN LinkUserUploadArg *pUserUploadArg);
 int LinkCreateAndStartAVUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg,
                                                     IN LinkUserUploadArg *pUserUploadArg, IN LinkPicUploadArg *pPicArg);
-int LinkSetUpdateTokenCallback();//TODO
-int LinkSetSnapshotCallback();//TODO
+int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type);
+
 void LinkSetuploadZone(LinkUploadZone zone);
 LinkUploadZone LinkGetuploadZone();
 int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);

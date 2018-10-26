@@ -361,6 +361,12 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
         return ret;
 }
 
+int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *_pTsMuxUploader, void *_pOpaque, const char *_pBuf, int _nBuflen, enum LinkPicUploadType _type) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        assert(pFFTsMuxUploader->pPicUploader != NULL);
+        return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, _pOpaque, _pBuf, _nBuflen, _type);
+}
+
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 {
         FFTsMuxContext *pTsMuxCtx = (FFTsMuxContext*)_pOpaque;
