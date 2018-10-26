@@ -32,6 +32,8 @@ message( "HOST is " ${HOST} )
 add_custom_target(all-clean
         COMMAND echo "CLEAN CURL"
         COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/curl && git clean -dxf
+        COMMAND echo "CLEAN WOLFSSL"
+        COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/wolfssl && git clean -dxf
     )
 
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wno-unused")

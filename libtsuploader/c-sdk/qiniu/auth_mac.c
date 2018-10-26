@@ -9,6 +9,7 @@
 
 #include "http.h"
 #include <curl/curl.h>
+#include <openssl/ssl.h>
 #include <openssl/hmac.h>
 #include <openssl/engine.h>
 
@@ -22,7 +23,7 @@
 void Qiniu_MacAuth_Init()
 {
 	ENGINE_load_builtin_engines();
-	ENGINE_register_all_complete();
+	//ENGINE_register_all_complete();
 }
 
 void Qiniu_MacAuth_Cleanup()
