@@ -129,6 +129,12 @@ static void * listenPicUpload(void *_pOpaque)
 static int waitUploadMgrThread(void * _pOpaque) {
         PicUploader *p = (PicUploader*)_pOpaque;
         p->nQuit_ = 1;
+        
+        LinkPicUploadSignal sig;
+        memset(&sig, 0, sizeof(sig));
+        sig.signalType_ = LinkPicUploadSignalStop;
+        p->pSignalQueue_->Push(p->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+        
         pthread_join(p->workerId_, NULL);
         LinkDestroyQueue(&p->pSignalQueue_);
         free(p);
