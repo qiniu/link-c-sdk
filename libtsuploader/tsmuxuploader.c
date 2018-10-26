@@ -313,10 +313,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = 0;
-        if (nIsKeyFrame && pFFTsMuxUploader->pPicUploader != NULL) {
-                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
-                                                          strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), _nTimestamp);
-        }
+
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -811,6 +808,12 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         return ret;
 }
 
+static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
+        LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
+                                                  strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), nTimestamp);
+}
+
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
@@ -823,6 +826,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
+        LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return LINK_SUCCESS;

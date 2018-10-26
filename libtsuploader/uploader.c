@@ -51,6 +51,8 @@ typedef struct _KodoUploader{
         
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
+        LinkTsStartUploadCallback tsStartUploadCallback;
+        void *pTsStartUploadCallbackArg;
 }KodoUploader;
 
 static struct timespec tmResolution;
@@ -287,6 +289,10 @@ static void * streamUpload(void *_pOpaque)
         sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
                 curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
         LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
+        
+        if (pUploader->tsStartUploadCallback) {
+                pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, curTime / 1000000);
+        }
 #ifdef LINK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
         client.xferinfoCb = timeoutCallback;
@@ -541,6 +547,12 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         
         return LINK_SUCCESS;
+}
+
+void LinkUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        pKodoUploader->tsStartUploadCallback = cb;
+        pKodoUploader->pTsStartUploadCallbackArg = pOpaque;
 }
 
 void LinkDestroyUploader(LinkTsUploader ** _pUploader)
