@@ -75,11 +75,10 @@ static void * listenPicUpload(void *_pOpaque)
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
 
         while(!pPicUploader->nQuit_) {
-                fprintf(stderr, "==========\n");
                 LinkPicUploadSignal sig;
                 int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60);
-                
+                fprintf(stderr, "----->pu receive a signal:%d\n", sig.signalType_);
                 LinkUploaderStatInfo info;
                 pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
                 LinkLogDebug("signal queue:%d", info.nLen_);
@@ -184,7 +183,7 @@ static void * uploadPicture(void *_pOpaque) {
         snprintf(key, sizeof(key), "frame/%s/%lld/0.jpg", pSig->deviceId, pSig->nTimestamp);
         
         char uptoken[1024] = {0};
-        int ret = pSig->pPicUploader->picUpSettings_.getTokenCallback(pSig->pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
+        int ret = pSig->pPicUploader->picUpSettings_.getTokenCallback(pSig->pPicUploader->picUpSettings_.pGetTokenCallbackOpaque,
                                                                       uptoken, sizeof(uptoken));
         if (ret == LINK_BUFFER_IS_SMALL) {
                 LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);

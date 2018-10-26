@@ -654,6 +654,7 @@ static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhe
         const char *file = "../../demo/material/3c.jpg";
         int n = strlen(file)+1;
         char * pFile = (char *)malloc(n);
+        *pBufSize = n;
         memcpy(pFile, file, n);
         *pBuf = pFile;
         *pType = LinkPicUploadTypeFile;
