@@ -5,7 +5,7 @@ static void *gSvaeWhenAsync; //may race risk. but for test is enough
 enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
 
 static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = "./material/3c.jpg";
+        const char *file = "../../demo/material/3c.jpg";
         int n = strlen(file)+1;
         char * pFile = (char *)malloc(n);
         memcpy(pFile, file, n);

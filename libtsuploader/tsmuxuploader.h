@@ -3,6 +3,7 @@
 #include "base.h"
 #include "uploader.h"
 #include "resource.h"
+#include "picuploader.h"
 
 typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
 
@@ -22,6 +23,8 @@ typedef struct _LinkTsMuxUploader{
 }LinkTsMuxUploader;
 
 int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg, LinkUserUploadArg *pUserUploadArg);
+int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg,
+                                            LinkUserUploadArg *pUserUploadArg, LinkPicUploadArg *pPicArg);
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *pTsMuxUploader);
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader);
 #endif

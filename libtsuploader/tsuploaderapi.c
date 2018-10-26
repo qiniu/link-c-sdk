@@ -82,6 +82,40 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
         return LINK_SUCCESS;
 }
 
+int LinkCreateAndStartAVUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
+                                                    LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
+{
+        if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
+            _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
+            _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
+                LinkLogError("token or deviceid or argument is null");
+                return LINK_ARG_ERROR;
+        }
+        
+        LinkTsMuxUploader *pTsMuxUploader;
+        int ret = LinkNewTsMuxUploaderWithPictureUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg);
+        if (ret != 0) {
+                LinkLogError("LinkNewTsMuxUploaderWithPictureUploader fail");
+                return ret;
+        }
+        if (_pUserUploadArg->nUploaderBufferSize != 0) {
+                pTsMuxUploader->SetUploaderBufferSize(pTsMuxUploader, _pUserUploadArg->nUploaderBufferSize);
+        }
+        if (_pUserUploadArg->nNewSegmentInterval != 0) {
+                pTsMuxUploader->SetNewSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
+        }
+        
+        ret = LinkTsMuxUploaderStart(pTsMuxUploader);
+        if (ret != 0){
+                LinkDestroyTsMuxUploader(&pTsMuxUploader);
+                LinkLogError("UploadStart fail:%d", ret);
+                return ret;
+        }
+        *_pTsMuxUploader = pTsMuxUploader;
+        
+        return LINK_SUCCESS;
+}
+
 int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
 {
         if (_pTsMuxUploader == NULL || _pData == NULL || _nDataLen == 0) {

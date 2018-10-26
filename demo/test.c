@@ -55,6 +55,8 @@ typedef struct {
         
         bool IsJustTestSyncUploadPicture;
         bool IsJustTestAsyncUploadPicture;
+        bool IsWithPicUpload;
+        bool IsPicUploadSyncMode;
 }CmdArg;
 
 typedef struct {
@@ -644,6 +646,51 @@ void logCb(int _nLevel, char * pLog)
         fprintf(stderr, "-%s", pLog);
 }
 
+typedef struct {
+        void * pData;
+}GetPicSaver;
+
+static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
+        const char *file = "../../demo/material/3c.jpg";
+        int n = strlen(file)+1;
+        char * pFile = (char *)malloc(n);
+        memcpy(pFile, file, n);
+        *pBuf = pFile;
+        *pType = LinkPicUploadTypeFile;
+        
+        if (cmdArg.IsPicUploadSyncMode) {
+                return LinkGetPictureModeSync;
+        }
+        GetPicSaver * saver = (GetPicSaver*)pOpaque;
+        saver->pData = pSvaeWhenAsync;
+        return LinkGetPictureModeAsync;
+}
+
+static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
+        fprintf(stderr, "free data\n");
+        free(pBuf);
+        return 0;
+}
+
+static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
+        int ret = 0;
+        LinkPicUploadArg picArg;
+        picArg.getPicCallback = getPicCallback;
+        picArg.getPictureFreeCallback = getPictureFreeCallback;
+        picArg.pGetPicCallbackOpaque = NULL;
+        
+        if (!cmdArg.IsWithPicUpload)
+                ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
+        else {
+                GetPicSaver * saver = malloc(sizeof(GetPicSaver));
+                memset(saver, 0, sizeof(GetPicSaver));
+                picArg.pGetPicCallbackOpaque = saver;
+                ret = LinkCreateAndStartAVUploaderWithPictureUploader(_pTsMuxUploader, _pAvArg,
+                                                                      _pUserUploadArg, &picArg);
+        }
+        return ret;
+}
+
 static void checkCmdArg(const char * name)
 {
         if (cmdArg.IsTestAACWithoutAdts)
@@ -761,7 +808,7 @@ static void * second_test(void * opaque) {
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
-        int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
@@ -795,7 +842,7 @@ static void * second_file_test(void * opaque) {
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
-        int ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
@@ -819,8 +866,12 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
         flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
-        flag_bool(&cmdArg.IsJustTestSyncUploadPicture, "jpicsync", "just test upload picture");
-        flag_bool(&cmdArg.IsJustTestAsyncUploadPicture, "jpicasync", "just test upload picture");
+        flag_bool(&cmdArg.IsJustTestSyncUploadPicture, "jpicsync", "just test upload picture with sync mode");
+        flag_bool(&cmdArg.IsJustTestAsyncUploadPicture, "jpicasync", "just test upload picture with async mode");
+        flag_bool(&cmdArg.IsWithPicUpload, "withpic", "with picture upload start");
+        flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
+        
+        
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
@@ -873,10 +924,10 @@ int main(int argc, const char** argv)
         
         if (cmdArg.IsJustTestSyncUploadPicture) {
                 justTestSyncUploadPicture(cmdArg.pTokenUrl);
-                return;
+                return 0;
         }else if (cmdArg.IsJustTestAsyncUploadPicture) {
                 justTestAsyncUploadPicture(cmdArg.pTokenUrl);
-                return;
+                return 0;
         }
 
         char *pVFile = NULL;
@@ -987,7 +1038,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
-        ret = LinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return ret;

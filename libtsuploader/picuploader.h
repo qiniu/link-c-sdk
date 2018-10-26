@@ -23,6 +23,12 @@ typedef struct {
         LinkGetPictureCallback getPicCallback;
         void *pGetPicCallbackOpaque;
         LinkGetPictureFreeCallback getPictureFreeCallback;
+}LinkPicUploadArg;
+
+typedef struct {
+        LinkGetPictureCallback getPicCallback;
+        void *pGetPicCallbackOpaque;
+        LinkGetPictureFreeCallback getPictureFreeCallback;
         LinkUploadPictureGetTokenCallback getTokenCallback;
         void *pGetTokenCallbackOpaque;
 }LinkPicUploadFullArg;

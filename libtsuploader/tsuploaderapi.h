@@ -8,6 +8,8 @@
 int LinkInitUploader();
 
 int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg, IN LinkUserUploadArg *pUserUploadArg);
+int LinkCreateAndStartAVUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg,
+                                                    IN LinkUserUploadArg *pUserUploadArg, IN LinkPicUploadArg *pPicArg);
 int LinkSetUpdateTokenCallback();//TODO
 int LinkSetSnapshotCallback();//TODO
 void LinkSetuploadZone(LinkUploadZone zone);

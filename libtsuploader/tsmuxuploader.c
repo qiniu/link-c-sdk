@@ -66,6 +66,7 @@ typedef struct _FFTsMuxUploader{
         char deviceId_[65];
         Token token_;
         LinkUploadArg uploadArg;
+        PictureUploader *pPicUploader;
 }FFTsMuxUploader;
 
 static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -312,6 +313,10 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int ret = 0;
+        if (nIsKeyFrame && pFFTsMuxUploader->pPicUploader != NULL) {
+                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
+                                                          strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), _nTimestamp);
+        }
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -767,6 +772,39 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         return LINK_SUCCESS;
 }
 
+static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
+        memcpy(pBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+        return LINK_SUCCESS;
+}
+
+int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
+                                            LinkUserUploadArg *_pUserUploadArg, LinkPicUploadArg *_pPicArg) {
+        
+        //LinkTsMuxUploader *pTsMuxUploader
+        int ret = LinkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
+        if (ret != LINK_SUCCESS) {
+                return ret;
+        }
+        
+        LinkPicUploadFullArg fullArg;
+        fullArg.getPicCallback = _pPicArg->getPicCallback;
+        fullArg.pGetPicCallbackOpaque = _pPicArg->pGetPicCallbackOpaque;
+        fullArg.getPictureFreeCallback = _pPicArg->getPictureFreeCallback;
+        fullArg.getTokenCallback = getTokenCallback;
+        fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
+        PictureUploader *pPicUploader;
+        ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
+        if (ret != LINK_SUCCESS) {
+                LinkDestroyTsMuxUploader(_pTsMuxUploader);
+                LinkLogError("LinkNewPictureUploader fail:%d", ret);
+                return ret;
+        }
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
+        pFFTsMuxUploader->pPicUploader = pPicUploader;
+        return ret;
+}
+
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
@@ -787,6 +825,8 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(*_pTsMuxUploader);
+        
+        LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->pTsMuxCtx) {
