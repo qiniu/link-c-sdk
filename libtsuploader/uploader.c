@@ -431,11 +431,21 @@ static int streamPushData(LinkTsUploader *pTsUploader, char * pData, int nDataLe
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
         int ret = pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
-        if (pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
+        if (pKodoUploader->pQueue_->GetType(pKodoUploader->pQueue_) != TSQ_APPEND && pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
                 pKodoUploader->nWaitFirstMutexLocked_ = WF_FIRST;
                 pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
         }
         return ret;
+}
+
+static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
+        KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
+        if (pKodoUploader->nWaitFirstMutexLocked_ == WF_LOCKED)
+                pKodoUploader->nWaitFirstMutexLocked_ = WF_FIRST;
+        
+        pthread_mutex_unlock(&pKodoUploader->waitFirstMutex_);
+        
+        return;
 }
 
 #else
@@ -535,6 +545,7 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         pKodoUploader->uploader.UploadStart = streamUploadStart;
         pKodoUploader->uploader.UploadStop = streamUploadStop;
         pKodoUploader->uploader.Push = streamPushData;
+        pKodoUploader->uploader.NotifyDataPrapared = notifyDataPrapared;
 #else
         pKodoUploader->uploader.UploadStart = memUploadStart;
         pKodoUploader->uploader.UploadStop = memUploadStop;

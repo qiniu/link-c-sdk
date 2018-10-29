@@ -26,6 +26,7 @@ typedef struct _LinkTsUploader{
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
         LinkUploadState (*GetUploaderState)(LinkTsUploader *pTsUploader);
+        void (*NotifyDataPrapared)(LinkTsUploader *pTsUploader);
         int(*Push)(LinkTsUploader *pTsUploader, char * pData, int nDataLen);
         void (*GetStatInfo)(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *pStatInfo);
         void (*RecordTimestamp)(LinkTsUploader *pTsUploader, int64_t nTimestamp);

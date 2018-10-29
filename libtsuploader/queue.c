@@ -262,6 +262,11 @@ static void getStatInfo(LinkCircleQueue *_pQueue, LinkUploaderStatInfo *_pStatIn
         return;
 }
 
+enum CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        return pQueueImp->policy;
+}
+
 int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         int ret;
@@ -293,6 +298,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->circleQueue.GetStatInfo = getStatInfo;
         pQueueImp->nLenInByte_ = pQueueImp->nItemLen_ * _nInitItemCount;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
+        pQueueImp->circleQueue.GetType = getQueueType;
         
         if (TSQ_APPEND == _policy) {
                 pQueueImp->nCap_ = pQueueImp->nLenInByte_;

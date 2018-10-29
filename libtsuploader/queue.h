@@ -35,6 +35,7 @@ typedef struct _LinkCircleQueue{
         LinkCircleQueuePopWithNoOverwrite PopWithNoOverwrite;
         LinkCircleQueueStopPush StopPush;
         void (*GetStatInfo)(LinkCircleQueue *pQueue, LinkUploaderStatInfo *pStatInfo);
+        enum CircleQueuePolicy (*GetType)(LinkCircleQueue *pQueue);
 }LinkCircleQueue;
 
 int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout,  enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
