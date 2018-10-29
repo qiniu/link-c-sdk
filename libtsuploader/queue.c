@@ -22,6 +22,28 @@ typedef struct _CircleQueueImp{
 	int nIsAvailableAfterTimeout;
 }CircleQueueImp;
 
+static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen) {
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
+        if (nDataLen + pQueueImp->nLen_  < pQueueImp->nCap_) {
+                int newLen = pQueueImp->nCap_ * 3 / 2;
+                char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * newLen);
+                if (pTmp == NULL) {
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        return LINK_NO_MEMORY;
+                }
+                
+                memcpy(pTmp, pQueueImp->pData_, pQueueImp->nLen_);
+                free(pQueueImp->pData_);
+                pQueueImp->pData_ = pTmp;
+                pQueueImp->nCap_ = newLen;
+        }
+        
+        memcpy(pQueueImp->pData_ + pQueueImp->nLen_, pData_, nDataLen);
+        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
+        pQueueImp->nLen_ += nDataLen;
+        return nDataLen;
+}
+
 static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
@@ -40,6 +62,15 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                 LinkLogWarn("queue is only readable now");
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return LINK_NO_PUSH;
+        }
+        
+        if (pQueueImp->policy == TSQ_APPEND) {
+                int ret = queueAppendPush(_pQueue, pData_, nDataLen);
+                
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                if (ret > 0)
+                        pthread_cond_signal(&pQueueImp->condition_);
+                return ret;
         }
         
         int nPos = pQueueImp->nEnd_;
@@ -263,7 +294,25 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->nLenInByte_ = pQueueImp->nItemLen_ * _nInitItemCount;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
         
+        if (TSQ_APPEND == _policy) {
+                pQueueImp->nCap_ = pQueueImp->nLenInByte_;
+        }
+        
         *_pQueue = (LinkCircleQueue*)pQueueImp;
+        return LINK_SUCCESS;
+}
+
+int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)pQueue;
+        if (pQueueImp->policy != TSQ_APPEND) {
+                return LINK_Q_WRONGSTATE;
+        }
+
+        pthread_mutex_lock(&pQueueImp->mutex_);
+        *pBuf = pQueueImp->pData_;
+        *nBufLen = pQueueImp->nLen_;
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+
         return LINK_SUCCESS;
 }
 
