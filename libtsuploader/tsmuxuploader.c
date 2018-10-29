@@ -53,7 +53,7 @@ typedef struct _FFTsMuxUploader{
         int nAACBufLen;
         FFTsMuxContext *pTsMuxCtx;
         
-        int64_t nLastVideoTimestamp;
+        int64_t nLastTimestamp;
         int64_t nFirstTimestamp; //initial to -1
         int nKeyFrameCount;
         int nFrameCount;
@@ -771,7 +771,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
-        pFFTsMuxUploader->queueType_ = TSQ_FIX_LENGTH;
+        pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
@@ -815,7 +815,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
 
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
-        LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
+        if (pFFTsMuxUploader->pPicUploader)
+                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
                                                   strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), nTimestamp);
 }
 

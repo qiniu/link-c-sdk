@@ -24,7 +24,7 @@ typedef struct _CircleQueueImp{
 
 static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen) {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        if (nDataLen + pQueueImp->nLen_  < pQueueImp->nCap_) {
+        if (nDataLen + pQueueImp->nLen_  > pQueueImp->nCap_) {
                 int newLen = pQueueImp->nCap_ * 3 / 2;
                 char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * newLen);
                 if (pTmp == NULL) {
@@ -319,7 +319,7 @@ int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
         *nBufLen = pQueueImp->nLen_;
         pthread_mutex_unlock(&pQueueImp->mutex_);
 
-        return LINK_SUCCESS;
+        return pQueueImp->nLen_;
 }
 
 void LinkDestroyQueue(LinkCircleQueue **_pQueue)
