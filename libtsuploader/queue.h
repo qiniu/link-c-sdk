@@ -8,7 +8,8 @@
 
 enum CircleQueuePolicy{
         TSQ_FIX_LENGTH,
-        TSQ_VAR_LENGTH
+        TSQ_VAR_LENGTH，
+        TSQ_APPEND
 };
 
 typedef struct _LinkCircleQueue LinkCircleQueue;

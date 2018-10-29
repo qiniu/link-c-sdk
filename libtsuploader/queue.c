@@ -10,6 +10,7 @@ typedef struct _CircleQueueImp{
         char *pData_;
         int nCap_;
         int nLen_;
+        int nLenInByte_;
         int nStart_;
         int nEnd_;
         volatile int nQState_;
@@ -74,35 +75,44 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                         pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                         pQueueImp->statInfo.nOverwriteCnt++;
                         return LINK_Q_OVERWRIT;
-                } else{
-                        char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * pQueueImp->nCap_ * 2);
+                } else {
+                        //TODO TSQ_VAR_LENGTH not used now. so there is may have bug
+                        int newLen = pQueueImp->nCap_ * 3 / 2;
+                        char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * newLen);
                         int nOriginCap = pQueueImp->nCap_;
                         if (pTmp == NULL) {
                                 pthread_mutex_unlock(&pQueueImp->mutex_);
-                                return -1;
+                                return LINK_NO_MEMORY;
                         }
-                        pQueueImp->nCap_ *= 2;
-                        //TODO
+                        
+                        
+                        if (pQueueImp->nStart_ == 0) {
+                                memcpy(pTmp, pQueueImp->pData_, pQueueImp->nLenInByte_);
+                        } else {
+                                memcpy(pTmp, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_,
+                                       pQueueImp->nLenInByte_ - pQueueImp->nStart_ * pQueueImp->nItemLen_);
+                                memcpy(pTmp + pQueueImp->nLenInByte_ - pQueueImp->nStart_ * pQueueImp->nItemLen_,
+                                       pQueueImp->pData_, pQueueImp->nEnd_ * pQueueImp->nItemLen_);
+                        }
+                        pQueueImp->nStart_ = 0;
+                        
+                        memcpy(pTmp + pQueueImp->nLenInByte_, &nDataLen, sizeof(int));
+                        memcpy(pTmp + pQueueImp->nLenInByte_+ sizeof(int), pData_, nDataLen);
+                        
+                        pQueueImp->nEnd_ = nOriginCap + 1;
+                        pQueueImp->nLen_++;
+                        
+                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
+                        
+                        pQueueImp->nCap_ = newLen;
                         free(pQueueImp->pData_);
                         pQueueImp->pData_ = pTmp;
+                        pQueueImp->nLenInByte_ = newLen * pQueueImp->nItemLen_;
                         
-                        
-                        memcpy(pTmp,
-                               pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_,
-                               (nOriginCap - pQueueImp->nStart_) * pQueueImp->nItemLen_);
-                        memcpy(pTmp + (nOriginCap - pQueueImp->nStart_) * pQueueImp->nItemLen_,
-                               pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nItemLen_,
-                               pQueueImp->nEnd_ * pQueueImp->nItemLen_);
-                        pQueueImp->nStart_ = 0;
-                        pQueueImp->nEnd_ = nOriginCap + 1;
-                        memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_, &nDataLen, sizeof(int));
-                        memcpy(pTmp + nOriginCap * pQueueImp->nItemLen_ + sizeof(int), pData_, nDataLen);
-                        
-                        pQueueImp->nLen_++;
                         pthread_mutex_unlock(&pQueueImp->mutex_);
+                        
                         pthread_cond_signal(&pQueueImp->condition_);
 
-                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                         return nDataLen;
                 }
         }
@@ -250,6 +260,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->circleQueue.PopWithNoOverwrite = PopQueueWithNoOverwrite;
         pQueueImp->circleQueue.StopPush = StopPush;
         pQueueImp->circleQueue.GetStatInfo = getStatInfo;
+        pQueueImp->nLenInByte_ = pQueueImp->nItemLen_ * _nInitItemCount;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
         
         *_pQueue = (LinkCircleQueue*)pQueueImp;
