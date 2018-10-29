@@ -272,7 +272,14 @@ static void * streamUpload(void *_pOpaque)
         }
         
         int64_t curTime = LinkGetCurrentNanosecond();
-        // ts/uid/ua_id/yyyy/mm/dd/hh/mm/ss/mmm/fragment_start_ts/expiry.ts
+        
+        
+        enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
+        int64_t tsDuration = pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp;
+        if (qtype == TSQ_APPEND) {
+                curTime = curTime - tsDuration*1000000;
+                //LinkLogDebug("-------->curtime:%lld", curTime/1000000);
+        }
         
         if (pUploader->uploadArg.nSegmentId_ == 0) {
                 pUploader->uploadArg.nSegmentId_ = curTime;
@@ -294,16 +301,14 @@ static void * streamUpload(void *_pOpaque)
 #ifdef LINK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
         client.xferinfoCb = timeoutCallback;
-        if (pUploader->pQueue_->GetType(pUploader->pQueue_) == TSQ_APPEND) {
+        if (qtype == TSQ_APPEND) {
                 int r, l;
                 char *bufData;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
-                        //TODO duration
-                        int64_t d = pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp;
                         //ts/uaid/startts/endts/segment_start_ts/expiry.ts
                         sprintf(key, "ts/%s/%lld/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
-                                curTime / 1000000 - d,curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
+                                curTime / 1000000, curTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
                         error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, l, &putExtra);
                 } else {
