@@ -67,6 +67,7 @@ typedef struct _FFTsMuxUploader{
         Token token_;
         LinkUploadArg uploadArg;
         PictureUploader *pPicUploader;
+        enum CircleQueuePolicy queueType_;
 }FFTsMuxUploader;
 
 static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -113,6 +114,8 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 #ifndef USE_OWN_TSMUX
                         av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
 #endif
+                        if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
+                                _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
                         LinkLogError("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
                         LinkPushFunction(_pFFTsMuxUploader->pTsMuxCtx);
                         _pFFTsMuxUploader->pTsMuxCtx = NULL;
@@ -482,7 +485,8 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
         }
 }
 
-static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkUploadArg *_pUploadArg, int nQBufSize)
+static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkUploadArg *_pUploadArg,
+                           int nQBufSize, enum CircleQueuePolicy queueType)
 #ifdef USE_OWN_TSMUX
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
@@ -491,7 +495,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
-        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, TSQ_FIX_LENGTH, 188, nQBufSize / 188);
+        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, 188, nQBufSize / 188);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -527,7 +531,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
         int nBufsize = getBufferSize();
-        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, TSQ_FIX_LENGTH, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
+        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -767,6 +771,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
+        pFFTsMuxUploader->queueType_ = TSQ_FIX_LENGTH;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
@@ -821,7 +826,8 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         assert(pFFTsMuxUploader->pTsMuxCtx == NULL);
         
         int nBufsize = getBufferSize(pFFTsMuxUploader);
-        int ret = newTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg, &pFFTsMuxUploader->uploadArg, nBufsize);
+        int ret = newTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg,
+                                  &pFFTsMuxUploader->uploadArg, nBufsize, pFFTsMuxUploader->queueType_);
         if (ret != 0) {
                 free(pFFTsMuxUploader);
                 return ret;
