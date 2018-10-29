@@ -285,20 +285,40 @@ static void * streamUpload(void *_pOpaque)
         
         int nDeleteAfterDays_ = getExpireDays(uptoken);
         memset(key, 0, sizeof(key));
-        //ts/uaid/startts/fragment_start_ts/expiry.ts
-        sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
-                curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
-        LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
+        
         
         if (pUploader->tsStartUploadCallback) {
                 pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, curTime / 1000000);
         }
+        Qiniu_Error error;
 #ifdef LINK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
         client.xferinfoCb = timeoutCallback;
-        Qiniu_Error error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
+        if (pUploader->pQueue_->GetType(pUploader->pQueue_) == TSQ_APPEND) {
+                int r, l;
+                char *bufData;
+                r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
+                if (r > 0) {
+                        //TODO duration
+                        int64_t d = pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp;
+                        //ts/uaid/startts/endts/segment_start_ts/expiry.ts
+                        sprintf(key, "ts/%s/%lld/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
+                                curTime / 1000000 - d,curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
+                        LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
+                        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, l, &putExtra);
+                } else {
+                        LinkLogError("LinkGetQueueBuffer get no data:%d", r);
+                        goto END;
+                }
+        }else {
+                //ts/uaid/startts/fragment_start_ts/expiry.ts
+                sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
+                        curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
+                LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
+                error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
+        }
 #else
-        Qiniu_Error error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
+        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
                                                pUploader->nTsDataLen, &putExtra);
 #endif
         
