@@ -41,6 +41,7 @@ typedef struct _KodoUploader{
         
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
+        int64_t nTsStartTimestamp;
         LinkUploadState state;
         
         int64_t getDataBytes;
@@ -271,22 +272,18 @@ static void * streamUpload(void *_pOpaque)
                 goto END;
         }
         
-        int64_t curTime = LinkGetCurrentNanosecond();
+        int64_t tsStartTime = pUploader->nTsStartTimestamp;
         
         
         enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
         int64_t tsDuration = pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp;
-        if (qtype == TSQ_APPEND) {
-                curTime = curTime - tsDuration*1000000;
-                //LinkLogDebug("-------->curtime:%lld", curTime/1000000);
-        }
         
         if (pUploader->uploadArg.nSegmentId_ == 0) {
-                pUploader->uploadArg.nSegmentId_ = curTime;
+                pUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
-        pUploader->uploadArg.nLastUploadTsTime_ = curTime;
+        pUploader->uploadArg.nLastUploadTsTime_ = tsStartTime;
         if (pUploader->uploadArg.UploadArgUpadate) {
-                pUploader->uploadArg.UploadArgUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, curTime);
+                pUploader->uploadArg.UploadArgUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime);
         }
         uint64_t nSegmentId = pUploader->uploadArg.nSegmentId_;
         
@@ -295,7 +292,7 @@ static void * streamUpload(void *_pOpaque)
         
         
         if (pUploader->tsStartUploadCallback) {
-                pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, curTime / 1000000);
+                pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, tsStartTime / 1000000);
         }
         Qiniu_Error error;
 #ifdef LINK_STREAM_UPLOAD
@@ -308,7 +305,7 @@ static void * streamUpload(void *_pOpaque)
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry.ts
                         sprintf(key, "ts/%s/%lld/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
-                                curTime / 1000000, curTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
                         error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, l, &putExtra);
                 } else {
@@ -318,7 +315,7 @@ static void * streamUpload(void *_pOpaque)
         }else {
                 //ts/uaid/startts/fragment_start_ts/expiry.ts
                 sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
-                        curTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
+                        tsStartTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
                 LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
                 error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
         }
@@ -525,6 +522,7 @@ void recordTimestamp(LinkTsUploader *_pTsUploader, int64_t _nTimestamp)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         if (pKodoUploader->nFirstFrameTimestamp == -1) {
+                pKodoUploader->nTsStartTimestamp = LinkGetCurrentNanosecond();
                 pKodoUploader->nFirstFrameTimestamp = _nTimestamp;
                 pKodoUploader->nLastFrameTimestamp = _nTimestamp;
         }
