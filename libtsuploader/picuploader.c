@@ -65,6 +65,7 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *
         pSig->signalType_ = LinkPicUploadSignalUpload;
         pSig->pData = pBuf;
         pSig->nDataLen = nBuflen;
+        pSig->upType_ = type;
         int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
         free(pSig);
         return ret;
