@@ -51,6 +51,8 @@ add_library(tsuploader STATIC
     picuploader.h
     picuploader.c
     localkey.h
+    segmentmgr.c
+    segmentmgr.h
 )
 
 add_subdirectory(c-sdk)

@@ -77,6 +77,7 @@ typedef struct _LinkMediaArg{
 #define LINK_WRITE_TS_ERR    -2401
 #define LINK_Q_OVERWRIT      -5001
 #define LINK_Q_WRONGSTATE    -5002
+#define LINK_MAX_SEG         -5103
 #define LINK_SUCCESS         0
 
 
