@@ -42,4 +42,4 @@ endif()
 
 add_subdirectory(third_party)
 add_subdirectory(libtsuploader)
-add_subdirectory(demo)
+add_subdirectory(tests)

@@ -2,3 +2,6 @@ build
 *.o
 *.lo
 third_party/curl-7.61.1
+build-linux
+third_party/curl
+third_party/wolfssl/
