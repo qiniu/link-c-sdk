@@ -839,6 +839,19 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         return LINK_SUCCESS;
 }
 
+void LinkNotiryNomoreData(IN LinkTsMuxUploader *_pTsMuxUploader) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
+        if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
+                return;
+        }
+        
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->pTsMuxCtx)
+                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        return;
+}
+
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(*_pTsMuxUploader);
