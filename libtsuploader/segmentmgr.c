@@ -73,6 +73,8 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
                 pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
         }
         memcpy(pToken->pData, pTokenStart, nTokenLen);
+        pToken->pToken = pToken->pData;
+        pToken->nTokenLen = nTokenLen;
         pToken->pToken[nTokenLen] = 0;
         
         //bucket
@@ -95,31 +97,31 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
                 pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
         }
         memcpy(pToken->pData + nTokenLen + 1, pUrlStart, nUrlLen);
-        pToken->pToken[nTokenLen + nUrlLen + 1] = 0;
-        
-        pToken->pToken = pTokenStart;
-        pToken->nTokenLen = nTokenLen;
-        pToken->pUrlPath = pUrlStart;
+        pToken->pUrlPath = pToken->pData + nTokenLen + 1;
         pToken->nUrlPathLen = nUrlLen;
+        pToken->pToken[nTokenLen + nUrlLen + 1] = 0;
         
         return size * nmemb;
 }
 
-int getMoveToken(char *pBuf, int nBufLen, char *pUrl, struct MgrToken *pToken)
+int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *pBody, struct MgrToken *pToken)
 {
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
-        memset(pBuf, 0, nBufLen);
+
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeMoveToken);
         curl_easy_setopt(curl, CURLOPT_URL, pUrl);
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, pBody);
         
         pToken->pData = pBuf;
         pToken->nDataLen = nBufLen;
         pToken->nCurlRet = 0;
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, pToken);
+        //memset(pBuf, 0, nBufLen);
         int ret =curl_easy_perform(curl);
         if (ret != 0) {
                 curl_easy_cleanup(curl);
@@ -140,6 +142,8 @@ static int doMove(const char *pUrl, const char *pToken) {
         snprintf(authHeader, sizeof(authHeader), "Authorization: QBox %s", pToken);
         headers = curl_slist_append(headers, authHeader);
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
+        curl_easy_setopt(curl, CURLOPT_URL, pUrl);
 
         int ret =curl_easy_perform(curl);
         if (ret != 0) {
@@ -154,7 +158,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
         int i, idx = -1;
-        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(SegmentHandle); i++) {
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == segInfo.handle) {
                         idx = i;
                         break;
@@ -187,16 +191,19 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 isNewSeg = 0;
         }
         
-        char uptoken[1536];
+        char uptoken[1536] = {0};
         
-        if(isNewSeg) {
+        if(!isNewSeg) {
                 struct MgrToken mgrToken;
+                int nUrlLen = 0;
+                nUrlLen = sprintf(uptoken, "%s", segmentMgr.handles[idx].mgrTokenRequestUrl);
+                uptoken[nUrlLen] = 0;
                 if (segmentMgr.handles[idx].useHttps) {
-                        sprintf(uptoken, "%s?src=%s&dest=%s&security=true", segmentMgr.handles[idx].mgrTokenRequestUrl, oldKey, key);
+                        sprintf(uptoken + nUrlLen + 1, "{\"src\":\"%s\",\"dest\":\"%s\",\"security\":true}", oldKey, key);
                 } else {
-                        sprintf(uptoken, "%s?src=%s&dest=%s&security=false", segmentMgr.handles[idx].mgrTokenRequestUrl, oldKey, key);
+                        sprintf(uptoken + nUrlLen + 1, "{\"src\":\"%s\",\"dest\":\"%s\",\"security\":false}", oldKey, key);
                 }
-                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, &mgrToken);
+                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, uptoken + nUrlLen + 1, &mgrToken);
                 if (ret != 0 || mgrToken.nCurlRet != 0) {
                         LinkLogError("getMoveToken fail:%d", ret, mgrToken.nCurlRet);
                         return;
@@ -264,7 +271,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
 #endif
         
         Qiniu_Error error;
-        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, NULL, 0, &putExtra);
+        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, &putExtra);
 
         
 #ifdef __ARM
@@ -315,7 +322,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
-                        LinkLogInfo("pop segment info:%p %lld %lld\n", segInfo.handle, segInfo.nStart, segInfo.nEnd);
+                        LinkLogInfo("pop segment info:%d %lld %lld\n", segInfo.handle, segInfo.nStart, segInfo.nEnd);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
@@ -334,7 +341,7 @@ int LinkInitSegmentMgr() {
                 return LINK_SUCCESS;
         }
         int i = 0;
-        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(SegmentHandle); i++) {
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 segmentMgr.handles[i].handle = -1;
         }
         
@@ -357,7 +364,7 @@ int LinkInitSegmentMgr() {
 
 int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
         int i = 0;
-        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(SegmentHandle); i++) {
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == -1) {
                         *pSeg = i;
                         segmentMgr.handles[i].handle  = i;
