@@ -5,6 +5,7 @@ project(testupload)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
 message( "line-8 HOST is " ${HOST} )
+message( "line-8 HOST is " ${CFLAGS} )
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/output/${HOST}/lib")
 
 
@@ -31,6 +32,7 @@ add_executable(testupload
     flag.h
     flag.c
     testpic.c
+    testseg.c
 )
 
 if(APPLE)

@@ -57,6 +57,9 @@ typedef struct {
         bool IsJustTestAsyncUploadPicture;
         bool IsWithPicUpload;
         bool IsPicUploadSyncMode;
+        
+        bool IsJustTestSegment;
+        const char *pMgrToken;
 }CmdArg;
 
 typedef struct {
@@ -871,6 +874,8 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsJustTestAsyncUploadPicture, "jpicasync", "just test upload picture with async mode");
         flag_bool(&cmdArg.IsWithPicUpload, "withpic", "with picture upload start");
         flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
+        flag_bool(&cmdArg.IsJustTestSegment, "jseg", "just test segment manager");
+        flag_str(&cmdArg.pMgrToken, "mgrtoken", "where to get move token");
         
         
 #ifdef TEST_WITH_FFMPEG
@@ -928,6 +933,13 @@ int main(int argc, const char** argv)
                 return 0;
         }else if (cmdArg.IsJustTestAsyncUploadPicture) {
                 justTestAsyncUploadPicture(cmdArg.pTokenUrl);
+                return 0;
+        } else if (cmdArg.IsJustTestSegment) {
+                if (cmdArg.pMgrToken == NULL) {
+                        printf("IsJustTestSegment need to set mgrtoken\n");
+                        return -1;
+                }
+                JustTestSegmentMgr(cmdArg.pTokenUrl, cmdArg.pMgrToken);
                 return 0;
         }
 
