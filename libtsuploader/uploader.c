@@ -283,8 +283,9 @@ static void * streamUpload(void *_pOpaque)
                 pUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
         pUploader->uploadArg.nLastUploadTsTime_ = tsStartTime;
-        if (pUploader->uploadArg.UploadArgUpadate) {
-                pUploader->uploadArg.UploadArgUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime);
+        if (pUploader->uploadArg.UploadSegmentIdUpadate) {
+                pUploader->uploadArg.UploadSegmentIdUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime,
+                                                            tsStartTime + tsDuration * 1000000);
         }
         uint64_t nSegmentId = pUploader->uploadArg.nSegmentId_;
         

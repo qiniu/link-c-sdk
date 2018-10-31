@@ -679,15 +679,19 @@ static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTok
         return LINK_SUCCESS;
 }
 
-static void upadateUploadArg(void *_pOpaque, void* pArg, int64_t nNow)
+static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkUploadArg *_pUploadArg = (LinkUploadArg *)pArg;
+
+        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
+        
         if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
                 pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
                 return;
         }
+
         int64_t nDiff = pFFTsMuxUploader->nNewSegmentInterval * 1000000000LL;
         if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
@@ -756,7 +760,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
         
         pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-        pFFTsMuxUploader->uploadArg.UploadArgUpadate = upadateUploadArg;
+        pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;

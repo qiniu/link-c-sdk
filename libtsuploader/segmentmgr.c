@@ -215,7 +215,9 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 
                 ret = doMove(mgrToken.pUrlPath, mgrToken.pToken);
                 if (ret != 0) {
-                        LinkLogError("doMove fail:%d", ret);
+                        LinkLogError("move %s to %s fail", oldKey, key);
+                } else {
+                        LinkLogDebug("move %s to %s success", oldKey, key);
                 }
                 return;
         }
@@ -283,27 +285,27 @@ static void upadateSegmentFile(SegInfo segInfo) {
 #endif
         if (error.code != 200) {
                 if (error.code == 401) {
-                        LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
+                        LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
                         char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
                         if (pMsg) {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
+                                LinkLogError("upload segment :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
                         }else {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code,
+                                LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code,
                                              pFullErrMsg);
                         }
                 } else {
                         const char *pCurlErrMsg = curl_easy_strerror(error.code);
                         if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
                         } else {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
                         }
                 }
         } else {
-                LinkLogDebug("upload picture key:%s success", key);
+                LinkLogDebug("upload segment key:%s success", key);
         }
         
         Qiniu_Client_Cleanup(&client);
