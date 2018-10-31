@@ -109,6 +109,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *pBody, struct MgrTok
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
 
+        //printf("=======>url:%s\n", pUrl);
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
@@ -135,6 +136,8 @@ static int doMove(const char *pUrl, const char *pToken) {
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
+        
+        //printf("------->url:%s\n------->token:%s\n", pUrl, pToken);
         
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
@@ -373,9 +376,11 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                         memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
                         
                         segmentMgr.handles[*pSeg].useHttps = pArg->useHttps;
-                        segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen;
+                        
                         memcpy(segmentMgr.handles[*pSeg].mgrTokenRequestUrl, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
-                        segmentMgr.handles[*pSeg].mgrTokenRequestUrl[pArg->nMgrTokenRequestUrlLen] = 0;
+                        sprintf(segmentMgr.handles[*pSeg].mgrTokenRequestUrl + pArg->nMgrTokenRequestUrlLen, "/%s", segmentMgr.handles[i].ua);
+                        segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen + pArg->nDeviceIdLen + 1;
+                        segmentMgr.handles[*pSeg].mgrTokenRequestUrl[segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen] = 0;
                         
                         return LINK_SUCCESS;
                 }

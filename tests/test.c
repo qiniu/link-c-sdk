@@ -690,7 +690,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
                 ret = LinkCreateAndStartAVUploaderWithPictureUploader(_pTsMuxUploader, _pAvArg,
-                                                                      _pUserUploadArg, &picArg);
+                                                                      _pUserUploadArg, &picArg, NULL); //TODO
         }
         return ret;
 }
