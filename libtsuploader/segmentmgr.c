@@ -11,7 +11,8 @@ typedef struct {
         int64_t nStart;
         int64_t nEnd;
         SegmentHandle handle;
-        int isRestart;
+        uint8_t isRestart;
+        uint8_t isReleaseHandle;
 }SegInfo;
 
 typedef struct {
@@ -310,6 +311,20 @@ static void upadateSegmentFile(SegInfo segInfo) {
         return;
 }
 
+static void linkReleaseSegmentHandle(SegmentHandle seg) {
+        if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
+                segmentMgr.handles[seg].handle = -1;
+                segmentMgr.handles[seg].nStart = 0;
+                segmentMgr.handles[seg].nEnd = 0;
+                segmentMgr.handles[seg].isRestart = 0;
+                segmentMgr.handles[seg].getTokenCallback = NULL;
+                segmentMgr.handles[seg].pGetTokenCallbackArg = NULL;
+                segmentMgr.handles[seg].useHttps = 0;
+                segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
+                segmentMgr.handles[seg].mgrTokenRequestUrl[0] = 0;
+        }
+}
+
 static void * segmetMgrRun(void *_pOpaque) {
         
         LinkUploaderStatInfo info = {0};
@@ -329,7 +344,11 @@ static void * segmetMgrRun(void *_pOpaque) {
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
-                                upadateSegmentFile(segInfo);
+                                if (segInfo.isReleaseHandle) {
+                                        linkReleaseSegmentHandle(segInfo.handle);
+                                } else {
+                                        upadateSegmentFile(segInfo);
+                                }
                         }
                 }
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
@@ -351,6 +370,7 @@ int LinkInitSegmentMgr() {
         LinkCircleQueue *pQueue;
         int ret = LinkNewCircleQueue(&pQueue, 0, TSQ_FIX_LENGTH, sizeof(SegInfo), 256);
         if (ret != LINK_SUCCESS) {
+                pthread_mutex_unlock(&segMgrMutex);
                 return ret;
         }
         segmentMgr.pSegQueue_ = pQueue;
@@ -358,14 +378,18 @@ int LinkInitSegmentMgr() {
         ret = pthread_create(&segmentMgr.segMgrThread_, NULL, segmetMgrRun, NULL);
         if (ret != 0) {
                 LinkDestroyQueue(&pQueue);
+                pthread_mutex_unlock(&segMgrMutex);
                 return LINK_THREAD_ERROR;
         }
-        
+        segMgrStarted = 1;
         pthread_mutex_unlock(&segMgrMutex);
         return LINK_SUCCESS;
 }
 
 int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
+        if (!segMgrStarted) {
+                return LINK_NOT_INITED;
+        }
         int i = 0;
         for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == -1) {
@@ -389,18 +413,18 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
 }
 
 void LinkReleaseSegmentHandle(SegmentHandle *pSeg) {
-        if (*pSeg >= 0 && *pSeg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
-                segmentMgr.handles[*pSeg].handle = -1;
-                segmentMgr.handles[*pSeg].nStart = 0;
-                segmentMgr.handles[*pSeg].nEnd = 0;
-                segmentMgr.handles[*pSeg].isRestart = 0;
-                segmentMgr.handles[*pSeg].getTokenCallback = NULL;
-                segmentMgr.handles[*pSeg].pGetTokenCallbackArg = NULL;
-                segmentMgr.handles[*pSeg].useHttps = 0;
-                segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = 0;
-                segmentMgr.handles[*pSeg].mgrTokenRequestUrl[0] = 0;
-                *pSeg = -1;
+        if (*pSeg < 0 || !segMgrStarted) {
+                return;
         }
+        SegInfo segInfo;
+        segInfo.handle = *pSeg;
+        segInfo.nStart = 0;
+        segInfo.nEnd = 0;
+        segInfo.isRestart = 0;
+        segInfo.isReleaseHandle = 1;
+        *pSeg = -1;
+        
+        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
 int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRestart) {
@@ -409,12 +433,19 @@ int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRes
         segInfo.nStart = nStart;
         segInfo.nEnd = nEnd;
         segInfo.isRestart = isRestart;
+        segInfo.isReleaseHandle = 0;
         
         return segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
 void LinkUninitSegmentMgr() {
+        pthread_mutex_lock(&segMgrMutex);
+        if (!segMgrStarted) {
+                pthread_mutex_unlock(&segMgrMutex);
+                return;
+        }
         segmentMgr.nQuit_ = 1;
-        pthread_join(&segmentMgr.segMgrThread_, NULL);
+        pthread_mutex_unlock(&segMgrMutex);
+        pthread_join(segmentMgr.segMgrThread_, NULL);
         return;
 }

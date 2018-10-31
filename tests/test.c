@@ -683,14 +683,23 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         picArg.getPictureFreeCallback = getPictureFreeCallback;
         picArg.pGetPicCallbackOpaque = NULL;
         
+        SegmentUserArg segArg;
+        segArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
+        segArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
+        segArg.useHttps = 0;
+        
         if (!cmdArg.IsWithPicUpload)
                 ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
         else {
+                if (cmdArg.pMgrToken == NULL) {
+                        LinkLogError("mgrtoken is NULL");
+                        exit(8);
+                }
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
                 ret = LinkCreateAndStartAVUploaderWithPictureUploader(_pTsMuxUploader, _pAvArg,
-                                                                      _pUserUploadArg, &picArg, NULL); //TODO
+                                                                      _pUserUploadArg, &picArg, &segArg);
         }
         return ret;
 }

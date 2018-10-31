@@ -286,6 +286,8 @@ static void * uploadPicture(void *_pOpaque) {
 }
 
 void LinkDestroyPictureUploader(PictureUploader **pPicUploader) {
+        if (*pPicUploader == NULL)
+                return;
         LinkPushFunction(*pPicUploader);
         *pPicUploader = NULL;
         return;
