@@ -32,7 +32,6 @@ add_executable(demo-tsupload
     queue.h
     socket_logging.c
     socket_logging.h
-    flag.h
     dev_core.c
     dev_core.h
     stream.c

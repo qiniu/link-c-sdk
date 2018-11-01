@@ -218,7 +218,7 @@ int TsUploaderSdkInit()
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[STREAM_MAIN].devId);
     userUploadArg.nUploaderBufferSize = 512;
 
-    ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg );
+    ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg , NULL );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
@@ -255,7 +255,7 @@ int TsUploaderSdkInit()
         userUploadArg.pDeviceId_ = gIpc.stream[STREAM_SUB].devId;
         userUploadArg.pToken_ = gIpc.stream[STREAM_SUB].token;
         userUploadArg.nTokenLen_ = strlen(gIpc.stream[STREAM_SUB].token);
-        ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg );
+        ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg, NULL );
         if (ret != 0) {
             DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
             return ret;
