@@ -290,7 +290,7 @@ static Qiniu_Error Qiniu_Io_call_with_callback(
 Qiniu_Error Qiniu_Io_PutStream(
         Qiniu_Client *self, Qiniu_Io_PutRet *ret,
         const char *uptoken, const char *key,
-        void *ctx, curl_off_t fsize, rdFunc rdr,
+        void *ctx, int64_t fsize, rdFunc rdr,
         Qiniu_Io_PutExtra *extra) {
     Qiniu_Io_form form;
     Qiniu_Io_form_init(&form, uptoken, key, &extra);
