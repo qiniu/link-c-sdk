@@ -263,27 +263,29 @@ static void * streamUpload(void *_pOpaque)
         
         char key[128] = {0};
         
+        enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
         // wait for first packet
         if (pUploader->nWaitFirstMutexLocked_ == WF_LOCKED) {
                 pthread_mutex_lock(&pUploader->waitFirstMutex_);
                 pthread_mutex_unlock(&pUploader->waitFirstMutex_);
         }
-        if (pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
+        
+        if (qtype != TSQ_APPEND && pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
                 goto END;
         }
         
         int64_t tsStartTime = pUploader->nTsStartTimestamp;
         
         
-        enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
         int64_t tsDuration = pUploader->nLastFrameTimestamp - pUploader->nFirstFrameTimestamp;
         
         if (pUploader->uploadArg.nSegmentId_ == 0) {
                 pUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
         pUploader->uploadArg.nLastUploadTsTime_ = tsStartTime;
-        if (pUploader->uploadArg.UploadArgUpadate) {
-                pUploader->uploadArg.UploadArgUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime);
+        if (pUploader->uploadArg.UploadSegmentIdUpadate) {
+                pUploader->uploadArg.UploadSegmentIdUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime,
+                                                            tsStartTime + tsDuration * 1000000);
         }
         uint64_t nSegmentId = pUploader->uploadArg.nSegmentId_;
         

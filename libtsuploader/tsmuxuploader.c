@@ -9,6 +9,7 @@
 #include <sys/sysinfo.h>
 #endif
 #include "servertime.h"
+#include "segmentmgr.h"
 
 #ifdef USE_OWN_TSMUX
 #include "tsmux.h"
@@ -67,6 +68,7 @@ typedef struct _FFTsMuxUploader{
         Token token_;
         LinkUploadArg uploadArg;
         PictureUploader *pPicUploader;
+        SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
 }FFTsMuxUploader;
 
@@ -401,6 +403,8 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 #endif
                 FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxCtx->pTsMuxUploader);
                 if (pFFTsMuxUploader) {
+                        LinkReleaseSegmentHandle(&pFFTsMuxUploader->segmentHandle);
+                        LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
                         if (pFFTsMuxUploader->pAACBuf) {
                                 free(pFFTsMuxUploader->pAACBuf);
                         }
@@ -675,15 +679,19 @@ static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTok
         return LINK_SUCCESS;
 }
 
-static void upadateUploadArg(void *_pOpaque, void* pArg, int64_t nNow)
+static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkUploadArg *_pUploadArg = (LinkUploadArg *)pArg;
+
+        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
+        
         if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
                 pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
                 return;
         }
+
         int64_t nDiff = pFFTsMuxUploader->nNewSegmentInterval * 1000000000LL;
         if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
@@ -752,7 +760,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
         
         pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-        pFFTsMuxUploader->uploadArg.UploadArgUpadate = upadateUploadArg;
+        pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
@@ -787,13 +795,38 @@ static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
 }
 
 int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
-                                            LinkUserUploadArg *_pUserUploadArg, LinkPicUploadArg *_pPicArg) {
+                                            LinkUserUploadArg *_pUserUploadArg, LinkPicUploadArg *_pPicArg, SegmentUserArg *_pSegArg) {
         
         //LinkTsMuxUploader *pTsMuxUploader
         int ret = LinkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
+        
+        ret = LinkInitSegmentMgr();
+        if (ret != LINK_SUCCESS) {
+                LinkDestroyTsMuxUploader(_pTsMuxUploader);
+                LinkLogError("LinkInitSegmentMgr fail:%d", ret);
+                return ret;
+        }
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
+        
+        SegmentHandle segHandle;
+        SegmentArg arg;
+        arg.getTokenCallback = getTokenCallback;
+        arg.pGetTokenCallbackArg = *_pTsMuxUploader;
+        arg.pDeviceId = pFFTsMuxUploader->deviceId_;
+        arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
+        arg.pMgrTokenRequestUrl = _pSegArg->pMgrTokenRequestUrl;
+        arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
+        arg.useHttps = _pSegArg->useHttps;
+        ret = LinkNewSegmentHandle(&segHandle, &arg);
+        if (ret != LINK_SUCCESS) {
+                LinkDestroyTsMuxUploader(_pTsMuxUploader);
+                LinkLogError("LinkInitSegmentMgr fail:%d", ret);
+                return ret;
+        }
+        pFFTsMuxUploader->segmentHandle = segHandle;
         
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
@@ -808,7 +841,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 LinkLogError("LinkNewPictureUploader fail:%d", ret);
                 return ret;
         }
-        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
+        
         pFFTsMuxUploader->pPicUploader = pPicUploader;
         return ret;
 }
@@ -855,8 +888,6 @@ void LinkNotiryNomoreData(IN LinkTsMuxUploader *_pTsMuxUploader) {
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(*_pTsMuxUploader);
-        
-        LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->pTsMuxCtx) {

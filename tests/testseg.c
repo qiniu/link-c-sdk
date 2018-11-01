@@ -2,6 +2,7 @@
 #include "segmentmgr.h"
 #include "servertime.h"
 #include <string.h>
+#include <time.h>
 
 static char segStoreToken[1024];
 static int segGetTokenCallback(void *pOpaque, char *pBuf, int nBuflen) {
@@ -40,11 +41,14 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         }
         
         int count = 5;
-        int64_t nStart = 10001000;
-        int64_t nEnd = 10002000;
+        struct timespec tp;
+        
+        clock_gettime(CLOCK_MONOTONIC, &tp);
+        int64_t nStart = tp.tv_sec * 1000;
+        int64_t nEnd = nStart+5320;
         while(count) {
                 LinkUpdateSegment(segHandle, nStart, nEnd, 0);
-                nEnd+=100;
+                nEnd+=5222;
                 count--;
                 sleep(5);
         }

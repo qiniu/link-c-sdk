@@ -11,7 +11,8 @@ typedef struct {
         int64_t nStart;
         int64_t nEnd;
         SegmentHandle handle;
-        int isRestart;
+        uint8_t isRestart;
+        uint8_t isReleaseHandle;
 }SegInfo;
 
 typedef struct {
@@ -109,6 +110,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *pBody, struct MgrTok
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
 
+        //printf("=======>url:%s\n", pUrl);
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
@@ -135,6 +137,8 @@ static int doMove(const char *pUrl, const char *pToken) {
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
+        
+        //printf("------->url:%s\n------->token:%s\n", pUrl, pToken);
         
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
@@ -211,7 +215,9 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 
                 ret = doMove(mgrToken.pUrlPath, mgrToken.pToken);
                 if (ret != 0) {
-                        LinkLogError("doMove fail:%d", ret);
+                        LinkLogError("move %s to %s fail", oldKey, key);
+                } else {
+                        LinkLogDebug("move %s to %s success", oldKey, key);
                 }
                 return;
         }
@@ -279,32 +285,46 @@ static void upadateSegmentFile(SegInfo segInfo) {
 #endif
         if (error.code != 200) {
                 if (error.code == 401) {
-                        LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
+                        LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
                         char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
                         if (pMsg) {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
+                                LinkLogError("upload segment :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
                         }else {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code,
+                                LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code,
                                              pFullErrMsg);
                         }
                 } else {
                         const char *pCurlErrMsg = curl_easy_strerror(error.code);
                         if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
                         } else {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
                         }
                 }
         } else {
-                LinkLogDebug("upload picture key:%s success", key);
+                LinkLogDebug("upload segment key:%s success", key);
         }
         
         Qiniu_Client_Cleanup(&client);
         
         return;
+}
+
+static void linkReleaseSegmentHandle(SegmentHandle seg) {
+        if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
+                segmentMgr.handles[seg].handle = -1;
+                segmentMgr.handles[seg].nStart = 0;
+                segmentMgr.handles[seg].nEnd = 0;
+                segmentMgr.handles[seg].isRestart = 0;
+                segmentMgr.handles[seg].getTokenCallback = NULL;
+                segmentMgr.handles[seg].pGetTokenCallbackArg = NULL;
+                segmentMgr.handles[seg].useHttps = 0;
+                segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
+                segmentMgr.handles[seg].mgrTokenRequestUrl[0] = 0;
+        }
 }
 
 static void * segmetMgrRun(void *_pOpaque) {
@@ -326,7 +346,11 @@ static void * segmetMgrRun(void *_pOpaque) {
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
-                                upadateSegmentFile(segInfo);
+                                if (segInfo.isReleaseHandle) {
+                                        linkReleaseSegmentHandle(segInfo.handle);
+                                } else {
+                                        upadateSegmentFile(segInfo);
+                                }
                         }
                 }
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
@@ -348,6 +372,7 @@ int LinkInitSegmentMgr() {
         LinkCircleQueue *pQueue;
         int ret = LinkNewCircleQueue(&pQueue, 0, TSQ_FIX_LENGTH, sizeof(SegInfo), 256);
         if (ret != LINK_SUCCESS) {
+                pthread_mutex_unlock(&segMgrMutex);
                 return ret;
         }
         segmentMgr.pSegQueue_ = pQueue;
@@ -355,14 +380,18 @@ int LinkInitSegmentMgr() {
         ret = pthread_create(&segmentMgr.segMgrThread_, NULL, segmetMgrRun, NULL);
         if (ret != 0) {
                 LinkDestroyQueue(&pQueue);
+                pthread_mutex_unlock(&segMgrMutex);
                 return LINK_THREAD_ERROR;
         }
-        
+        segMgrStarted = 1;
         pthread_mutex_unlock(&segMgrMutex);
         return LINK_SUCCESS;
 }
 
 int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
+        if (!segMgrStarted) {
+                return LINK_NOT_INITED;
+        }
         int i = 0;
         for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == -1) {
@@ -373,9 +402,11 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                         memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
                         
                         segmentMgr.handles[*pSeg].useHttps = pArg->useHttps;
-                        segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen;
+                        
                         memcpy(segmentMgr.handles[*pSeg].mgrTokenRequestUrl, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
-                        segmentMgr.handles[*pSeg].mgrTokenRequestUrl[pArg->nMgrTokenRequestUrlLen] = 0;
+                        sprintf(segmentMgr.handles[*pSeg].mgrTokenRequestUrl + pArg->nMgrTokenRequestUrlLen, "/%s", segmentMgr.handles[i].ua);
+                        segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen + pArg->nDeviceIdLen + 1;
+                        segmentMgr.handles[*pSeg].mgrTokenRequestUrl[segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen] = 0;
                         
                         return LINK_SUCCESS;
                 }
@@ -384,18 +415,18 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
 }
 
 void LinkReleaseSegmentHandle(SegmentHandle *pSeg) {
-        if (*pSeg >= 0 && *pSeg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
-                segmentMgr.handles[*pSeg].handle = -1;
-                segmentMgr.handles[*pSeg].nStart = 0;
-                segmentMgr.handles[*pSeg].nEnd = 0;
-                segmentMgr.handles[*pSeg].isRestart = 0;
-                segmentMgr.handles[*pSeg].getTokenCallback = NULL;
-                segmentMgr.handles[*pSeg].pGetTokenCallbackArg = NULL;
-                segmentMgr.handles[*pSeg].useHttps = 0;
-                segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = 0;
-                segmentMgr.handles[*pSeg].mgrTokenRequestUrl[0] = 0;
-                *pSeg = -1;
+        if (*pSeg < 0 || !segMgrStarted) {
+                return;
         }
+        SegInfo segInfo;
+        segInfo.handle = *pSeg;
+        segInfo.nStart = 0;
+        segInfo.nEnd = 0;
+        segInfo.isRestart = 0;
+        segInfo.isReleaseHandle = 1;
+        *pSeg = -1;
+        
+        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
 int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRestart) {
@@ -404,12 +435,19 @@ int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRes
         segInfo.nStart = nStart;
         segInfo.nEnd = nEnd;
         segInfo.isRestart = isRestart;
+        segInfo.isReleaseHandle = 0;
         
         return segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
 void LinkUninitSegmentMgr() {
+        pthread_mutex_lock(&segMgrMutex);
+        if (!segMgrStarted) {
+                pthread_mutex_unlock(&segMgrMutex);
+                return;
+        }
         segmentMgr.nQuit_ = 1;
-        pthread_join(&segmentMgr.segMgrThread_, NULL);
+        pthread_mutex_unlock(&segMgrMutex);
+        pthread_join(segmentMgr.segMgrThread_, NULL);
         return;
 }

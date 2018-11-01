@@ -36,6 +36,12 @@ typedef struct _LinkUserUploadArg{
         int   nNewSegmentInterval;
 }LinkUserUploadArg;
 
+typedef struct {
+        char *pMgrTokenRequestUrl;
+        int nMgrTokenRequestUrlLen;
+        int useHttps;
+}SegmentUserArg;
+
 typedef enum {
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2
@@ -78,6 +84,7 @@ typedef struct _LinkMediaArg{
 #define LINK_Q_OVERWRIT      -5001
 #define LINK_Q_WRONGSTATE    -5002
 #define LINK_MAX_SEG         -5103
+#define LINK_NOT_INITED      -5103
 #define LINK_SUCCESS         0
 
 

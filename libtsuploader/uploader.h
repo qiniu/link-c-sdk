@@ -6,7 +6,7 @@
 #include "queue.h"
 #include "base.h"
 
-typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow);
+typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow, int64_t nEnd);
 
 typedef struct _UploadArg {
         char    *pToken_;
@@ -15,7 +15,7 @@ typedef struct _UploadArg {
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
         int64_t nLastUploadTsTime_;
-        LinkUploadArgUpadater UploadArgUpadate;
+        LinkUploadArgUpadater UploadSegmentIdUpadate;
 }LinkUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;

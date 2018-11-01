@@ -83,7 +83,8 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 }
 
 int LinkCreateAndStartAVUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
-                                                    LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
+                                                    LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg,
+                                                    IN SegmentUserArg *_pSegArg)
 {
         if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
             _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
@@ -93,7 +94,7 @@ int LinkCreateAndStartAVUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxU
         }
         
         LinkTsMuxUploader *pTsMuxUploader;
-        int ret = LinkNewTsMuxUploaderWithPictureUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg);
+        int ret = LinkNewTsMuxUploaderWithPictureUploader(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg, _pSegArg);
         if (ret != 0) {
                 LinkLogError("LinkNewTsMuxUploaderWithPictureUploader fail");
                 return ret;
@@ -193,6 +194,7 @@ void LinkUninitUploader()
         if (nProcStatus != 1)
                 return;
         nProcStatus = 2;
+        LinkUninitSegmentMgr();
         LinkStopMgr();
         Qiniu_Global_Cleanup();
         

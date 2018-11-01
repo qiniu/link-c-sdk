@@ -654,19 +654,22 @@ typedef struct {
 }GetPicSaver;
 
 static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = "../../demo/material/3c.jpg";
-        int n = strlen(file)+1;
-        char * pFile = (char *)malloc(n);
+        const char *file = "../../tests/material/3c.jpg";
+        
+        int n = strlen(file);
+        char * pFile = (char *)malloc(n+1);
         *pBufSize = n;
         memcpy(pFile, file, n);
         *pBuf = pFile;
         *pType = LinkPicUploadTypeFile;
+        pFile[n] = 0;
         
+        GetPicSaver * saver = (GetPicSaver*)pOpaque;
         if (cmdArg.IsPicUploadSyncMode) {
                 return LinkGetPictureModeSync;
         }
-        GetPicSaver * saver = (GetPicSaver*)pOpaque;
-        saver->pData = pSvaeWhenAsync;
+        
+        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, pSvaeWhenAsync, pFile, n, LinkPicUploadTypeFile);
         return LinkGetPictureModeAsync;
 }
 
@@ -683,14 +686,24 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         picArg.getPictureFreeCallback = getPictureFreeCallback;
         picArg.pGetPicCallbackOpaque = NULL;
         
+        SegmentUserArg segArg;
+        segArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
+        segArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
+        segArg.useHttps = 0;
+        
         if (!cmdArg.IsWithPicUpload)
                 ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
         else {
+                if (cmdArg.pMgrToken == NULL) {
+                        LinkLogError("mgrtoken is NULL");
+                        exit(8);
+                }
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
                 ret = LinkCreateAndStartAVUploaderWithPictureUploader(_pTsMuxUploader, _pAvArg,
-                                                                      _pUserUploadArg, &picArg);
+                                                                      _pUserUploadArg, &picArg, &segArg);
+                saver->pData = *_pTsMuxUploader;
         }
         return ret;
 }
@@ -743,7 +756,7 @@ static void checkCmdArg(const char * name)
                 }
         } else {
                 if (cmdArg.pUa1 == NULL) {
-                        cmdArg.pUa1 = "ipcxxa";
+                        cmdArg.pUa1 = "ipc99a";
                 }
         }
         if (cmdArg.pZone) {
@@ -896,7 +909,7 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
         flag_str(&cmdArg.pToken, "token", "upload token");
-        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipcxxa");
+        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc99a");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
         flag_str(&cmdArg.pZone, "zone", "upload zone(huadong huabei huanan beimei dongnanya). default huadong");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
@@ -947,14 +960,14 @@ int main(int argc, const char** argv)
         char *pAFile = NULL;
 
         if(cmdArg.IsTestAAC) {
-                pAFile = "../../demo/material/h265_aac_1_16000_a.aac";
+                pAFile = "../../tests/material/h265_aac_1_16000_a.aac";
 	} else {
-                pAFile = "../../demo/material/h265_aac_1_16000_pcmu_8000.mulaw";
+                pAFile = "../../tests/material/h265_aac_1_16000_pcmu_8000.mulaw";
         }
         if(cmdArg.IsTestH265) {
-                pVFile = "../../demo/material/h265_aac_1_16000_v.h265";
+                pVFile = "../../tests/material/h265_aac_1_16000_v.h265";
 	} else {
-                pVFile = "../../demo/material/h265_aac_1_16000_h264.h264";
+                pVFile = "../../tests/material/h265_aac_1_16000_h264.h264";
         }
 
 	if (cmdArg.pAFilePath) {
