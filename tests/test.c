@@ -654,7 +654,7 @@ typedef struct {
 }GetPicSaver;
 
 static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = "../../demo/material/3c.jpg";
+        const char *file = "../../tests/material/3c.jpg";
         
         int n = strlen(file);
         char * pFile = (char *)malloc(n+1);
@@ -960,14 +960,14 @@ int main(int argc, const char** argv)
         char *pAFile = NULL;
 
         if(cmdArg.IsTestAAC) {
-                pAFile = "../../demo/material/h265_aac_1_16000_a.aac";
+                pAFile = "../../tests/material/h265_aac_1_16000_a.aac";
 	} else {
-                pAFile = "../../demo/material/h265_aac_1_16000_pcmu_8000.mulaw";
+                pAFile = "../../tests/material/h265_aac_1_16000_pcmu_8000.mulaw";
         }
         if(cmdArg.IsTestH265) {
-                pVFile = "../../demo/material/h265_aac_1_16000_v.h265";
+                pVFile = "../../tests/material/h265_aac_1_16000_v.h265";
 	} else {
-                pVFile = "../../demo/material/h265_aac_1_16000_h264.h264";
+                pVFile = "../../tests/material/h265_aac_1_16000_h264.h264";
         }
 
 	if (cmdArg.pAFilePath) {
