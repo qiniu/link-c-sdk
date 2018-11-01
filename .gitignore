@@ -1,4 +1,5 @@
 build
+buildmac
 *.o
 *.lo
 third_party/curl-7.61.1
