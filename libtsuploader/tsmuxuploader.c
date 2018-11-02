@@ -42,6 +42,7 @@ typedef struct _Token {
         int nQuit;
         char * pToken_;
         int nTokenLen_;
+        int nCap_;
         pthread_mutex_t tokenMutex_;
 }Token;
 
@@ -653,7 +654,8 @@ static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTok
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         if (pFFTsMuxUploader->token_.pToken_ == NULL) {
-                pFFTsMuxUploader->token_.pToken_ = malloc(_nTokenLen);
+                pFFTsMuxUploader->token_.pToken_ = malloc(_nTokenLen + 100);
+                pFFTsMuxUploader->token_.nCap_ = _nTokenLen + 100;
                 if (pFFTsMuxUploader->token_.pToken_  == NULL) {
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_NO_MEMORY;
@@ -665,12 +667,13 @@ static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTok
                 return LINK_SUCCESS;
         }
         
-        if (_nTokenLen > pFFTsMuxUploader->token_.nTokenLen_) {
-                char *pTmpToken = malloc(_nTokenLen);
+        if (_nTokenLen > pFFTsMuxUploader->token_.nCap_) {
+                char *pTmpToken = malloc(_nTokenLen + 100);
                 if (pTmpToken  == NULL) {
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_NO_MEMORY;
                 }
+                pFFTsMuxUploader->token_.nCap_ = _nTokenLen + 100;
                 memcpy(pTmpToken, _pToken, _nTokenLen);
                 pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
                 free(pFFTsMuxUploader->token_.pToken_);
