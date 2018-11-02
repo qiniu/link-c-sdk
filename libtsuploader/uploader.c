@@ -209,11 +209,16 @@ static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
         
-        char *uptoken = NULL;
+        char uptoken[1280] = {0};
         Qiniu_Client client;
-        int canFreeToken = 0;
+        int ret = 0;
         
-        uptoken = pUploader->uploadArg.pToken_;
+        ret = pUploader->uploadArg.getTokenCallback(pUploader->uploadArg.pGetTokenCallbackArg,
+                                                        uptoken, sizeof(uptoken));
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("ts up getTokenCallback fail:%d", ret);
+                return NULL;
+        }
         Qiniu_Client_InitNoAuth(&client, 1024);
         
         Qiniu_Io_PutRet putRet;
@@ -358,9 +363,6 @@ static void * streamUpload(void *_pOpaque)
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
 END:
-        if (canFreeToken) {
-                Qiniu_Free(uptoken);
-        }
         Qiniu_Client_Cleanup(&client);
         
         return NULL;

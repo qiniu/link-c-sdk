@@ -40,8 +40,6 @@ typedef struct _FFTsMuxContext{
 
 typedef struct _Token {
         int nQuit;
-        char * pPrevToken_;
-        int nPrevTokenLen_;
         char * pToken_;
         int nTokenLen_;
         pthread_mutex_t tokenMutex_;
@@ -50,6 +48,7 @@ typedef struct _Token {
 typedef struct _FFTsMuxUploader{
         LinkTsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
+        pthread_mutex_t tokenMutex_;
         unsigned char *pAACBuf;
         int nAACBufLen;
         FFTsMuxContext *pTsMuxCtx;
@@ -73,6 +72,7 @@ typedef struct _FFTsMuxUploader{
 }FFTsMuxUploader;
 
 static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
+static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
 static int getAacFreqIndex(int _nFreq)
 {
@@ -412,9 +412,6 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                                 free(pFFTsMuxUploader->token_.pToken_);
                                 pFFTsMuxUploader->token_.pToken_ = NULL;
                         }
-                        if (pFFTsMuxUploader->token_.pPrevToken_) {
-                                free(pFFTsMuxUploader->token_.pPrevToken_);
-                        }
                         free(pFFTsMuxUploader);
                 }
                 free(pTsMuxCtx);
@@ -654,28 +651,39 @@ end:
 static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         if (pFFTsMuxUploader->token_.pToken_ == NULL) {
-                pFFTsMuxUploader->token_.pToken_ = malloc(_nTokenLen + 1);
+                pFFTsMuxUploader->token_.pToken_ = malloc(_nTokenLen);
                 if (pFFTsMuxUploader->token_.pToken_  == NULL) {
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_NO_MEMORY;
                 }
-        }else {
-                if (pFFTsMuxUploader->token_.pPrevToken_ != NULL) {
-                        free(pFFTsMuxUploader->token_.pPrevToken_);
-                }
-                pFFTsMuxUploader->token_.pPrevToken_ = pFFTsMuxUploader->token_.pToken_;
-                pFFTsMuxUploader->token_.nPrevTokenLen_ = pFFTsMuxUploader->token_.nTokenLen_;
+                memcpy(pFFTsMuxUploader->token_.pToken_, _pToken, _nTokenLen);
+                pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
                 
-                pFFTsMuxUploader->token_.pToken_ = malloc(_nTokenLen + 1);
-                if (pFFTsMuxUploader->token_.pToken_  == NULL) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_SUCCESS;
+        }
+        
+        if (_nTokenLen > pFFTsMuxUploader->token_.nTokenLen_) {
+                char *pTmpToken = malloc(_nTokenLen);
+                if (pTmpToken  == NULL) {
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_NO_MEMORY;
                 }
+                memcpy(pTmpToken, _pToken, _nTokenLen);
+                pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
+                free(pFFTsMuxUploader->token_.pToken_);
+                pFFTsMuxUploader->token_.pToken_ = pTmpToken;
+                
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_SUCCESS;
         }
+        
         memcpy(pFFTsMuxUploader->token_.pToken_, _pToken, _nTokenLen);
         pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
-        pFFTsMuxUploader->token_.pToken_[_nTokenLen] = 0;
         
-        pFFTsMuxUploader->uploadArg.pToken_ = _pToken;
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         return LINK_SUCCESS;
 }
 
@@ -762,12 +770,19 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
+        pFFTsMuxUploader->uploadArg.getTokenCallback = getTokenCallback;
+        pFFTsMuxUploader->uploadArg.pGetTokenCallbackArg = pFFTsMuxUploader;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
         
         pFFTsMuxUploader->nFirstTimestamp = -1;
         
         ret = pthread_mutex_init(&pFFTsMuxUploader->muxUploaderMutex_, NULL);
+        if (ret != 0){
+                free(pFFTsMuxUploader);
+                return LINK_MUTEX_ERROR;
+        }
+        ret = pthread_mutex_init(&pFFTsMuxUploader->tokenMutex_, NULL);
         if (ret != 0){
                 free(pFFTsMuxUploader);
                 return LINK_MUTEX_ERROR;
@@ -790,7 +805,14 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
 
 static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        if (nBuflen < pFFTsMuxUploader->token_.nTokenLen_) {
+                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, nBuflen);
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_BUFFER_IS_SMALL;
+        }
         memcpy(pBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         return LINK_SUCCESS;
 }
 
@@ -895,6 +917,8 @@ void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
         }
         pushRecycle(pFFTsMuxUploader);
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        pthread_mutex_destroy(&pFFTsMuxUploader->tokenMutex_);
+        pthread_mutex_destroy(&pFFTsMuxUploader->muxUploaderMutex_);
         *_pTsMuxUploader = NULL;
         return;
 }

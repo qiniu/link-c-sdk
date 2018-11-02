@@ -8,8 +8,11 @@
 
 typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow, int64_t nEnd);
 
+typedef int (*LinkTsGetTokenCallback)(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
+
 typedef struct _UploadArg {
-        char    *pToken_;
+        LinkTsGetTokenCallback getTokenCallback;
+        void *pGetTokenCallbackArg;
         LinkUploadZone uploadZone;
         char    *pDeviceId_;
         void    *pUploadArgKeeper_;
