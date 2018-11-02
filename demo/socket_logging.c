@@ -265,7 +265,7 @@ void *SimpleSshTask( void *param )
             ret = socket_init();
             if ( ret < 0 ) {
                 gStatus.retry_count ++;
-                printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
+                //printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
                 sleep(5);
                 continue;
             }

@@ -269,37 +269,39 @@ void InitConfig()
 {
     gIpc.cfg = cfg_init();
 
+    printf("init config...\n");
     gIpc.config.logOutput = OUTPUT_CONSOLE;
     gIpc.config.logVerbose = 1;
     gIpc.config.logPrintTime = 1;
     gIpc.config.timeStampPrintInterval = TIMESTAMP_REPORT_INTERVAL;
     gIpc.config.heartBeatInterval = 50;
-    gIpc.config.logFile = "/tmp/oem/tsupload.log";
+    gIpc.config.defaultLogFile = "/tmp/oem/tsupload.log";
     gIpc.config.tokenRetryCount = TOKEN_RETRY_COUNT;
-    gIpc.config.bucketName = "ipcamera";
+    gIpc.config.defaultBucketName = "ipcamera";
     gIpc.config.movingDetection = 0;
     gIpc.config.configUpdateInterval = 10;
     gIpc.config.multiChannel = 0;
     gIpc.config.openCache = 1;
     gIpc.config.cacheSize = STREAM_CACHE_SIZE;
     gIpc.config.updateFrom = UPDATE_FROM_FILE;
-    gIpc.config.url = "www.qiniu.com";
+    gIpc.config.defaultUrl = "www.qiniu.com";
     gIpc.config.tokenUrl = NULL;
     gIpc.config.simpleSshEnable = 1;
     gIpc.config.useLocalToken = 0;
     gIpc.config.ak = NULL;
     gIpc.config.sk = NULL;
     gIpc.config.serverIp = NULL;
+    gIpc.config.renameTokenUrl = NULL;
     if ( gIpc.config.useLocalToken ) {
         gIpc.config.tokenUploadInterval = 5;
     } else {
         gIpc.config.tokenUploadInterval = 3540;
     }
+
 }
 
 void LoadConfig()
 {
-
     if (cfg_load(gIpc.cfg,"/tmp/oem/app/ipc.conf") < 0) {
         fprintf(stderr,"Unable to load ipc.conf\n");
     }
@@ -309,12 +311,15 @@ int  CfgSaveItem( char *value, char **dest )
 {
     char *p = (char *) malloc ( strlen(value)+1 );
     
-    if ( !p || !dest ) {
+    if ( !p && !dest ) {
         return -1;
     }
-    memset( p, 0, strlen(p)+1 );
+    memset( p, 0, strlen(value)+1 );
     memcpy( p, value, strlen(value) );
-    free( *dest );
+    if ( *dest ) {
+        free( *dest );
+    }
+
     *dest = p;
 
     return 0;
@@ -328,12 +333,12 @@ void CfgGetStrItem( char *item, char **out )
     if ( p ) {
         if ( *out ) {
             if( strcmp( *out, p ) != 0 ) {
+                printf("%s %s %d new %s : %s, old : %s \n", __FILE__, __FUNCTION__, __LINE__, item, p, *out );
                 CfgSaveItem( p, out );
-                printf("%s %s %d new %s : %s\n", __FILE__, __FUNCTION__, __LINE__, item, p );
             }
         } else {
+            printf("%s %s %d new %s : %s, old : %s \n", __FILE__, __FUNCTION__, __LINE__, item, p, *out );
             CfgSaveItem( p, out );
-            printf("%s %s %d new %s : %s\n", __FILE__, __FUNCTION__, __LINE__, item, p );
         }
     }
 }
@@ -349,12 +354,9 @@ void CfgGetIntItem( char *item, int *out )
         if ( *out ) {
             if ( *out != val ) {
                *out = val; 
-               printf("new value of %s is %d\n", item, val );
+               printf("%s %s %d new value of %s is %d\n", __FILE__, __FUNCTION__, __LINE__, item, val );
             }
-        } else {
-            *out = val;
-            printf("new value of %s is %d\n", item, val );
-        }
+        } 
     }
 }
 
@@ -366,6 +368,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(sk), "SK", 1 },
     { CFG_MEMBER(url), "NETWORK_CHECK_URL", 1 },
     { CFG_MEMBER(tokenUrl), "TOKEN_GET_URL", 1 },
+    { CFG_MEMBER(renameTokenUrl), "RENAME_TOKEN_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },

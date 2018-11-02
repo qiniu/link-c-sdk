@@ -29,13 +29,13 @@ App gIpc;
 int AlarmCallback( int alarm, void *data )
 {
     if ( alarm == ALARM_MOTION_DETECT ) {
-        DBG_LOG("get event ALARM_MOTION_DETECT\n");
+        //DBG_LOG("get event ALARM_MOTION_DETECT\n");
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
-        DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
+        //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
-        DBG_LOG( "data = %s\n", (char *)data );
+        //DBG_LOG( "data = %s\n", (char *)data );
         char *file = (char *) malloc(  strlen((char *)data)+1 );
 
         memset( file, 0, strlen((char *)data)+1 );
@@ -54,6 +54,7 @@ static int CaptureDevInit( )
     gIpc.dev = NewCoreDevice();
     gIpc.audioType = AUDIO_AAC;
 
+    DBG_LOG("start to init ipc...\n");
     gIpc.dev->init( gIpc.audioType, gIpc.config.multiChannel, VideoGetFrameCb, AudioGetFrameCb );
     gIpc.dev->getDevId( gIpc.devId );
     DbgSendFileName( gIpc.devId );
@@ -107,8 +108,8 @@ static int getPictureFreeCallback (char *pBuf, int nNameBufSize)
     int ret = 0;
     char okfile[512] = { 0 };
 
-    DBG_LOG("pBuf = %s\n", pBuf );
-    DBG_LOG("pBuf address = %p\n", pBuf );
+    //DBG_LOG("pBuf = %s\n", pBuf );
+    //DBG_LOG("pBuf address = %p\n", pBuf );
     if ( access( pBuf, R_OK ) == 0  ) {
         ret = remove( pBuf );
         if ( ret != 0 ) {
@@ -138,6 +139,8 @@ int TsUploaderSdkInit()
     char *pUrl = NULL;
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
+    SegmentUserArg segArg;
+
 
     arg.getPicCallback = getPicCallback;
     arg.getPictureFreeCallback = getPictureFreeCallback;
@@ -165,7 +168,8 @@ int TsUploaderSdkInit()
     if ( gIpc.config.sk )
         LinkSetSk( gIpc.config.sk );
 
-    LinkSetBucketName( gIpc.config.bucketName );
+    if ( gIpc.config.bucketName )
+        LinkSetBucketName( gIpc.config.bucketName );
 
     if ( !gIpc.config.useLocalToken && !gIpc.config.tokenUrl ) {
         DBG_ERROR("token url not set, please modify /tmp/oem/app/ipc.conf and add token url\n");
@@ -218,7 +222,15 @@ int TsUploaderSdkInit()
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[STREAM_MAIN].devId);
     userUploadArg.nUploaderBufferSize = 512;
 
-    ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg , NULL );
+    segArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
+    if ( gIpc.config.renameTokenUrl )
+        segArg.nMgrTokenRequestUrlLen = strlen(gIpc.config.renameTokenUrl);
+    else
+        segArg.nMgrTokenRequestUrlLen = 0;
+
+    segArg.useHttps = 0;
+
+    ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg , &segArg );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
@@ -255,7 +267,7 @@ int TsUploaderSdkInit()
         userUploadArg.pDeviceId_ = gIpc.stream[STREAM_SUB].devId;
         userUploadArg.pToken_ = gIpc.stream[STREAM_SUB].token;
         userUploadArg.nTokenLen_ = strlen(gIpc.stream[STREAM_SUB].token);
-        ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg, NULL );
+        ret = LinkCreateAndStartAVUploaderWithPictureUploader(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg, &segArg );
         if (ret != 0) {
             DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
             return ret;
@@ -281,7 +293,9 @@ static void * UpadateToken() {
         LinkSetAk( gIpc.config.ak );
     if ( gIpc.config.sk )
         LinkSetSk( gIpc.config.sk );
-    LinkSetBucketName( gIpc.config.bucketName );
+
+    if ( gIpc.config.bucketName )
+        LinkSetBucketName( gIpc.config.bucketName );
 
     DBG_LOG("gIpc.config.ak = %s\n", gIpc.config.ak);
     DBG_LOG("gIpc.config.sk = %s\n", gIpc.config.sk);
@@ -367,16 +381,19 @@ int WaitForNetworkOk()
     CURL *curl;
     CURLcode res;
     int i = 0;
+    char *url = NULL;
 
-    if ( !gIpc.config.url ) {
-        DBG_ERROR("the check network url not set\n");
+    if ( gIpc.config.url ) {
+        url = gIpc.config.url;
+    } else {
+        url = gIpc.config.defaultUrl;
     }
 
     printf("start to check network, url = %s ....\n", gIpc.config.url );
     curl = curl_easy_init();
     if ( curl != NULL ) {
         for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
-            curl_easy_setopt( curl, CURLOPT_URL, gIpc.config.url );
+            curl_easy_setopt( curl, CURLOPT_URL, url );
             res = curl_easy_perform( curl );
             if ( res == CURLE_OK ) {
                 return 0;
@@ -429,12 +446,19 @@ int TsUploaderSdkDeInit()
 
 int main()
 {
+    char *logFile = NULL;
+
     InitConfig();
     UpdateConfig();
-
+    
     WaitForNetworkOk();
+    if ( gIpc.config.logFile ) {
+        logFile = gIpc.config.logFile;
+    } else {
+        logFile = gIpc.config.defaultLogFile;
+    }
     LoggerInit( gIpc.config.logPrintTime, gIpc.config.logOutput,
-                gIpc.config.logFile, gIpc.config.logVerbose );
+                logFile, gIpc.config.logVerbose );
     CaptureDevInit();
     StartConfigUpdateTask();
     /* 
