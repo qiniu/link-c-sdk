@@ -629,8 +629,10 @@ static void * updateToken(void * opaque) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
                 }
-                printf("token:%s\n", gtestToken);
-                ret = LinkUpdateToken(opaque, gtestToken, strlen(gtestToken));
+                printf("1token:%s\n", gtestToken);
+		assert(strlen(gtestToken) < 1024);
+                AVuploader *pAvuploader = (AVuploader *)opaque;
+                ret = LinkUpdateToken(pAvuploader->pTsMuxUploader, gtestToken, strlen(gtestToken));
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
@@ -1015,13 +1017,13 @@ int main(int argc, const char** argv)
                 } else {
                         strcpy(gtestToken, cmdArg.pToken);
                 }
-                printf("token:%s\n", gtestToken);
+                printf("2token:%s\n", gtestToken);
 
                 pthread_t updateTokenThread;
                 pthread_attr_t attr;
                 pthread_attr_init (&attr);
                 pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-                ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)avuploader.pTsMuxUploader);
+                ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)&avuploader);
                 if (ret != 0) {
                         printf("create update token thread fail\n");
                         return ret;

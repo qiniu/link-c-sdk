@@ -82,7 +82,7 @@ void justTestAsyncUploadPicture(char *pTokenUrl) {
                 
                 sleep(1);
                 
-                const char *file = "./material/3c.jpg";
+                const char *file = "../../tests/material/3c.jpg";
                 int n = strlen(file)+1;
                 char * pFile = (char *)malloc(n);
                 memcpy(pFile, file, n);
