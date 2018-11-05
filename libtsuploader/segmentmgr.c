@@ -25,6 +25,8 @@ typedef struct {
         void *pGetTokenCallbackArg;
         char mgrTokenRequestUrl[256];
         int nMgrTokenRequestUrlLen;
+        UploadStatisticCallback pUploadStatisticCb;
+        void *pUploadStatArg;
         int useHttps;
 }Seg;
 
@@ -283,6 +285,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
 #ifdef __ARM
         report_status( error.code, key );// add by liyq to record ts upload status
 #endif
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if (error.code != 200) {
                 if (error.code == 401) {
                         LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
@@ -305,10 +308,15 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         }
                 }
         } else {
+                uploadResult = LINK_UPLOAD_RESULT_OK;
                 LinkLogDebug("upload segment key:%s success", key);
         }
         
         Qiniu_Client_Cleanup(&client);
+        
+        if (segmentMgr.handles[idx].pUploadStatisticCb) {
+                segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
+        }
         
         return;
 }
@@ -401,6 +409,8 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                         segmentMgr.handles[i].pGetTokenCallbackArg = pArg->pGetTokenCallbackArg;
                         memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
                         
+                        segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;
+                        segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
                         segmentMgr.handles[*pSeg].useHttps = pArg->useHttps;
                         
                         memcpy(segmentMgr.handles[*pSeg].mgrTokenRequestUrl, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);

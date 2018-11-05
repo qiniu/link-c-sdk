@@ -13,6 +13,8 @@ typedef struct {
         void *pGetTokenCallbackArg;
         char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
+        UploadStatisticCallback pUploadStatisticCb;
+        void *pUploadStatArg;
         int useHttps;
 }SegmentArg;
 

@@ -846,6 +846,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
         arg.pMgrTokenRequestUrl = _pSegArg->pMgrTokenRequestUrl;
         arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
+        arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         arg.useHttps = _pSegArg->useHttps;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
