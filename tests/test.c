@@ -345,7 +345,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 } else {
                                                         nIDR++;
                                                         if(cmdArg.IsTestMove && !IsFirst) {;
-                                                                printf("sleep %dms to wait timeout start:%lld\n", cmdArg.nSleeptime, nNextVideoTime);
+                                                                printf("sleep %dms to wait timeout start:%"PRId64"\n", cmdArg.nSleeptime, nNextVideoTime);
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
                                                                 nNextVideoTime += cmdArg.nSleeptime;
@@ -461,9 +461,9 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                 nSleepTime = (nNextAudioTime - nNow - 1) * 1000;
                 }
                 if (nSleepTime != 0) {
-                        //printf("sleeptime:%lld\n", nSleepTime);
+                        //printf("sleeptime:%"PRId64"\n", nSleepTime);
                         if (nSleepTime > 40 * 1000) {
-			        LinkLogWarn("abnormal time diff:%lld", nSleepTime);
+			        LinkLogWarn("abnormal time diff:%"PRId64"", nSleepTime);
 			}
                         usleep(nSleepTime);
                 }
@@ -595,7 +595,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         int ret = 0;
         pAvuploader->nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
-                //fprintf(stderr, "push audio ts:%lld\n", timestamp);
+                //fprintf(stderr, "push audio ts:%"PRId64"\n", timestamp);
                 ret = LinkPushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
         } else {
                 if (pAvuploader->firstTimeStamp == -1){
@@ -611,7 +611,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         pAvuploader->nVideoKeyframeAccLen = 0;
                 }
                 pAvuploader->nVideoKeyframeAccLen += nDataLen;
-                //printf("------->push video key:%d ts:%lld size:%d\n",nIsKeyFrame, timestamp, nDataLen);
+                //printf("------->push video key:%d ts:%"PRId64" size:%d\n",nIsKeyFrame, timestamp, nDataLen);
                 if (nIsKeyFrame) {
                         if (cmdArg.IsDropFirstKeyFrame) {
                                 cmdArg.IsDropFirstKeyFrame = 0;

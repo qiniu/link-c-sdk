@@ -179,17 +179,17 @@ static void upadateSegmentFile(SegInfo segInfo) {
         memset(oldKey, 0, sizeof(oldKey));
         int isNewSeg = 1;
         if (segmentMgr.handles[idx].nStart <= 0 || segInfo.isRestart) {
-                snprintf(key, sizeof(key), "seg/%s/%lld/%lld", segmentMgr.handles[idx].ua, segInfo.nStart, segInfo.nEnd);
+                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua, segInfo.nStart, segInfo.nEnd);
                 segmentMgr.handles[idx].nStart = segInfo.nStart;
                 segmentMgr.handles[idx].nEnd = segInfo.nEnd;
         } else {
                 if (segInfo.nEnd < segmentMgr.handles[idx].nEnd) {
-                        LinkLogDebug("not update segment:%lld %lld", segmentMgr.handles[idx].nEnd, segInfo.nEnd);
+                        LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, segInfo.nEnd);
                         return;
                 }
-                snprintf(oldKey, sizeof(oldKey), "seg/%s/%lld/%lld", segmentMgr.handles[idx].ua,
+                snprintf(oldKey, sizeof(oldKey), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
-                snprintf(key, sizeof(key), "seg/%s/%lld/%lld", segmentMgr.handles[idx].ua,
+                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua,
                          segmentMgr.handles[idx].nStart, segInfo.nEnd);
                 segmentMgr.handles[idx].nEnd = segInfo.nEnd;
                 isNewSeg = 0;
@@ -342,7 +342,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
-                        LinkLogInfo("pop segment info:%d %lld %lld\n", segInfo.handle, segInfo.nStart, segInfo.nEnd);
+                        LinkLogInfo("pop segment info:%d %"PRId64" %"PRId64"\n", segInfo.handle, segInfo.nStart, segInfo.nEnd);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {

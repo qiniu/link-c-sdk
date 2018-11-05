@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <inttypes.h>
 #include "log.h"
 #ifndef __APPLE__
 #include <stdint.h>
