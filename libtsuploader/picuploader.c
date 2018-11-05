@@ -250,6 +250,7 @@ static void * uploadPicture(void *_pOpaque) {
 #ifdef __ARM
         report_status( error.code, key );// add by liyq to record ts upload status
 #endif
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if (error.code != 200) {
                 if (error.code == 401) {
                         LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
@@ -272,11 +273,16 @@ static void * uploadPicture(void *_pOpaque) {
                         }
                 }
         } else {
+                uploadResult = LINK_UPLOAD_RESULT_OK;
                 LinkLogDebug("upload picture key:%s success", key);
         }
         
         if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
                 pSig->pPicUploader->picUpSettings_.getPictureFreeCallback(pSig->pData, pSig->nDataLen);
+        }
+        
+        if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
+                pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
         
         Qiniu_Client_Cleanup(&client);

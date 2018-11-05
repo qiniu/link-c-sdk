@@ -861,6 +861,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         fullArg.getPictureFreeCallback = _pPicArg->getPictureFreeCallback;
         fullArg.getTokenCallback = getTokenCallback;
         fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
+        fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
