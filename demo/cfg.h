@@ -20,9 +20,11 @@ typedef struct {
     int timeStampPrintInterval;
     unsigned char heartBeatInterval;
     char *logFile;
+    char *defaultLogFile;
     int tokenUploadInterval;
     int tokenRetryCount;
     char *bucketName;
+    char *defaultBucketName;
     char *ak;
     char *sk;
     unsigned char movingDetection;
@@ -32,11 +34,13 @@ typedef struct {
     int cacheSize;
     unsigned char updateFrom;
     char *url;
+    char *defaultUrl;
     char *tokenUrl;
     unsigned char simpleSshEnable;
     unsigned char useLocalToken;
     char *serverIp;
     int serverPort;
+    char *renameTokenUrl;
 } Config;
 
 struct cfg_struct;
