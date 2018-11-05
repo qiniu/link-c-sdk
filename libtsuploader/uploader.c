@@ -451,6 +451,15 @@ static void * streamUpload(void *_pOpaque)
                 LinkLogDebug("upload file size:(exp:%lld real:%lld) key:%s success",
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+        if (pUploader->state == LINK_UPLOAD_OK) {
+                uploadResult = LINK_UPLOAD_RESULT_OK;
+        }
+                
+        if (pUploader->uploadArg.pUploadStatisticCb) {
+                pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
+        }
+        
 END:
         if (freeClient)
                 Qiniu_Client_Cleanup(&client);
@@ -671,6 +680,7 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
+        
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         

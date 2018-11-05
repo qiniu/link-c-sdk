@@ -775,6 +775,8 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         pFFTsMuxUploader->uploadArg.getTokenCallback = getTokenCallback;
         pFFTsMuxUploader->uploadArg.pGetTokenCallbackArg = pFFTsMuxUploader;
+        pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
         
