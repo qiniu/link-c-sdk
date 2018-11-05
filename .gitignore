@@ -8,3 +8,9 @@ third_party/curl
 third_party/wolfssl/
 *.a
 *.swp
+aj_dev.c
+build-arm
+build-mips
+build-linux
+build-mac
+tags

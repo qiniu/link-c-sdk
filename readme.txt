@@ -15,13 +15,12 @@
     * 修改toolchain.cmake,修改CMAKE_C_COMPILER和CMAKE_CXX_COMPILER为平台相关工具链
     * mkdir build-arm
     * cd build-arm
-    * cmake ..
     * make
   3.2 MIPS
     * 修改toolchain.cmake,修改CMAKE_C_COMPILER和CMAKE_CXX_COMPILER为平台相关工具链
     * mkdir build-mips
     * cd build-mips
-    * cmake ..
+    * cmake ../ -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake
     * make
 4.clean
    * 默认curl第三方库编译一次之后不会再编译，如果需要重新编译curl库，需要执行make all-clean
