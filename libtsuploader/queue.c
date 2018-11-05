@@ -26,7 +26,7 @@ static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (nDataLen + pQueueImp->nLen_  > pQueueImp->nCap_) {
                 int newLen = pQueueImp->nCap_ * 3 / 2;
-                char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * newLen);
+                char *pTmp = (char *)malloc(newLen);
                 if (pTmp == NULL) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         return LINK_NO_MEMORY;
@@ -36,6 +36,7 @@ static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                 free(pQueueImp->pData_);
                 pQueueImp->pData_ = pTmp;
                 pQueueImp->nCap_ = newLen;
+                pQueueImp->nLenInByte_ = newLen;
         }
         
         memcpy(pQueueImp->pData_ + pQueueImp->nLen_, pData_, nDataLen);
@@ -270,8 +271,9 @@ enum CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
 int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         int ret;
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp) +
-                                                             (_nMaxItemLen + sizeof(int)) * _nInitItemCount);
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp));
+        
+        char *pData = (char *)malloc((_nMaxItemLen + sizeof(int)) * _nInitItemCount);
         if (pQueueImp == NULL) {
                 return LINK_NO_MEMORY;
         }
@@ -288,7 +290,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         }
         
         pQueueImp->policy = _policy;
-        pQueueImp->pData_ = (char *)pQueueImp + sizeof(CircleQueueImp);
+        pQueueImp->pData_ = pData;
         pQueueImp->nCap_ = _nInitItemCount;
         pQueueImp->nItemLen_ = _nMaxItemLen + sizeof(int); //前缀int类型的一个长度
         pQueueImp->circleQueue.PopWithTimeout = PopQueue;
@@ -331,6 +333,8 @@ void LinkDestroyQueue(LinkCircleQueue **_pQueue)
         pthread_mutex_destroy(&pQueueImp->mutex_);
         pthread_cond_destroy(&pQueueImp->condition_);
 
+        if (pQueueImp->pData_)
+                free(pQueueImp->pData_);
         free(pQueueImp);
         *_pQueue = NULL;
         return;
