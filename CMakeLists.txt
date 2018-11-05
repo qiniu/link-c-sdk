@@ -5,7 +5,7 @@ project (link-c-sdk)
 
 message( "CMAKE_C_COMPILER is " ${CMAKE_C_COMPILER} )
 set( COMPILER 0 )
-string( REGEX MATCH cc|mips[a-zA-Z]+-gcc|arm[-a-zA-Z]*-gcc COMPILER ${CMAKE_C_COMPILER})
+string( REGEX MATCH "[^/]+$" COMPILER ${CMAKE_C_COMPILER})
 message( "COMPILER is " ${COMPILER} )
 #string( LENGTH ${COMPILER} LEN )
 set( POS 0 )
