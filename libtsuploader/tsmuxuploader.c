@@ -877,6 +877,16 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         return ret;
 }
 
+void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t _nSeconds) {
+        if (_pTsMuxUploader == NULL || _nSeconds <= 0) {
+                return;
+        }
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
+        return;
+}
+
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         if (pFFTsMuxUploader->pPicUploader)
