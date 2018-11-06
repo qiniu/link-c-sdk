@@ -12,6 +12,7 @@
 #include <qiniu/io.h>
 #include <qiniu/rs.h>
 #endif
+#include "fixjson.h"
 
 static int volatile nProcStatus = 0;
 static LinkUploadZone gUploadZone;
@@ -255,36 +256,39 @@ struct CurlToken {
         char * pData;
         int nDataLen;
         int nCurlRet;
+        LinkUploadZone *pZone;
 };
 
 size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
         struct CurlToken *pToken = (struct CurlToken *)pUserData;
-        if (pToken->nDataLen < size * nmemb) {
-                pToken->nCurlRet = -11;
+        
+        int len = pToken->nDataLen;
+        int ret = GetJsonContentByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
+        if (ret != LINK_SUCCESS) {
+                pToken->nCurlRet = ret;
                 return 0;
-        }
-        char *pTokenStart = strstr(pTokenStr, "\"token\"");
-        if (pTokenStart == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
-        }
-        pTokenStart += strlen("\"token\"");
-        while(*pTokenStart++ != '\"') {
         }
         
-        char *pTokenEnd = strchr(pTokenStart, '\"');
-        if (pTokenEnd == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
+        char zone[10] = {0};
+        len = sizeof(zone) - 1;
+        ret = GetJsonContentByKey((const char *)pTokenStr, "\"zone\"", zone, &len);
+        if (ret == LINK_SUCCESS && pToken->pZone != NULL) {
+                if (strcmp(zone, "z1") == 0) {
+                        *pToken->pZone = LINK_ZONE_HUABEI;
+                } else if(strcmp(zone, "z2") == 0) {
+                        *pToken->pZone = LINK_ZONE_HUANAN;
+                } else if(strcmp(zone, "na0.") == 0) {
+                        *pToken->pZone = LINK_ZONE_BEIMEI;
+                } else if(strcmp(zone, "as0") == 0) {
+                        *pToken->pZone = LINK_ZONE_DONGNANYA;
+                } else {
+                        *pToken->pZone = LINK_ZONE_HUADONG;
+                }
         }
-        if (pTokenEnd - pTokenStart >= pToken->nDataLen) {
-                pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pToken->pData, pTokenStart, pTokenEnd - pTokenStart);
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, char *pUrl)
 {
 #ifdef DISABLE_OPENSSL
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
@@ -300,6 +304,7 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, char *pUrl)
         token.pData = pBuf;
         token.nDataLen = nBufLen;
         token.nCurlRet = 0;
+        token.pZone = pZone;
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
         int ret =curl_easy_perform(curl);
         if (ret != 0) {

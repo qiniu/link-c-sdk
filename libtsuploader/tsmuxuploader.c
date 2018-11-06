@@ -849,6 +849,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         arg.useHttps = _pSegArg->useHttps;
+        arg.nUpdateIntervalSeconds = _pSegArg->nUpdateIntervalSeconds;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
                 LinkDestroyTsMuxUploader(_pTsMuxUploader);

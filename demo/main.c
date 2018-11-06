@@ -189,7 +189,7 @@ int TsUploaderSdkInit()
             pUrl = url;
         }
         DBG_LOG("pUrl = %s, i = %d\n", pUrl, i );
-        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), pUrl );
+        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), NULL, pUrl );
         if ( ret != 0 ) {
             DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
             sleep(2);
@@ -255,7 +255,7 @@ int TsUploaderSdkInit()
 
         for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
             DBG_LOG("i = %d\n", i );
-            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), pUrl );
+            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), NULL, pUrl );
             if ( ret != 0 ) {
                 DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
                 continue;
@@ -315,7 +315,7 @@ static void * UpadateToken() {
         if ( !gIpc.config.useLocalToken ) {
             pUrl = url;
         }
-        ret = LinkGetUploadToken(gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), pUrl );
+        ret = LinkGetUploadToken(gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), NULL, pUrl );
         if ( ret != 0 ) {
             DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
             sleep(2);
@@ -339,7 +339,7 @@ static void * UpadateToken() {
             if ( !gIpc.config.useLocalToken ) {
                 pUrl = url;
             }
-            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), pUrl );
+            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), NULL, pUrl );
             if ( ret != 0 ) {
                 DBG_ERROR("GetUploadToken error, ret = %d\n", ret );
                 sleep(2);

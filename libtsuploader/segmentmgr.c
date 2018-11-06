@@ -236,7 +236,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         }
         
         char uptoken[1536] = {0};
-        
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if(!isNewSeg) {
                 struct MgrToken mgrToken;
                 int nUrlLen = 0;
@@ -257,7 +257,12 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 if (ret != 0) {
                         LinkLogError("move %s to %s fail", oldKey, key);
                 } else {
+                        uploadResult = LINK_UPLOAD_RESULT_OK;
                         LinkLogDebug("move %s to %s success", oldKey, key);
+                }
+                
+                if (segmentMgr.handles[idx].pUploadStatisticCb) {
+                        segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_MOVE_SEG, uploadResult);
                 }
                 return;
         }
@@ -320,7 +325,6 @@ static void upadateSegmentFile(SegInfo segInfo) {
         error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, &putExtra);
 
         
-        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if (error.code != 200) {
                 if (error.code == 401) {
                         LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
@@ -350,7 +354,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         Qiniu_Client_Cleanup(&client);
         
         if (segmentMgr.handles[idx].pUploadStatisticCb) {
-                segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
+                segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_SEG, uploadResult);
         }
         
         return;

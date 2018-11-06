@@ -23,7 +23,7 @@ typedef enum {
         LINK_UPLOAD_TS = 1,
         LINK_UPLOAD_PIC = 2,
         LINK_UPLOAD_SEG = 3,
-        LINK_UPLOAD_MOVE_SEG = 3
+        LINK_UPLOAD_MOVE_SEG = 4
 } LinkUploadKind;
 
 typedef enum {
@@ -33,6 +33,7 @@ typedef enum {
 typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
 typedef enum _LinkUploadZone{
+        LINK_ZONE_UNKNOWN = 0,
         LINK_ZONE_HUADONG = 1,
         LINK_ZONE_HUABEI = 2,
         LINK_ZONE_HUANAN = 3,
@@ -55,6 +56,7 @@ typedef struct _LinkUserUploadArg{
 typedef struct {
         char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
+        int nUpdateIntervalSeconds;
         int useHttps;
 }SegmentUserArg;
 
