@@ -320,9 +320,6 @@ static void upadateSegmentFile(SegInfo segInfo) {
         error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, &putExtra);
 
         
-#ifdef __ARM
-        report_status( error.code, key );// add by liyq to record ts upload status
-#endif
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if (error.code != 200) {
                 if (error.code == 401) {

@@ -10,9 +10,6 @@
 #include <time.h>
 #include <curl/curl.h>
 #include "fixjson.h"
-#ifdef __ARM
-#include "./demo/socket_logging.h"
-#endif
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -420,9 +417,6 @@ static void * streamUpload(void *_pOpaque)
                                                pUploader->nTsDataLen, &putExtra);
 #endif
         
-#ifdef __ARM
-        report_status( error.code, key );// add by liyq to record ts upload status
-#endif
         if (error.code != 200) {
                 pUploader->state = LINK_UPLOAD_FAIL;
                 if (error.code == 401) {
