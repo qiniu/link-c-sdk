@@ -278,6 +278,7 @@ void InitConfig()
     gIpc.config.defaultLogFile = "/tmp/oem/tsupload.log";
     gIpc.config.tokenRetryCount = TOKEN_RETRY_COUNT;
     gIpc.config.defaultBucketName = "ipcamera";
+    gIpc.config.bucketName = NULL;
     gIpc.config.movingDetection = 0;
     gIpc.config.configUpdateInterval = 10;
     gIpc.config.multiChannel = 0;
@@ -370,6 +371,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(tokenUrl), "TOKEN_GET_URL", 1 },
     { CFG_MEMBER(renameTokenUrl), "RENAME_TOKEN_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
+    { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },
     { CFG_MEMBER(multiChannel), "MULTI_CHANNEL", 0 },

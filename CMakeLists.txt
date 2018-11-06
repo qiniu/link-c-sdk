@@ -40,6 +40,14 @@ if (WITH_DEBUG)
     add_definitions("-Wall -g")
 endif()
 
+execute_process(
+  COMMAND git describe --abbrev=8 --dirty --always --tags
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_CODE_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+add_definitions("-DCODE_VERSION=\"${GIT_CODE_VERSION}\"")
+
 add_subdirectory(third_party)
 add_subdirectory(libtsuploader)
 add_subdirectory(tests)

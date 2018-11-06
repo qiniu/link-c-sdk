@@ -426,6 +426,7 @@ void StartConfigUpdateTask()
 
 int CaptureDevStartStream()
 {
+    DBG_LOG("start the stream...\n");
     gIpc.dev->startStream( STREAM_MAIN );
     if ( gIpc.config.multiChannel ) {
         gIpc.dev->startStream( STREAM_SUB );
@@ -472,7 +473,7 @@ int main()
 
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
-    //DBG_LOG("commit id : %s\n", CODE_VERSION );
+    DBG_LOG("commit id : %s\n", CODE_VERSION );
     for (;; ) {
         sleep( gIpc.config.heartBeatInterval );
         DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gIpc.devId );
