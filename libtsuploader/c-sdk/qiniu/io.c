@@ -187,7 +187,7 @@ Qiniu_Error Qiniu_Io_PutFile(
 
 Qiniu_Error Qiniu_Io_PutBuffer(
         Qiniu_Client *self, Qiniu_Io_PutRet *ret,
-        const char *uptoken, const char *key, const char *buf, curl_off_t fsize, Qiniu_Io_PutExtra *extra) {
+        const char *uptoken, const char *key, const char *buf, int64_t fsize, Qiniu_Io_PutExtra *extra) {
     Qiniu_Io_form form;
     Qiniu_Io_form_init(&form, uptoken, key, &extra);
 
