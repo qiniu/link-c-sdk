@@ -5,7 +5,11 @@ static void *gSvaeWhenAsync; //may race risk. but for test is enough
 enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
 
 static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
+#ifdef __APPLE__
+        const char *file = "../../../tests/material/3c.jpg";
+#else
         const char *file = "../../tests/material/3c.jpg";
+#endif
         int n = strlen(file)+1;
         char * pFile = (char *)malloc(n);
         memcpy(pFile, file, n);
