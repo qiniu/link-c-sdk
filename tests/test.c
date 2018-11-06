@@ -11,6 +11,12 @@
 #include "adts.h"
 #include "flag.h"
 
+#ifdef __APPLE__
+#define MATERIAL_PATH "../../../tests/material/"
+#else
+#define MATERIAL_PATH "../../tests/material/"
+#endif
+
 typedef struct {
         bool IsInputFromFFmpeg;
         bool IsTestAAC;
@@ -656,7 +662,7 @@ typedef struct {
 }GetPicSaver;
 
 static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = "../../tests/material/3c.jpg";
+        const char *file = MATERIAL_PATH"3c.jpg";
         
         int n = strlen(file);
         char * pFile = (char *)malloc(n+1);
@@ -962,14 +968,14 @@ int main(int argc, const char** argv)
         char *pAFile = NULL;
 
         if(cmdArg.IsTestAAC) {
-                pAFile = "../../tests/material/h265_aac_1_16000_a.aac";
+                pAFile = MATERIAL_PATH"h265_aac_1_16000_a.aac";
 	} else {
-                pAFile = "../../tests/material/h265_aac_1_16000_pcmu_8000.mulaw";
+                pAFile = MATERIAL_PATH"h265_aac_1_16000_pcmu_8000.mulaw";
         }
         if(cmdArg.IsTestH265) {
-                pVFile = "../../tests/material/h265_aac_1_16000_v.h265";
+                pVFile = MATERIAL_PATH"h265_aac_1_16000_v.h265";
 	} else {
-                pVFile = "../../tests/material/h265_aac_1_16000_h264.h264";
+                pVFile = MATERIAL_PATH"h265_aac_1_16000_h264.h264";
         }
 
 	if (cmdArg.pAFilePath) {
