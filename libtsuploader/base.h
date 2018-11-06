@@ -23,7 +23,7 @@ typedef enum {
         LINK_UPLOAD_TS = 1,
         LINK_UPLOAD_PIC = 2,
         LINK_UPLOAD_SEG = 3,
-        LINK_UPLOAD_MOVE_SEG = 3
+        LINK_UPLOAD_MOVE_SEG = 4
 } LinkUploadKind;
 
 typedef enum {
@@ -56,6 +56,7 @@ typedef struct _LinkUserUploadArg{
 typedef struct {
         char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
+        int nUpdateIntervalSeconds;
         int useHttps;
 }SegmentUserArg;
 

@@ -35,7 +35,7 @@ typedef struct {
         int64_t nRolloverTestBase;
         int nUptokenInterval;
         int nQbufSize;
-        int nNewSetIntval;
+        int nNewSegIntval;
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pTokenUrl;
@@ -697,6 +697,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         SegmentUserArg segArg;
         segArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
         segArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
+        segArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
         segArg.useHttps = 0;
         
         if (!cmdArg.IsWithPicUpload)
@@ -879,6 +880,23 @@ static void * second_file_test(void * opaque) {
         return NULL;
 }
 
+static void uploadStatisticCallback(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult) {
+        switch(uploadKind) {
+                case LINK_UPLOAD_TS:
+                        fprintf(stderr, "====>:opaque:%d   ts upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        break;
+                case LINK_UPLOAD_PIC:
+                        fprintf(stderr, "====>:opaque:%d   pic upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        break;
+                case LINK_UPLOAD_SEG:
+                        fprintf(stderr, "====>:opaque:%d   seg upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        break;
+                case LINK_UPLOAD_MOVE_SEG:
+                        fprintf(stderr, "====>:opaque:%d   seg move:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        break;
+        }
+}
+
 int main(int argc, const char** argv)
 {
         flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
@@ -911,7 +929,7 @@ int main(int argc, const char** argv)
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
         flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
-        flag_int(&cmdArg.nNewSetIntval, "segint", "new segment interval");
+        flag_int(&cmdArg.nNewSegIntval, "segint", "new segment interval");
         flag_int(&cmdArg.nUptokenInterval, "uptokenint", "update token interval. default(3550s)");
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
@@ -1070,7 +1088,9 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
-        avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
+        avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSegIntval;
+        avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback;
+        avuploader.userUploadArg.pUploadStatArg = (void *)10;
         if (cmdArg.zone != LINK_ZONE_UNKNOWN) {
                 avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         } else if (upzone != LINK_ZONE_UNKNOWN) {
