@@ -210,7 +210,7 @@ static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserDa
         return len;
 }
 
-static int myPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize) {
+static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize) {
         CURL *easy = curl_easy_init();
         curl_mime *mime;
         curl_mimepart *part;
@@ -240,6 +240,7 @@ static int myPutBuffer(const char * uphost, const char *token, const char * key,
         CURLcode curlCode = curl_easy_perform(easy);
         
         int httpCode = 0;
+        int retCode = -1;
         if (curlCode != 0) { //curl error
                 const char *pCurlErrMsg = curl_easy_strerror(curlCode);
                 if (pCurlErrMsg != NULL) {
@@ -250,6 +251,7 @@ static int myPutBuffer(const char * uphost, const char *token, const char * key,
         } else {
                 curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &httpCode);
                 if (httpCode / 100 == 2) {
+                        retCode = LINK_SUCCESS;
                         LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
                         if (resp != NULL) {
@@ -268,7 +270,7 @@ static int myPutBuffer(const char * uphost, const char *token, const char * key,
         curl_easy_cleanup(easy);
         curl_mime_free(mime);
         
-        return curlCode;
+        return retCode;
 }
 
 #ifdef MULTI_SEG_TEST
@@ -382,6 +384,9 @@ static void * streamUpload(void *_pOpaque)
         if (pUploader->tsStartUploadCallback) {
                 pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, tsStartTime / 1000000);
         }
+        
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+        
         Qiniu_Error error;
 #ifdef LINK_STREAM_UPLOAD
         client.xferinfoData = _pOpaque;
@@ -398,7 +403,11 @@ static void * streamUpload(void *_pOpaque)
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
                         int64_t nBufDataLen = l;
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
-                        myPutBuffer(upHost, uptoken, key, bufData, l);
+                        if (linkPutBuffer(upHost, uptoken, key, bufData, l) == LINK_SUCCESS)
+                                uploadResult = LINK_UPLOAD_RESULT_OK;
+                        if (pUploader->uploadArg.pUploadStatisticCb) {
+                                pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
+                        }
                         return NULL;
                 } else {
                         LinkLogError("LinkGetQueueBuffer get no data:%d", r);
@@ -445,7 +454,7 @@ static void * streamUpload(void *_pOpaque)
                 LinkLogDebug("upload file size:(exp:%"PRId64" real:%"PRId64") key:%s success",
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
-        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+        
         if (pUploader->state == LINK_UPLOAD_OK) {
                 uploadResult = LINK_UPLOAD_RESULT_OK;
         }
