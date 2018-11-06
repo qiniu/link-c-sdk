@@ -221,6 +221,7 @@ int TsUploaderSdkInit()
     userUploadArg.pDeviceId_ = gIpc.stream[STREAM_MAIN].devId;
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[STREAM_MAIN].devId);
     userUploadArg.nUploaderBufferSize = 512;
+    userUploadArg.pUploadStatisticCb = ReportUploadStatistic;
 
     segArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
     if ( gIpc.config.renameTokenUrl )

@@ -10,7 +10,7 @@
 #ifndef LOG2FILE_H
 #define LOG2FILE_H
 
-extern int fileOpen( char *_pLogFile );
-extern int writeLog( char *log );
+extern int FileOpen( char *_pLogFile );
+extern int WriteLog( char *log );
 
 #endif  /*LOG2FILE_H*/

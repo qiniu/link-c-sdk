@@ -1,4 +1,4 @@
-// Last Update:2018-09-18 19:40:02
+// Last Update:2018-11-06 16:42:26
 /**
  * @file log2file.c
  * @brief 
@@ -13,7 +13,7 @@
 
 static FILE *gFd = NULL;
 
-int fileOpen( char *_pLogFile )
+int FileOpen( char *_pLogFile )
 {
     gFd = fopen( _pLogFile, "w+" );
     if ( !gFd ) {
@@ -27,7 +27,7 @@ int fileOpen( char *_pLogFile )
     return 0;
 }
 
-int writeLog( char *log )
+int WriteLog( char *log )
 {
     size_t ret = 0;
 

@@ -1,4 +1,4 @@
-// Last Update:2018-10-23 14:07:36
+// Last Update:2018-11-06 16:58:05
 /**
  * @file socket_logging.h
  * @brief 
@@ -10,6 +10,7 @@
 #ifndef SOCKET_LOGGING_H
 #define SOCKET_LOGGING_H
 
+#include "tsuploaderapi.h"
 typedef struct {
     int connecting;
     int retry_count;
@@ -29,5 +30,6 @@ extern int GetCurrentTime( char *now_time );
 extern void DbgSendFileName( char *logfile );
 extern void StartSocketDbgTask();
 extern int socket_init();
+extern void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
 #endif  /*SOCKET_LOGGING_H*/
