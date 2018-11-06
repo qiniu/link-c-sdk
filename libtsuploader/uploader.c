@@ -253,7 +253,7 @@ static int myPutBuffer(const char * uphost, const char *token, const char * key,
         } else {
                 curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &httpCode);
                 if (httpCode / 100 == 2) {
-                        LinkLogDebug("upload.file size:exp:%lld key:%s success",datasize, key);
+                        LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
                         if (resp != NULL) {
                                 LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg=%s", key, datasize, httpCode, resp);

@@ -426,6 +426,7 @@ void StartConfigUpdateTask()
 
 int CaptureDevStartStream()
 {
+    DBG_LOG("start the stream...\n");
     gIpc.dev->startStream( STREAM_MAIN );
     if ( gIpc.config.multiChannel ) {
         gIpc.dev->startStream( STREAM_SUB );
