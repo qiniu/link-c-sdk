@@ -98,7 +98,7 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadSignalUpload:
                                         pUpInfo = (LinkPicUploadSignal*)malloc(sizeof(LinkPicUploadSignal));
                                         if (pUpInfo == NULL) {
-                                                LinkLogWarn("upload picture:%lld no memory", sig.nTimestamp);
+                                                LinkLogWarn("upload picture:%"PRId64" no memory", sig.nTimestamp);
                                         } else {
                                                 memcpy(pUpInfo, &sig, sizeof(sig));
                                                 ret = pthread_create(&pUpInfo->uploadPicThread, NULL, uploadPicture, pUpInfo);
@@ -181,7 +181,7 @@ static void * uploadPicture(void *_pOpaque) {
         // frame/ua/ts_start_timestamp/fragment_start_timestamp.jpeg
         char key[160] = {0};
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key), "frame/%s/%lld/0.jpg", pSig->deviceId, pSig->nTimestamp);
+        snprintf(key, sizeof(key), "frame/%s/%"PRId64"/0.jpg", pSig->deviceId, pSig->nTimestamp);
         
         char uptoken[1024] = {0};
         int ret = pSig->pPicUploader->picUpSettings_.getTokenCallback(pSig->pPicUploader->picUpSettings_.pGetTokenCallbackOpaque,
@@ -250,6 +250,7 @@ static void * uploadPicture(void *_pOpaque) {
 #ifdef __ARM
         report_status( error.code, key );// add by liyq to record ts upload status
 #endif
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if (error.code != 200) {
                 if (error.code == 401) {
                         LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
@@ -272,11 +273,16 @@ static void * uploadPicture(void *_pOpaque) {
                         }
                 }
         } else {
+                uploadResult = LINK_UPLOAD_RESULT_OK;
                 LinkLogDebug("upload picture key:%s success", key);
         }
         
         if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
                 pSig->pPicUploader->picUpSettings_.getPictureFreeCallback(pSig->pData, pSig->nDataLen);
+        }
+        
+        if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
+                pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
         
         Qiniu_Client_Cleanup(&client);

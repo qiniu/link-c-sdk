@@ -178,9 +178,9 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         int isAdtsAdded = 0;
         
         if (_nFlag == LINK_STREAM_TYPE_AUDIO){
-                //fprintf(stderr, "audio frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                //fprintf(stderr, "audio frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
-                        LinkLogWarn("audio pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
+                        LinkLogWarn("audio pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                         return 0;
                 }
 #ifndef USE_OWN_TSMUX
@@ -235,9 +235,9 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                 }
 #endif
         }else{
-                //fprintf(stderr, "video frame: len:%d pts:%lld\n", _nDataLen, _nTimestamp);
+                //fprintf(stderr, "video frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
-                        LinkLogWarn("video pts not monotonically: prev:%lld now:%lld", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
+                        LinkLogWarn("video pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                         return 0;
                 }
 #ifdef USE_OWN_TSMUX
@@ -293,7 +293,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                    //at least 1 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_INIT){   // upload finished
-                        //printf("next ts:%d %lld\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
+                        //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
@@ -454,7 +454,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
                 setQBufferSize(pFFTsMuxUploader, "default", nSize);
                 return pFFTsMuxUploader->nUploadBufferSize;
         }
-        LinkLogInfo("toto memory size:%lld\n", nTotalMemSize);
+        LinkLogInfo("toto memory size:%"PRId64"\n", nTotalMemSize);
         
         int64_t M = 1024 * 1024;
         if (nTotalMemSize <= 32 * M) {
@@ -775,6 +775,8 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         pFFTsMuxUploader->uploadArg.getTokenCallback = getTokenCallback;
         pFFTsMuxUploader->uploadArg.pGetTokenCallbackArg = pFFTsMuxUploader;
+        pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         
         pFFTsMuxUploader->nNewSegmentInterval = 30;
         
@@ -844,6 +846,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
         arg.pMgrTokenRequestUrl = _pSegArg->pMgrTokenRequestUrl;
         arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
+        arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         arg.useHttps = _pSegArg->useHttps;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
@@ -859,6 +863,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         fullArg.getPictureFreeCallback = _pPicArg->getPictureFreeCallback;
         fullArg.getTokenCallback = getTokenCallback;
         fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
+        fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
@@ -869,6 +875,16 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         
         pFFTsMuxUploader->pPicUploader = pPicUploader;
         return ret;
+}
+
+void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t _nSeconds) {
+        if (_pTsMuxUploader == NULL || _nSeconds <= 0) {
+                return;
+        }
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
+        return;
 }
 
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {

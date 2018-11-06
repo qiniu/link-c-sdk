@@ -79,7 +79,7 @@ int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_of
         
         int nDiff = (int)((nNow - pUploader->nUlnowRecTime) / 1000000000);
         if (nDiff > 0) {
-                //printf("%d,==========dltotal:%lld dlnow:%lld ultotal:%lld ulnow-reculnow=%lld, now - lastrectime=%lld\n",
+                //printf("%d,==========dltotal:%"PRId64" dlnow:%"PRId64" ultotal:%"PRId64" ulnow-reculnow=%"PRId64", now - lastrectime=%"PRId64"\n",
                 //       pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
                 if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->isTimeoutWithData) {
                         pUploader->nLowSpeedCnt += nDiff;
@@ -396,7 +396,7 @@ static void * streamUpload(void *_pOpaque)
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry.ts
-                        sprintf(key, "ts/%s/%lld/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
+                        sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
                         int64_t nBufDataLen = l;
@@ -410,7 +410,7 @@ static void * streamUpload(void *_pOpaque)
         }else {
                 Qiniu_Client_InitNoAuth(&client, 1024);
                 //ts/uaid/startts/fragment_start_ts/expiry.ts
-                sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
+                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
                         tsStartTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
                 LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
                 error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
@@ -426,7 +426,7 @@ static void * streamUpload(void *_pOpaque)
         if (error.code != 200) {
                 pUploader->state = LINK_UPLOAD_FAIL;
                 if (error.code == 401) {
-                        LinkLogError("upload file :%s expsize:%lld httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
+                        LinkLogError("upload file :%s expsize:%"PRId64" httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
                 } else if (error.code >= 500) {
                         const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
                         char errMsg[256];
@@ -440,17 +440,26 @@ static void * streamUpload(void *_pOpaque)
                 } else {
                         const char *pCurlErrMsg = curl_easy_strerror(error.code);
                         if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload file :%s expsize:%lld errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
+                                LinkLogError("upload file :%s expsize:%"PRId64" errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
                         } else {
-                                LinkLogError("upload file :%s expsize:%lld errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
+                                LinkLogError("upload file :%s expsize:%"PRId64" errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
                         }
                 }
                 //debug_log(&client, error);
         } else {
                 pUploader->state = LINK_UPLOAD_OK;
-                LinkLogDebug("upload file size:(exp:%lld real:%lld) key:%s success",
+                LinkLogDebug("upload file size:(exp:%"PRId64" real:%"PRId64") key:%s success",
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+        if (pUploader->state == LINK_UPLOAD_OK) {
+                uploadResult = LINK_UPLOAD_RESULT_OK;
+        }
+                
+        if (pUploader->uploadArg.pUploadStatisticCb) {
+                pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
+        }
+        
 END:
         if (freeClient)
                 Qiniu_Client_Cleanup(&client);
@@ -474,7 +483,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                         if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
                                 return 0;
                         }
-                        LinkLogError("first pop from queue timeout:%d %lld %lld", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
+                        LinkLogError("first pop from queue timeout:%d %"PRId64" %"PRId64"", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
                 }
                 return CURL_READFUNC_ABORT;
         }
@@ -497,7 +506,7 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
                                         pUploader->isTimeoutWithData = 1;
                                         goto RET;
                                 }
-                                LinkLogError("next pop from queue timeout:%d %lld %lld", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
+                                LinkLogError("next pop from queue timeout:%d %"PRId64" %"PRId64"", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
                         }
                         return CURL_READFUNC_ABORT;
                 }
@@ -671,6 +680,7 @@ int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum Cir
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
+        
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         

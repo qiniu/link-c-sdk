@@ -163,7 +163,7 @@ static void printPts(uint8_t *buf){
         int64_t pts = (int64_t)(*buf & 0x0e) << 29 |
         (AV_RB16(buf+1) >> 1) << 15 |
         AV_RB16(buf+3) >> 1;
-        printf("pes pts:%lld\n", pts/90);
+        printf("pes pts:%"PRId64"\n", pts/90);
 }
 
 static int getPESHeaderJustWithPtsLen(LinkPES *_pPes)

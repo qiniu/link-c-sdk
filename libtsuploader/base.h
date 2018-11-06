@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <inttypes.h>
 #include "log.h"
 #ifndef __APPLE__
 #include <stdint.h>
@@ -17,6 +18,19 @@
 #ifndef IN
 #define IN
 #endif
+
+typedef enum {
+        LINK_UPLOAD_TS = 1,
+        LINK_UPLOAD_PIC = 2,
+        LINK_UPLOAD_SEG = 3,
+        LINK_UPLOAD_MOVE_SEG = 3
+} LinkUploadKind;
+
+typedef enum {
+        LINK_UPLOAD_RESULT_OK = 1,
+        LINK_UPLOAD_RESULT_FAIL = 2
+} LinkUploadResult;
+typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
 typedef enum _LinkUploadZone{
         LINK_ZONE_HUADONG = 1,
@@ -34,6 +48,8 @@ typedef struct _LinkUserUploadArg{
         int   nDeviceIdLen_;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;
+        UploadStatisticCallback pUploadStatisticCb;
+        void *pUploadStatArg;
 }LinkUserUploadArg;
 
 typedef struct {
