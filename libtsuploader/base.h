@@ -33,6 +33,7 @@ typedef enum {
 typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
 typedef enum _LinkUploadZone{
+        LINK_ZONE_UNKNOWN = 0,
         LINK_ZONE_HUADONG = 1,
         LINK_ZONE_HUABEI = 2,
         LINK_ZONE_HUANAN = 3,

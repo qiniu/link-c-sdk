@@ -12,7 +12,7 @@ static int segGetTokenCallback(void *pOpaque, char *pBuf, int nBuflen) {
 }
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
-        int ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), pUpToken);
+        int ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, pUpToken);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;

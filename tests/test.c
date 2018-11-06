@@ -630,7 +630,7 @@ static void * updateToken(void * opaque) {
         while(1) {
                 sleep(cmdArg.nUptokenInterval);
                 memset(gtestToken, 0, sizeof(gtestToken));
-                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), NULL, cmdArg.pTokenUrl);
                 if (ret != 0) {
                         printf("update token file<<<<<<<<<<<<<\n");
                         return NULL;
@@ -1015,9 +1015,10 @@ int main(int argc, const char** argv)
 #endif
         
         AVuploader avuploader;
+        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         if (!cmdArg.IsNoNet) {
                 if (cmdArg.pToken == NULL) {
-                        ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), cmdArg.pTokenUrl);
+                        ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, cmdArg.pTokenUrl);
                         if (ret != 0)
                                 return ret;
                 } else {
@@ -1070,7 +1071,11 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
-        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
+        if (cmdArg.zone != LINK_ZONE_UNKNOWN) {
+                avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
+        } else if (upzone != LINK_ZONE_UNKNOWN) {
+                avuploader.userUploadArg.uploadZone_ = upzone;
+        }
         
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
