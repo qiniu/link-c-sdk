@@ -202,6 +202,78 @@ static int getExpireDays(char * pToken)
         return atoi(days);
 }
 
+static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserData) {
+        char **pResp = (char **)resp;
+        int len = size * nmemb ;
+        char *respTxt = (char *)malloc(len +1);
+        memcpy(respTxt, pUserData, len);
+        
+        respTxt[len] = 0;
+        *pResp = respTxt;
+        return len;
+}
+
+static int myPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize) {
+        CURL *easy = curl_easy_init();
+        curl_mime *mime;
+        curl_mimepart *part;
+        
+        /* Build an HTTP form with a single field named "data", */
+        mime = curl_mime_init(easy);
+        
+        part = curl_mime_addpart(mime);
+        curl_mime_name(part, "token");
+        curl_mime_data(part, token, CURL_ZERO_TERMINATED);
+        
+        part = curl_mime_addpart(mime);
+        curl_mime_name(part, "key");
+        curl_mime_data(part, key, CURL_ZERO_TERMINATED);
+        
+        part = curl_mime_addpart(mime);
+        curl_mime_name(part, "file");
+        curl_mime_data(part, data, datasize);
+        
+        char *resp = NULL;
+        curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, writeResult);
+        curl_easy_setopt(easy, CURLOPT_WRITEDATA, &resp);
+        
+        /* Post and send it. */
+        curl_easy_setopt(easy, CURLOPT_MIMEPOST, mime);
+        curl_easy_setopt(easy, CURLOPT_URL, uphost);
+        CURLcode curlCode = curl_easy_perform(easy);
+        
+        int httpCode = 0;
+        if (curlCode != 0) { //curl error
+                const char *pCurlErrMsg = curl_easy_strerror(curlCode);
+                if (pCurlErrMsg != NULL) {
+                        LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, datasize, curlCode, pCurlErrMsg);
+                } else {
+                        LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, datasize, curlCode);
+                }
+        } else {
+                curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &httpCode);
+                if (httpCode / 100 == 2) {
+                        LinkLogDebug("upload.file size:exp:%lld key:%s success",datasize, key);
+                } else {
+                        if (resp != NULL) {
+                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg=%s", key, datasize, httpCode, resp);
+                        } else {
+                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg={not receive response}", key, datasize, httpCode);
+                        }
+                }
+        }
+        
+        if (resp != NULL) {
+                free(resp);
+        }
+        
+        /* Clean-up. */
+        curl_easy_cleanup(easy);
+        curl_mime_free(mime);
+        
+        return curlCode;
+}
+
 #ifdef MULTI_SEG_TEST
 static int newSegCount = 0;
 #endif
@@ -211,7 +283,7 @@ static void * streamUpload(void *_pOpaque)
         
         char uptoken[1280] = {0};
         Qiniu_Client client;
-        int ret = 0;
+        int ret = 0, freeClient = 1;
         
         ret = pUploader->uploadArg.getTokenCallback(pUploader->uploadArg.pGetTokenCallbackArg,
                                                         uptoken, sizeof(uptoken));
@@ -219,45 +291,57 @@ static void * streamUpload(void *_pOpaque)
                 LinkLogError("ts up getTokenCallback fail:%d", ret);
                 return NULL;
         }
-        Qiniu_Client_InitNoAuth(&client, 1024);
+
         
         Qiniu_Io_PutRet putRet;
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
+        
+        const char *upHost;
         //设置机房域名
 #ifdef DISABLE_OPENSSL
         switch(pUploader->uploadArg.uploadZone) {
         case LINK_ZONE_HUABEI:
+                upHost = "http://upload-z1.qiniup.com";
                 Qiniu_Use_Zone_Huabei(Qiniu_False);
                 break;
         case LINK_ZONE_HUANAN:
+                upHost = "http://upload-z2.qiniup.com";
                 Qiniu_Use_Zone_Huanan(Qiniu_False);
                 break;
         case LINK_ZONE_BEIMEI:
+                upHost = "http://upload-na0.qiniup.com";
                 Qiniu_Use_Zone_Beimei(Qiniu_False);
                 break;
         case LINK_ZONE_DONGNANYA:
+                upHost = "http://upload-as0.qiniup.com";
                 Qiniu_Use_Zone_Dongnanya(Qiniu_False);
                 break;
         default:
+                upHost = "http://upload.qiniup.com";
                 Qiniu_Use_Zone_Huadong(Qiniu_False);
                 break;
         }
 #else
         switch(pUploader->uploadArg.uploadZone) {
         case LINK_ZONE_HUABEI:
+                upHost = "https://up-z1.qiniup.com";
                 Qiniu_Use_Zone_Huabei(Qiniu_True);
                 break;
         case LINK_ZONE_HUANAN:
+                upHost = "https://up-z2.qiniup.com";
                 Qiniu_Use_Zone_Huanan(Qiniu_True);
                 break;
         case LINK_ZONE_BEIMEI:
+                upHost = "https://up-na0.qiniup.com";
                 Qiniu_Use_Zone_Beimei(Qiniu_True);
                 break;
         case LINK_ZONE_DONGNANYA:
+                upHost = "https://up-as0.qiniup.com";
                 Qiniu_Use_Zone_Dongnanya(Qiniu_True);
                 break;
         default:
+                upHost = "https://up.qiniup.com";
                 Qiniu_Use_Zone_Huadong(Qiniu_True);
                 break;
         }
@@ -308,18 +392,23 @@ static void * streamUpload(void *_pOpaque)
         if (qtype == TSQ_APPEND) {
                 int r, l;
                 char *bufData;
+                freeClient = 0;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry.ts
                         sprintf(key, "ts/%s/%lld/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
-                        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, l, &putExtra);
+                        int64_t nBufDataLen = l;
+                        //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
+                        myPutBuffer(upHost, uptoken, key, bufData, l);
+                        return NULL;
                 } else {
                         LinkLogError("LinkGetQueueBuffer get no data:%d", r);
                         goto END;
                 }
         }else {
+                Qiniu_Client_InitNoAuth(&client, 1024);
                 //ts/uaid/startts/fragment_start_ts/expiry.ts
                 sprintf(key, "ts/%s/%lld/%lld/%d.ts", pUploader->uploadArg.pDeviceId_,
                         tsStartTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
@@ -363,7 +452,8 @@ static void * streamUpload(void *_pOpaque)
                          pUploader->getDataBytes, pUploader->nLastUlnow, key);
         }
 END:
-        Qiniu_Client_Cleanup(&client);
+        if (freeClient)
+                Qiniu_Client_Cleanup(&client);
         
         return NULL;
 }
