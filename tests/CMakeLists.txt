@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 2.8)
 project(testupload)
 
 
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
 message( "line-8 HOST is " ${HOST} )
 message( "line-8 HOST is " ${CFLAGS} )
