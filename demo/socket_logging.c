@@ -1,4 +1,4 @@
-// Last Update:2018-10-30 21:12:59
+// Last Update:2018-11-06 17:10:56
 /**
  * @file socket_logging.c
  * @brief 
@@ -6,15 +6,16 @@
  * @version 0.1.00
  * @date 2018-08-16
  */
-#include<stdio.h> //DBG_LOG
-#include<string.h>    //strlen
-#include<sys/socket.h>    //socket
-#include<arpa/inet.h> //inet_addr
+#include<stdio.h> 
+#include<string.h> 
+#include<sys/socket.h>
+#include<arpa/inet.h>
 #include <pthread.h>
 #include <errno.h>
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
+#include "tsuploaderapi.h"
 #include "socket_logging.h"
 #include "queue.h"
 #include "dbg.h"
@@ -122,27 +123,29 @@ int log_send( char *message )
     return 0;
 }
 
-int reportStatus( int code, char *_pFileName )
+void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult)
 {
     static int total = 0, error = 0;
     char message[512] = { 0 };
     char now[200] = { 0 };
 
-    memset( message, 0, sizeof(message) );
-    if ( code != 200 ) {
-        error ++;
+    DBG_LOG("uploadKind = %d\n", uploadKind );
+    if ( uploadKind == LINK_UPLOAD_TS ) {
+        memset( message, 0, sizeof(message) );
+        if ( uploadResult != LINK_UPLOAD_RESULT_OK ) {
+            error ++;
+        }
+        total++;
+        memset( now, 0, sizeof(now) );
+        GetCurrentTime( now );
+        sprintf( message, "[ %s ] [ %s ] [ cur : %s] [ total : %d ] [ error : %d ] [ percent : %%%f ]\n", 
+                 now,
+                 gIpc.devId,
+                 "ts",
+                 total, error, error*1.0/total*100 ); 
+        DBG_LOG("%s", message );
     }
-    total++;
-    memset( now, 0, sizeof(now) );
-    GetCurrentTime( now );
-    sprintf( message, "[ %s ] [ %s ] [ cur : %s] [ total : %d ] [ error : %d ] [ percent : %%%f ]\n", 
-             now,
-             gIpc.devId,
-             _pFileName,
-             total, error, error*1.0/total*100 ); 
-    DBG_LOG("%s", message );
 
-    return 0;
 }
 
 int GetTimeDiff( struct timeval *_pStartTime, struct timeval *_pEndTime )

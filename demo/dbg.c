@@ -1,4 +1,4 @@
-// Last Update:2018-10-23 15:45:44
+// Last Update:2018-11-06 17:11:21
 /**
  * @file dbg.c
  * @brief 
@@ -29,7 +29,6 @@ void SdkLogCallback(int nLogLevel, char *log )
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
 {
-    struct timeval time;
 
     memset( &gLogger, 0, sizeof(gLogger) );
 
@@ -41,7 +40,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
     printf("output = %d\n", output );
     switch( output ) {
     case OUTPUT_FILE:
-        fileOpen( gLogger.logFile );
+        FileOpen( gLogger.logFile );
         break;
     case OUTPUT_SOCKET:
         socket_init();
@@ -63,7 +62,6 @@ int dbg( unsigned logLevel, const char *file, const char *function, int line, co
     char buffer[BUFFER_SIZE] = { 0 };
     va_list arg;
     int len = 0;
-    char *pTime = NULL;
     char now[200] = { 0 };
 
     if ( gLogger.printTime ) {
@@ -82,7 +80,7 @@ int dbg( unsigned logLevel, const char *file, const char *function, int line, co
 
     switch( gLogger.output ) {
     case OUTPUT_FILE:
-        writeLog( buffer ); 
+        WriteLog( buffer ); 
         break;
     case OUTPUT_SOCKET:
         log_send( buffer );
