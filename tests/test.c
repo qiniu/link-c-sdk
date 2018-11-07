@@ -802,9 +802,7 @@ static void checkCmdArg(const char * name)
                         cmdArg.zone = LINK_ZONE_DONGNANYA;
                 }
         }
-        if (cmdArg.zone == 0) {
-                cmdArg.zone = LINK_ZONE_HUADONG;
-        }
+        
         if (cmdArg.pToken != NULL) {
                 if (strlen(cmdArg.pToken) > sizeof(gtestToken) - 1) {
                         LinkLogError("token too long");
@@ -1119,6 +1117,7 @@ int main(int argc, const char** argv)
         if (cmdArg.zone != LINK_ZONE_UNKNOWN) {
                 avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         } else if (upzone != LINK_ZONE_UNKNOWN) {
+                LinkLogDebug("set upload zone to:%d", upzone);
                 avuploader.userUploadArg.uploadZone_ = upzone;
         }
         
