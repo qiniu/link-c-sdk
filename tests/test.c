@@ -66,6 +66,8 @@ typedef struct {
         
         bool IsJustTestSegment;
         const char *pMgrToken;
+        LinkTsMuxUploader * pFirstUploader;
+        int nSigQuitTimes;
 }CmdArg;
 
 typedef struct {
@@ -78,7 +80,8 @@ typedef struct {
         int nVideoKeyframeAccLen;
         char * pAFile;
         char * pVFile;
-        char * pUrl;;
+        char * pUrl;
+        
 }AVuploader;
 
 #define VERSION "v1.0.0"
@@ -371,7 +374,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         }
                                                 }
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
-                                                if (cbRet != 0) {
+                                                if (cbRet != 0 && cbRet != LINK_PAUSED) {
                                                         bVideoOk = 0;
                                                 }
                                                 nNextVideoTime += 40;
@@ -397,7 +400,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 }
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO,cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
-                                                if (cbRet != 0) {
+                                                if (cbRet != 0  && cbRet != LINK_PAUSED) {
                                                         bVideoOk = 0;
                                                 }
                                                 nNextVideoTime += 40;
@@ -421,7 +424,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                 else
                                                         cbRet = callback(opaque, pAudioData + audioOffset, adts.var.aac_frame_length,
                                                                  THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
-                                                if (cbRet != 0) {
+                                                if (cbRet != 0 && cbRet != LINK_PAUSED) {
                                                         bAudioOk = 0;
                                                         continue;
                                                 }
@@ -439,7 +442,7 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                         } else {
                                 if(audioOffset+160 <= nAudioDataLen) {
                                         cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
-                                        if (cbRet != 0) {
+                                        if (cbRet != 0  && cbRet != LINK_PAUSED) {
                                                 bAudioOk = 0;
                                                 continue;
                                         }
@@ -567,7 +570,7 @@ int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
 
                 av_packet_unref(&pkt);
         }
-        if (ret != 0) {
+        if (ret != 0 && cbRet != LINK_PAUSED) {
                 char msg[128] = {0};
                 av_strerror(ret, msg, sizeof(msg)) ;
                 printf("ffmpeg end:%s\n", msg);
@@ -648,8 +651,22 @@ static void * updateToken(void * opaque) {
 }
 
 void signalHander(int s){
-        printf("SIGINT catched\n");
-        cmdArg.IsQuit = true;
+        
+        if (SIGINT == s) {
+                printf("SIGINT catched\n");
+                cmdArg.IsQuit = true;
+        }
+        if (SIGQUIT == s) {
+                printf("SIGQUIT catched\n");
+                if (cmdArg.nSigQuitTimes % 2 == 0) {
+                        LinkLogDebug("=======>pause upload");
+                        LinkPauseUpload(cmdArg.pFirstUploader);
+                } else {
+                        LinkLogDebug("=======>resume upload");
+                        LinkResumeUpload(cmdArg.pFirstUploader);
+                }
+                cmdArg.nSigQuitTimes++;
+        }
 }
 
 void logCb(int _nLevel, char * pLog)
@@ -856,7 +873,7 @@ static void do_start_file_test(AVuploader *pAvuploader){
                 }
                 if (cmdArg.IsFileLoop) {
                         cmdArg.nRoundCount++;
-                        printf(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceId_);
+                        LinkLogInfo(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceId_);
                 }
         } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
 }
@@ -967,8 +984,8 @@ int main(int argc, const char** argv)
 
         checkCmdArg(argv[0]);
         
-        //LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
-        LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
+        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
+        //LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
         if (cmdArg.IsJustTestSyncUploadPicture) {
                 justTestSyncUploadPicture(cmdArg.pTokenUrl);
                 return 0;
@@ -1023,6 +1040,7 @@ int main(int argc, const char** argv)
 #endif
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
+        signal(SIGQUIT, signalHander);
         
 #ifndef DISABLE_OPENSSL
         if (cmdArg.IsLocalToken) {
@@ -1103,6 +1121,7 @@ int main(int argc, const char** argv)
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return ret;
         }
+        cmdArg.pFirstUploader = avuploader.pTsMuxUploader;
         
         
         avuploader.pAFile = pAFile;
