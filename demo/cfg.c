@@ -352,7 +352,7 @@ void CfgGetIntItem( char *item, int *out )
     p = cfg_get( gIpc.cfg, item );
     if ( p ) {
         val = atoi( p );
-        if ( *out ) {
+        if ( out ) {
             if ( *out != val ) {
                *out = val; 
                printf("%s %s %d new value of %s is %d\n", __FILE__, __FUNCTION__, __LINE__, item, val );

@@ -1,4 +1,4 @@
-// Last Update:2018-11-06 17:10:56
+// Last Update:2018-11-07 11:28:32
 /**
  * @file socket_logging.c
  * @brief 
@@ -85,7 +85,7 @@ int socket_init()
 
     server.sin_addr.s_addr = inet_addr( gIpc.config.serverIp );
     server.sin_family = AF_INET;
-    DBG_LOG("gIpc.config.serverPort = %d\n", gIpc.config.serverPort );
+    printf("log server : %s : %d\n", gIpc.config.serverIp, gIpc.config.serverPort );
     server.sin_port = htons( gIpc.config.serverPort );
 
     ret = connect(gsock , (struct sockaddr *)&server , sizeof(server));
