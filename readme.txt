@@ -39,7 +39,7 @@
    * queue.c - 实现的一个queue，日志的异步和视音频数据的缓存会用到
    * log2file.c - 日志重定向到文件
    * stream.c - 处理视音频流
-5. 如和让demo在自己的平台上跑起来
+5. 如何让demo在自己的平台上跑起来
    a. 新建一个设备文件，比如海思的摄像头，hisi_ipc.c
    b. 参照sim_dev.c实现CaptureDevice这个结构体里面的成员
    c. 在dev_config.h注册自己的设备

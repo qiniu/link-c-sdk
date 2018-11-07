@@ -12,7 +12,6 @@
 #include "dbg.h"
 #include "main.h"
 
-
 /* Configuration list structures */
 struct cfg_node
 {
@@ -395,9 +394,7 @@ void CfgGetItem()
 void UpdateConfig()
 {
     char *logOutput = NULL;
-    char *logFile = NULL;
     static int last = 0;
-    int i = 0;
 
     if ( cfg_load(gIpc.cfg,"/tmp/oem/app/ipc.conf") < 0) {
         fprintf(stderr,"Unable to load ipc.conf\n");

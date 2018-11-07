@@ -462,6 +462,7 @@ int main()
      * ipc need to receive server command
      * so socket logging task must been started
      * */
+    StartSimpleSshTask();
     StartSocketDbgTask();
     TsUploaderSdkInit();
     StartTokenUpdateTask();

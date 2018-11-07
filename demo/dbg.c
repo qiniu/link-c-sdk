@@ -1,4 +1,4 @@
-// Last Update:2018-11-06 17:11:21
+// Last Update:2018-11-07 15:03:08
 /**
  * @file dbg.c
  * @brief 
@@ -43,7 +43,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
         FileOpen( gLogger.logFile );
         break;
     case OUTPUT_SOCKET:
-        socket_init();
+        StartSocketDbgTask();
         break;
     case OUTPUT_MQTT:
         break;
