@@ -7,6 +7,7 @@
 #include "tsuploaderapi.h"
 #include "fixjson.h"
 #include "servertime.h"
+#include "b64/urlsafe_b64.h"
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
@@ -55,80 +56,63 @@ struct MgrToken {
         int nTokenLen;
         char *pUrlPath;
         int nUrlPathLen;
+        int isHttps;
 };
 
 static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
         struct MgrToken *pToken = (struct MgrToken *)pUserData;
-        if (pToken->nDataLen < size * nmemb) {
-                pToken->nCurlRet = -11;
+       
+        int nTokenLen = pToken->nDataLen;
+        int ret = GetJsonContentByKey(pTokenStr, "\"token\"", pToken->pData, &nTokenLen);
+        if (ret != LINK_SUCCESS) {
+                pToken->nCurlRet = ret;
                 return 0;
         }
-        char *pTokenStart = strstr(pTokenStr, "\"token\"");
-        if (pTokenStart == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
-        }
-        pTokenStart += strlen("\"token\"");
-        while(*pTokenStart++ != '\"') {
-        }
-        
-        char *pTokenEnd = strchr(pTokenStart, '\"');
-        if (pTokenEnd == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
-        }
-        int nTokenLen = pTokenEnd - pTokenStart;
-        if (nTokenLen >= pToken->nDataLen) {
-                pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pToken->pData, pTokenStart, nTokenLen);
         pToken->pToken = pToken->pData;
         pToken->nTokenLen = nTokenLen;
         pToken->pToken[nTokenLen] = 0;
         
-        //bucket
-        char *pUrlStart = strstr(pTokenStr, "\"url\"");
-        if (pUrlStart == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
+        int len = 0;
+        if (pToken->isHttps) {
+                len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
+                         "https://rs.qiniu.com%s", pToken->pUrlPath+8);
+        } else {
+                len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
+                         "http://rs.qiniu.com%s", pToken->pUrlPath+8);
         }
-        pUrlStart += strlen("\"url\"");
-        while(*pUrlStart++ != '\"') {
-        }
-        
-        char *pUrlEnd = strchr(pUrlStart, '\"');
-        if (pUrlEnd == NULL) {
-                pToken->nCurlRet = LINK_JSON_FORMAT;
-                return 0;
-        }
-        int nUrlLen = pUrlEnd - pUrlStart;
-        if ( nUrlLen >= pToken->nDataLen - nTokenLen - 2) {
-                pToken->nCurlRet = LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pToken->pData + nTokenLen + 1, pUrlStart, nUrlLen);
         pToken->pUrlPath = pToken->pData + nTokenLen + 1;
-        pToken->nUrlPathLen = nUrlLen;
-        pToken->pToken[nTokenLen + nUrlLen + 1] = 0;
+        pToken->nUrlPathLen = len-2;
+        pToken->pUrlPath[len-2] = 0;
         
         return size * nmemb;
 }
 
-int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *pBody, struct MgrToken *pToken)
+int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, struct MgrToken *pToken)
 {
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
 
+        char oldkeyB64[96] = {0};
+        char keyB64[96] = {0};
+        urlsafe_b64_encode(oldkey, strlen(oldkey), oldkeyB64, sizeof(oldkeyB64) - 1);
+        urlsafe_b64_encode(key, strlen(key), keyB64, sizeof(keyB64) - 1);
+        
+        char requetBody[256] = {0};
+        snprintf(requetBody, sizeof(requetBody), "{\"key\":\"/move/%s/%s/force/false\"}", oldkeyB64, keyB64);
         //printf("=======>url:%s\n", pUrl);
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeMoveToken);
         curl_easy_setopt(curl, CURLOPT_URL, pUrl);
+        
         curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, pBody);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requetBody);
         
         pToken->pData = pBuf;
         pToken->nDataLen = nBufLen;
+        pToken->pUrlPath = requetBody;
+        pToken->nUrlPathLen = strlen(requetBody);
         pToken->nCurlRet = 0;
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, pToken);
         //memset(pBuf, 0, nBufLen);
@@ -242,12 +226,8 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 int nUrlLen = 0;
                 nUrlLen = sprintf(uptoken, "%s", segmentMgr.handles[idx].mgrTokenRequestUrl);
                 uptoken[nUrlLen] = 0;
-                if (segmentMgr.handles[idx].useHttps) {
-                        sprintf(uptoken + nUrlLen + 1, "{\"src\":\"%s\",\"dest\":\"%s\",\"security\":true}", oldKey, key);
-                } else {
-                        sprintf(uptoken + nUrlLen + 1, "{\"src\":\"%s\",\"dest\":\"%s\",\"security\":false}", oldKey, key);
-                }
-                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, uptoken + nUrlLen + 1, &mgrToken);
+                mgrToken.isHttps = segmentMgr.handles[idx].useHttps;
+                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken);
                 if (ret != 0 || mgrToken.nCurlRet != 0) {
                         LinkLogError("getMoveToken fail:%d", ret, mgrToken.nCurlRet);
                         return;
