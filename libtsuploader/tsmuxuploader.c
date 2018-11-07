@@ -70,6 +70,7 @@ typedef struct _FFTsMuxUploader{
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
+        int8_t isPause;
 }FFTsMuxUploader;
 
 static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -318,6 +319,10 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->isPause) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                return LINK_PAUSED;
+        }
         int ret = 0;
 
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
@@ -347,6 +352,10 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->isPause) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+                return LINK_PAUSED;
+        }
         int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, 0);
         if (ret != 0) {
                 return ret;
@@ -886,6 +895,41 @@ void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t
         
         LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
         return;
+}
+
+int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
+        if (_pTsMuxUploader == NULL ) {
+                return LINK_ARG_ERROR;
+        }
+        int ret = LINK_SUCCESS;
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        pFFTsMuxUploader->isPause = 1;
+        
+        pFFTsMuxUploader->nKeyFrameCount = 0;
+        pFFTsMuxUploader->nFrameCount = 0;
+        pFFTsMuxUploader->nFirstTimestamp = 0;
+        pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
+        pushRecycle(pFFTsMuxUploader);
+        ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
+        
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+
+        return ret;
+}
+
+int LinkResumeUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
+        if (_pTsMuxUploader == NULL ) {
+                return LINK_ARG_ERROR;
+        }
+        
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        pFFTsMuxUploader->isPause = 0;
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+        
+        return LINK_SUCCESS;
 }
 
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
