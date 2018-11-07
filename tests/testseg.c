@@ -6,18 +6,20 @@
 
 static char segStoreToken[1024];
 static int segGetTokenCallback(void *pOpaque, char *pBuf, int nBuflen) {
-        printf("in segGetTokenCallback\n");
+        LinkLogDebug("in segGetTokenCallback");
         memcpy(pBuf, segStoreToken, strlen(segStoreToken));
         return strlen(segStoreToken);
 }
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
-        int ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, pUpToken);
+        int ret = LinkInitTime();
+        assert(ret == LINK_SUCCESS);
+        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, pUpToken);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;
         }
-        printf("jseg token:%s\n", segStoreToken);
+        LinkLogDebug("jseg token:%s\n", segStoreToken);
         
         ret = LinkInitSegmentMgr();
         if (ret != LINK_SUCCESS) {
@@ -34,6 +36,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         arg.pMgrTokenRequestUrl = (char *)pMgrUrl;
         arg.nMgrTokenRequestUrlLen = strlen(arg.pMgrTokenRequestUrl);
         arg.useHttps = 0;
+        arg.pUploadStatisticCb = NULL;
+        arg.pUploadStatArg = NULL;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);

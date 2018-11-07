@@ -4,7 +4,6 @@ char * GetErrorMsg(IN const char *_pJson, OUT char *_pBuf, IN int _nBufLen)
 {
         const char * pStart = _pJson;
         pStart = strstr(pStart, "\\\"error\\\"");
-        printf("\\\"error\\\"");
         if (pStart == NULL)
                 return NULL;
         pStart += strlen("\\\"error\\\"");

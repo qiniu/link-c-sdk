@@ -967,6 +967,8 @@ int main(int argc, const char** argv)
 
         checkCmdArg(argv[0]);
         
+        //LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
+        LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
         if (cmdArg.IsJustTestSyncUploadPicture) {
                 justTestSyncUploadPicture(cmdArg.pTokenUrl);
                 return 0;
@@ -1019,7 +1021,6 @@ int main(int argc, const char** argv)
  	        printf("avformat_network_init\n");
 	}
 #endif
-        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         
