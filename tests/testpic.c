@@ -1,5 +1,8 @@
 #include "picuploader.h"
 #include "servertime.h"
+#include "localkey.h"
+#include <unistd.h>
+#include "picuploader.h"
 
 static void *gSvaeWhenAsync; //may race risk. but for test is enough
 enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
@@ -35,7 +38,8 @@ static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
 }
 
 void justTestSyncUploadPicture(char *pTokenUrl) {
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), pTokenUrl);
+        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
@@ -63,7 +67,8 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
 
 void justTestAsyncUploadPicture(char *pTokenUrl) {
         gSyncMode = LinkGetPictureModeAsync;
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), pTokenUrl);
+        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);

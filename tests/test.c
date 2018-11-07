@@ -17,6 +17,10 @@
 #define MATERIAL_PATH "../../tests/material/"
 #endif
 
+void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl);
+void justTestSyncUploadPicture(char *pTokenUrl);
+void justTestAsyncUploadPicture(char *pTokenUrl);
+
 typedef struct {
         bool IsInputFromFFmpeg;
         bool IsTestAAC;
@@ -900,16 +904,16 @@ static void * second_file_test(void * opaque) {
 static void uploadStatisticCallback(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult) {
         switch(uploadKind) {
                 case LINK_UPLOAD_TS:
-                        fprintf(stderr, "====>:opaque:%d   ts upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        fprintf(stderr, "====>:opaque:%p   ts upload:%s\n", pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
                         break;
                 case LINK_UPLOAD_PIC:
-                        fprintf(stderr, "====>:opaque:%d   pic upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        fprintf(stderr, "====>:opaque:%p   pic upload:%s\n", pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
                         break;
                 case LINK_UPLOAD_SEG:
-                        fprintf(stderr, "====>:opaque:%d   seg upload:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        fprintf(stderr, "====>:opaque:%p   seg upload:%s\n", pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
                         break;
                 case LINK_UPLOAD_MOVE_SEG:
-                        fprintf(stderr, "====>:opaque:%d   seg move:%s\n", (int)pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
+                        fprintf(stderr, "====>:opaque:%p   seg move:%s\n", pUserOpaque, uploadResult == LINK_UPLOAD_RESULT_OK ? "success" : "fail");
                         break;
         }
 }

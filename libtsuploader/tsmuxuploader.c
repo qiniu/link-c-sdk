@@ -73,7 +73,7 @@ typedef struct _FFTsMuxUploader{
         int8_t isPause;
 }FFTsMuxUploader;
 
-static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
+//static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
 static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
 static int getAacFreqIndex(int _nFreq)
@@ -176,7 +176,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         }
         
         int ret = 0;
-        int isAdtsAdded = 0;
         
         if (_nFlag == LINK_STREAM_TYPE_AUDIO){
                 //fprintf(stderr, "audio frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
@@ -185,12 +184,12 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         return 0;
                 }
 #ifndef USE_OWN_TSMUX
+                int isAdtsAdded = 0;
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                 pkt.dts = pkt.pts;
                 pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
 #endif
-                
                 unsigned char * pAData = (unsigned char * )_pData;
                 if (pFFTsMuxUploader->avArg.nAudioFormat ==  LINK_AUDIO_AAC && (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0)) {
                         LinkADTSFixheader fixHeader;
@@ -222,12 +221,13 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         LinkConvertAdtsHeader2Char(&fixHeader, &varHeader, pFFTsMuxUploader->pAACBuf);
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
                         memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
-                        isAdtsAdded = 1;
+
 #ifdef USE_OWN_TSMUX
                         LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t *)pFFTsMuxUploader->pAACBuf, varHeader.aac_frame_length, _nTimestamp);
 #else
                         pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
                         pkt.size = varHeader.aac_frame_length;
+                        isAdtsAdded = 1;
 #endif
                 } 
 #ifdef USE_OWN_TSMUX
@@ -517,7 +517,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         avArg.nAudioChannels = _pAvArg->nChannels;
         avArg.nAudioSampleRate = _pAvArg->nSamplerate;
         
-        avArg.output = writeTsPacketToMem;
+        avArg.output = (LinkTsPacketCallback)writeTsPacketToMem;
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
         

@@ -27,7 +27,7 @@ typedef struct {
         LinkAsyncInterface asyncWait_;
         enum LinkPicUploadSignalType signalType_;
         enum LinkPicUploadType upType_;
-        char *pData;
+        const char *pData;
         int nDataLen;
         int64_t nTimestamp; //file name need
         pthread_t uploadPicThread;
@@ -61,7 +61,7 @@ int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, con
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type) {
         PicUploader *pPicUp = (PicUploader *)pPicUploader;
         LinkPicUploadSignal* pSig = (LinkPicUploadSignal*)pOpaque;
-        pSig->pPicUploader = (char *)pPicUp;
+        pSig->pPicUploader = pPicUp;
         pSig->signalType_ = LinkPicUploadSignalUpload;
         pSig->pData = pBuf;
         pSig->nDataLen = nBuflen;

@@ -401,7 +401,7 @@ static void * streamUpload(void *_pOpaque)
                         sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
-                        int64_t nBufDataLen = l;
+
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
                         if (linkPutBuffer(upHost, uptoken, key, bufData, l) == LINK_SUCCESS)
                                 uploadResult = LINK_UPLOAD_RESULT_OK;

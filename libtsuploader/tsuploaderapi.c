@@ -8,11 +8,10 @@
 #ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
 #endif
-#ifndef DISABLE_OPENSSL
 #include <qiniu/io.h>
 #include <qiniu/rs.h>
-#endif
 #include "fixjson.h"
+#include "segmentmgr.h"
 
 static int volatile nProcStatus = 0;
 static LinkUploadZone gUploadZone;

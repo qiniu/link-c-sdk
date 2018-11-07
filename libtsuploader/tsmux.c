@@ -47,12 +47,6 @@ static uint16_t getPidCounter(LinkTsMuxerContext* _pMuxCtx, uint64_t _nPID)
         return -1;
 }
 
-static int writeTsHeader(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pBuf, int _nUinitStartIndicator, int _nPid, int _nAdaptationField)
-{
-        uint16_t counter = getPidCounter(_pMuxCtx, _nPid);
-        return LinkWriteTsHeader(_pBuf, _nUinitStartIndicator, counter, _nPid, _nAdaptationField);
-}
-
 static void writeTable(LinkTsMuxerContext* _pMuxCtx, int64_t _nPts)
 {
         if (_pMuxCtx->isTableWrited) {
