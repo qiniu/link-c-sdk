@@ -162,24 +162,16 @@ int TsUploaderSdkInit()
     DBG_LOG("gIpc.config.ak = %s\n", gIpc.config.ak);
     DBG_LOG("gIpc.config.sk = %s\n", gIpc.config.sk);
     DBG_LOG("gIpc.config.bucketName = %s\n", gIpc.config.bucketName);
-    if ( gIpc.config.ak )
-        LinkSetAk( gIpc.config.ak );
-
-    if ( gIpc.config.sk )
-        LinkSetSk( gIpc.config.sk );
-
-    if ( gIpc.config.bucketName )
-        LinkSetBucketName( gIpc.config.bucketName );
 
     if ( !gIpc.config.useLocalToken && !gIpc.config.tokenUrl ) {
         DBG_ERROR("token url not set, please modify /tmp/oem/app/ipc.conf and add token url\n");
         return -1;
     }
-        
 
     printf("%s %s %d tokenUrl = %s\n", __FILE__, __FUNCTION__, __LINE__, gIpc.config.tokenUrl );
     if ( gIpc.config.tokenUrl )
         strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
+    strncat( url, "/", 1 );
     strncat( url, gIpc.devId, strlen(gIpc.devId) );
     strncat( url, "a", 1 );
     DBG_LOG("url = %s\n", url );
@@ -246,6 +238,7 @@ int TsUploaderSdkInit()
     if ( gIpc.config.multiChannel ) {
         memset( url, 0, sizeof(url) );
         strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
+        strncat( url, "/", 1 );
         strncat( url, gIpc.devId, strlen(gIpc.devId) );
         strncat( url, "b", 1 );
         DBG_LOG("url = %s\n", url );
@@ -309,6 +302,7 @@ static void * UpadateToken() {
             return NULL;
         }
         strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
+        strncat( url, "/", 1 );
         strncat( url, gIpc.devId, strlen(gIpc.devId) );
         strncat( url, "a", 1 );
         DBG_LOG("url = %s\n", url );
@@ -333,6 +327,7 @@ static void * UpadateToken() {
         if ( gIpc.config.multiChannel ) {
             memset( url, 0, sizeof(url) );
             strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
+            strncat( url, "/", 1 );
             strncat( url, gIpc.devId, strlen(gIpc.devId) );
             strncat( url, "b", 1 );
             DBG_LOG("url = %s\n", url );
@@ -467,6 +462,7 @@ int main()
      * ipc need to receive server command
      * so socket logging task must been started
      * */
+    StartSimpleSshTask();
     StartSocketDbgTask();
     TsUploaderSdkInit();
     StartTokenUpdateTask();

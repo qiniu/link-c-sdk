@@ -12,7 +12,6 @@
 #include "dbg.h"
 #include "main.h"
 
-
 /* Configuration list structures */
 struct cfg_node
 {
@@ -352,7 +351,7 @@ void CfgGetIntItem( char *item, int *out )
     p = cfg_get( gIpc.cfg, item );
     if ( p ) {
         val = atoi( p );
-        if ( *out ) {
+        if ( out ) {
             if ( *out != val ) {
                *out = val; 
                printf("%s %s %d new value of %s is %d\n", __FILE__, __FUNCTION__, __LINE__, item, val );
@@ -395,9 +394,7 @@ void CfgGetItem()
 void UpdateConfig()
 {
     char *logOutput = NULL;
-    char *logFile = NULL;
     static int last = 0;
-    int i = 0;
 
     if ( cfg_load(gIpc.cfg,"/tmp/oem/app/ipc.conf") < 0) {
         fprintf(stderr,"Unable to load ipc.conf\n");

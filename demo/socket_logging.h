@@ -31,5 +31,6 @@ extern void DbgSendFileName( char *logfile );
 extern void StartSocketDbgTask();
 extern int socket_init();
 extern void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
+extern void StartSimpleSshTask();
 
 #endif  /*SOCKET_LOGGING_H*/

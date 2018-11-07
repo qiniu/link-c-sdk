@@ -1,4 +1,4 @@
-// Last Update:2018-11-06 17:10:56
+// Last Update:2018-11-07 15:00:16
 /**
  * @file socket_logging.c
  * @brief 
@@ -85,7 +85,7 @@ int socket_init()
 
     server.sin_addr.s_addr = inet_addr( gIpc.config.serverIp );
     server.sin_family = AF_INET;
-    DBG_LOG("gIpc.config.serverPort = %d\n", gIpc.config.serverPort );
+    printf("log server : %s : %d\n", gIpc.config.serverIp, gIpc.config.serverPort );
     server.sin_port = htons( gIpc.config.serverPort );
 
     ret = connect(gsock , (struct sockaddr *)&server , sizeof(server));
@@ -129,7 +129,7 @@ void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUpl
     char message[512] = { 0 };
     char now[200] = { 0 };
 
-    DBG_LOG("uploadKind = %d\n", uploadKind );
+    //DBG_LOG("uploadKind = %d\n", uploadKind );
     if ( uploadKind == LINK_UPLOAD_TS ) {
         memset( message, 0, sizeof(message) );
         if ( uploadResult != LINK_UPLOAD_RESULT_OK ) {
@@ -192,13 +192,13 @@ void *SocketLoggingTask( void *param )
                     memset( log, 0, sizeof(log) );
                     gLogQueue->dequeue( gLogQueue, log, NULL );
                 } else {
-                    printf("error, gLogQueue is NULL\n");
+                    DBG_ERROR("error, gLogQueue is NULL\n");
                     return NULL;
                 }
                 //printf("log = %s", log);
                 ret = send(gsock , log , strlen(log) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
                 if(  ret < 0 ) {
-                    printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+                    DBG_ERROR("Send failed, ret = %d, %s\n", ret, strerror(errno) );
                     gStatus.connecting = 0;
                     shutdown( gsock, SHUT_RDWR );
                     close( gsock );
@@ -209,14 +209,14 @@ void *SocketLoggingTask( void *param )
                 if ( ret < 0 ) {
                     sleep(5);
                     gStatus.retry_count ++;
-                    printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
+                    DBG_ERROR("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
                     continue;
                 }
-                printf("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
+                DBG_LOG("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
                 gStatus.connecting = 1;
                 gStatus.retry_count = 0;
                 DbgSendFileName( gIpc.devId );
-                printf("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
+                DBG_LOG("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             }
         } else {
             sleep( 3 );
@@ -272,11 +272,11 @@ void *SimpleSshTask( void *param )
                 sleep(5);
                 continue;
             }
-            printf("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
+            DBG_LOG("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
             gStatus.connecting = 1;
             gStatus.retry_count = 0;
             DbgSendFileName( gIpc.devId );
-            printf("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
+            DBG_LOG("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             sleep( 3 );
         }
     }
@@ -285,14 +285,22 @@ void *SimpleSshTask( void *param )
 
 void StartSocketDbgTask()
 {
-    static pthread_t log = 0, cmd;
+    static pthread_t log = 0;
 
     if ( !log ) {
-        printf("%s %s %d start socket logging thread\n", __FILE__, __FUNCTION__, __LINE__);
+        DBG_LOG("%s %s %d start socket logging thread\n", __FILE__, __FUNCTION__, __LINE__);
         if ( gIpc.config.logOutput == OUTPUT_SOCKET)
             pthread_create( &log, NULL, SocketLoggingTask, NULL );
+    }
+}
+
+void StartSimpleSshTask()
+{
+    static pthread_t thread = 0;
+
+    if ( !thread ) {
         if ( gIpc.config.simpleSshEnable )
-            pthread_create( &cmd, NULL, SimpleSshTask, NULL );
+            pthread_create( &thread, NULL, SimpleSshTask, NULL );
     }
 }
 
@@ -310,6 +318,9 @@ void CmdHnadleDump( char *param )
     sprintf( buffer+strlen(buffer), "gMovingDetect = %d\n", gIpc.detectMoving );
     sprintf( buffer+strlen(buffer), "gAudioType = %d\n", gIpc.audioType );
     sprintf( buffer+strlen(buffer), "queue = %d\n", gLogQueue->getSize( gLogQueue ) );
+    sprintf( buffer+strlen(buffer), "tokenUrl = %s\n", pConfig->tokenUrl );
+    sprintf( buffer+strlen(buffer), "renameTokenUrl = %s\n", pConfig->renameTokenUrl );
+    sprintf( buffer+strlen(buffer), "cache = %d\n", pConfig->openCache );
     sprintf( buffer+strlen(buffer), "logStop = %d\n", gStatus.logStop );
     ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
