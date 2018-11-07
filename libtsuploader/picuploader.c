@@ -71,6 +71,11 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *
         return ret;
 }
 
+void LinkPicUploaderSetUploadZone(PictureUploader *pPicUploader, LinkUploadZone upzone) {
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        pPicUp->picUpSettings_.uploadZone = upzone;
+}
+
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
@@ -199,10 +204,8 @@ static void * uploadPicture(void *_pOpaque) {
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
 
-        //设置机房域名
-        LinkUploadZone upZone = LinkGetuploadZone();
 #ifdef DISABLE_OPENSSL
-        switch(upZone) {
+        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_False);
                         break;
@@ -220,7 +223,7 @@ static void * uploadPicture(void *_pOpaque) {
                         break;
         }
 #else
-        switch(upZone) {
+        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_True);
                         break;

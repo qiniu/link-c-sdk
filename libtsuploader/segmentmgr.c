@@ -12,6 +12,7 @@
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
 #define SEGMENT_INTERVAL 3
+#define SEGMENT_SET_UPLOADZONE 4
 typedef struct {
         int64_t nStart;
         int64_t nEndOrInt;
@@ -35,6 +36,7 @@ typedef struct {
         int useHttps;
         int64_t nUpdateIntervalSeconds;
         int64_t nLastUpdateTime;
+        LinkUploadZone uploadZone;
 }Seg;
 
 typedef struct {
@@ -179,6 +181,22 @@ static void setSegmentInt(SegInfo segInfo) {
         segmentMgr.handles[idx].nUpdateIntervalSeconds = segInfo.nEndOrInt;
 }
 
+static void setSegmentUploadZone(SegInfo segInfo) {
+        int i, idx = -1;
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
+                if (segmentMgr.handles[i].handle == segInfo.handle) {
+                        idx = i;
+                        break;
+                }
+        }
+        if (idx < 0) {
+                LinkLogWarn("wrong segment handle:%d", segInfo.handle);
+                return;
+        }
+        
+        segmentMgr.handles[idx].uploadZone = (LinkUploadZone)segInfo.nEndOrInt;
+}
+
 static void upadateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
@@ -261,10 +279,8 @@ static void upadateSegmentFile(SegInfo segInfo) {
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
         
-        //设置机房域名
-        LinkUploadZone upZone = LinkGetuploadZone();
 #ifdef DISABLE_OPENSSL
-        switch(upZone) {
+        switch(segmentMgr.handles[idx].uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_False);
                         break;
@@ -282,7 +298,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         break;
         }
 #else
-        switch(upZone) {
+        switch(segmentMgr.handles[idx].uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_True);
                         break;
@@ -381,6 +397,8 @@ static void * segmetMgrRun(void *_pOpaque) {
                                         upadateSegmentFile(segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_INTERVAL) {
                                         setSegmentInt(segInfo);
+                                } else if (segInfo.nOperation == SEGMENT_SET_UPLOADZONE) {
+                                        setSegmentUploadZone(segInfo);
                                 }
                         }
                 }
@@ -436,6 +454,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
                         segmentMgr.handles[i].useHttps = pArg->useHttps;
                         segmentMgr.handles[i].nUpdateIntervalSeconds = pArg->nUpdateIntervalSeconds;
+                        segmentMgr.handles[i].uploadZone = pArg->uploadZone;
                         if (pArg->nUpdateIntervalSeconds <= 0) {
                                 segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
                         }
@@ -462,6 +481,23 @@ void LinkSetSegmentUpdateInt(SegmentHandle seg, int64_t nSeconds) {
         segInfo.nEndOrInt = nSeconds * 1000000000;
         segInfo.isRestart = 0;
         segInfo.nOperation = SEGMENT_INTERVAL;
+        
+        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        
+        return;
+}
+
+void LinkSetSegmentUploadZone(SegmentHandle seg, LinkUploadZone upzone) {
+        if (!segMgrStarted) {
+                return;
+        }
+        
+        SegInfo segInfo;
+        segInfo.handle = seg;
+        segInfo.nStart = 0;
+        segInfo.nEndOrInt = (int)upzone;
+        segInfo.isRestart = 0;
+        segInfo.nOperation = SEGMENT_SET_UPLOADZONE;
         
         segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         

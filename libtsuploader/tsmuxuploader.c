@@ -809,6 +809,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
         pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
+        pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
@@ -857,6 +858,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        arg.uploadZone = _pUserUploadArg->uploadZone_;
         arg.useHttps = _pSegArg->useHttps;
         arg.nUpdateIntervalSeconds = _pSegArg->nUpdateIntervalSeconds;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
@@ -875,6 +877,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        fullArg.uploadZone = _pUserUploadArg->uploadZone_;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
@@ -955,6 +958,19 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        return LINK_SUCCESS;
+}
+
+int LinkTsMuxUploaderSetUploadZone(LinkTsMuxUploader *_pTsMuxUploader, LinkUploadZone _upzone) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        assert(pFFTsMuxUploader->pTsMuxCtx == NULL);
+        if (pFFTsMuxUploader->pPicUploader) {
+                LinkPicUploaderSetUploadZone(pFFTsMuxUploader->pPicUploader, _upzone);
+        }
+        if (pFFTsMuxUploader->segmentHandle != LINK_INVALIE_SEGMENT_HANDLE) {
+                LinkSetSegmentUploadZone(pFFTsMuxUploader->segmentHandle, _upzone);
+        }
         return LINK_SUCCESS;
 }
 

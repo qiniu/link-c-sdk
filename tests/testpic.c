@@ -51,6 +51,7 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
         arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetTokenCallbackOpaque = NULL;
+        arg.uploadZone = upzone;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);
@@ -80,6 +81,7 @@ void justTestAsyncUploadPicture(char *pTokenUrl) {
         arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetTokenCallbackOpaque = NULL;
+        arg.uploadZone = upzone;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);

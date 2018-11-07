@@ -14,7 +14,6 @@
 #include "segmentmgr.h"
 
 static int volatile nProcStatus = 0;
-static LinkUploadZone gUploadZone;
 
 int LinkInitUploader()
 {
@@ -181,12 +180,8 @@ int LinkIsProcStatusQuit()
         return 0;
 }
 
-void LinkSetuploadZone(LinkUploadZone zone) {
-        gUploadZone = zone;
-}
-
-LinkUploadZone LinkGetuploadZone() {
-        return gUploadZone;
+void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone) {
+        LinkTsMuxUploaderSetUploadZone(pTsMuxUploader, zone);
 }
 
 void LinkUninitUploader()

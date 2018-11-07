@@ -719,6 +719,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         segArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
         segArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
         segArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
+        segArg.uploadZone = _pUserUploadArg->uploadZone_;
         segArg.useHttps = 0;
         
         if (!cmdArg.IsWithPicUpload)

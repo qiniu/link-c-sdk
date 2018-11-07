@@ -17,8 +17,8 @@ void LinkNotiryNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
-void LinkSetuploadZone(LinkUploadZone zone);
-LinkUploadZone LinkGetuploadZone();
+void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone);
+
 int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);
 void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader, IN int nSize);
 int LinkGetUploadBufferUsedSize(IN LinkTsMuxUploader *pTsMuxUploader);
