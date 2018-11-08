@@ -465,7 +465,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
                 setQBufferSize(pFFTsMuxUploader, "default", nSize);
                 return pFFTsMuxUploader->nUploadBufferSize;
         }
-        LinkLogInfo("toto memory size:%"PRId64"\n", nTotalMemSize);
+        LinkLogInfo("total memory size:%"PRId64"\n", nTotalMemSize);
         
         int64_t M = 1024 * 1024;
         if (nTotalMemSize <= 32 * M) {

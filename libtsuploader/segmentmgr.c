@@ -29,7 +29,7 @@ typedef struct {
         char ua[32];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
-        char mgrTokenRequestUrl[256];
+        char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
@@ -101,7 +101,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         
         char requetBody[256] = {0};
         snprintf(requetBody, sizeof(requetBody), "{\"key\":\"/move/%s/%s/force/false\"}", oldkeyB64, keyB64);
-        //printf("=======>url:%s\n", pUrl);
+        //printf("=======>move url:%s\n", pUrl);
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
@@ -242,7 +242,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         if(!isNewSeg) {
                 struct MgrToken mgrToken;
                 int nUrlLen = 0;
-                nUrlLen = sprintf(uptoken, "%s", segmentMgr.handles[idx].mgrTokenRequestUrl);
+                nUrlLen = sprintf(uptoken, "%s/%s", segmentMgr.handles[idx].pMgrTokenRequestUrl, segmentMgr.handles[idx].ua);
                 uptoken[nUrlLen] = 0;
                 mgrToken.isHttps = segmentMgr.handles[idx].useHttps;
                 int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken);
@@ -370,7 +370,10 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].useHttps = 0;
                 segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
-                segmentMgr.handles[seg].mgrTokenRequestUrl[0] = 0;
+                if (segmentMgr.handles[seg].pMgrTokenRequestUrl) {
+                        free(segmentMgr.handles[seg].pMgrTokenRequestUrl);
+                        segmentMgr.handles[seg].pMgrTokenRequestUrl = NULL;
+                }
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
                 segmentMgr.handles[seg].nUpdateIntervalSeconds = 30 * 1000000000LL;
         }
@@ -448,6 +451,17 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
         int i = 0;
         for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == -1) {
+                        //TODO mgrTokenRequestUrl malloc and free
+                        int nMoveUrlLen = pArg->nMgrTokenRequestUrlLen + 1;
+                        char *pTmp = (char *)malloc(nMoveUrlLen);
+                        if (pTmp == NULL) {
+                                return LINK_NO_MEMORY;
+                        }
+                        memcpy(pTmp, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
+                        pTmp[nMoveUrlLen - 1] = 0;
+                        segmentMgr.handles[i].pMgrTokenRequestUrl = pTmp;
+                        segmentMgr.handles[i].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen;
+                        
                         *pSeg = i;
                         segmentMgr.handles[i].handle  = i;
                         segmentMgr.handles[i].getUploadParamCallback = pArg->getUploadParamCallback;
@@ -462,11 +476,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         if (pArg->nUpdateIntervalSeconds <= 0) {
                                 segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
                         }
-                        //TODO mgrTokenRequestUrl malloc and free
-                        memcpy(segmentMgr.handles[*pSeg].mgrTokenRequestUrl, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
-                        sprintf(segmentMgr.handles[*pSeg].mgrTokenRequestUrl + pArg->nMgrTokenRequestUrlLen, "/%s", segmentMgr.handles[i].ua);
-                        segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen + pArg->nDeviceIdLen + 1;
-                        segmentMgr.handles[*pSeg].mgrTokenRequestUrl[segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen] = 0;
+                        
                         
                         return LINK_SUCCESS;
                 }
