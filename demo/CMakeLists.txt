@@ -8,8 +8,6 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/include")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/output/${HOST}/lib")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
-link_directories("/home/vod/an-jia/libs")
-include_directories("/home/vod/an-jia/include")
 
 if (WITH_OPENSSL)
     set(DISABLE_OPENSSL OFF)
@@ -39,7 +37,6 @@ add_executable(demo-tsupload
     stream.c
     stream.h
     sim_dev.c
-    #    aj_dev.c
 )
 
 if(APPLE)
@@ -53,7 +50,7 @@ if(APPLE)
 else()
     if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
-        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl m pthread devsdk tools )
+        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
         else()
         	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread )
         endif()

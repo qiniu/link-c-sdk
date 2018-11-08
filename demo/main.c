@@ -174,6 +174,7 @@ int TsUploaderSdkInit()
     strncat( url, "/", 1 );
     strncat( url, gIpc.devId, strlen(gIpc.devId) );
     strncat( url, "a", 1 );
+    strncat( url, "?callback=false", strlen("?callback=false") );
     DBG_LOG("url = %s\n", url );
 
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
@@ -241,6 +242,7 @@ int TsUploaderSdkInit()
         strncat( url, "/", 1 );
         strncat( url, gIpc.devId, strlen(gIpc.devId) );
         strncat( url, "b", 1 );
+        strncat( url, "?callback=false", strlen("?callback=false") );
         DBG_LOG("url = %s\n", url );
 
         if ( !gIpc.config.useLocalToken ) {
@@ -305,6 +307,7 @@ static void * UpadateToken() {
         strncat( url, "/", 1 );
         strncat( url, gIpc.devId, strlen(gIpc.devId) );
         strncat( url, "a", 1 );
+        strncat( url, "?callback=false", strlen("?callback=false") );
         DBG_LOG("url = %s\n", url );
         memset(gIpc.stream[STREAM_MAIN].token, 0, sizeof(gIpc.stream[STREAM_MAIN].token));
         if ( !gIpc.config.useLocalToken ) {
@@ -330,6 +333,7 @@ static void * UpadateToken() {
             strncat( url, "/", 1 );
             strncat( url, gIpc.devId, strlen(gIpc.devId) );
             strncat( url, "b", 1 );
+            strncat( url, "?callback=false", strlen("?callback=false") );
             DBG_LOG("url = %s\n", url );
             memset( gIpc.stream[STREAM_SUB].token, 0, sizeof(gIpc.stream[STREAM_SUB].token));
             if ( !gIpc.config.useLocalToken ) {
