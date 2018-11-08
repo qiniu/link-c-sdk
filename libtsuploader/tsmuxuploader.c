@@ -973,7 +973,7 @@ void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         pFFTsMuxUploader->isTypeOneshot = 0;
-        memcpy(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+        memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return;
