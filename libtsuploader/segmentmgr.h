@@ -11,7 +11,7 @@ typedef struct {
         int nDeviceIdLen;
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
-        char *pMgrTokenRequestUrl;
+        const char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
@@ -22,11 +22,11 @@ typedef struct {
 
 int LinkInitSegmentMgr();
 
-int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg);
-void LinkSetSegmentUpdateInt(SegmentHandle seg, int64_t nSeconds);
-void LinkSetSegmentUploadZone(SegmentHandle seg, LinkUploadZone upzone);
-void LinkReleaseSegmentHandle(SegmentHandle *pSeg);
-int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRestart);
+int LinkNewSegmentHandle(OUT SegmentHandle *pSeg, IN const SegmentArg *pArg);
+void LinkSetSegmentUpdateInt(IN SegmentHandle seg, IN int64_t nSeconds);
+void LinkSetSegmentUploadZone(IN SegmentHandle seg, IN LinkUploadZone upzone);
+void LinkReleaseSegmentHandle(IN OUT SegmentHandle *pSeg);
+int LinkUpdateSegment(IN SegmentHandle seg, IN int64_t nStart, IN int64_t nEnd, IN int isRestart);
 
 void LinkUninitSegmentMgr();
 

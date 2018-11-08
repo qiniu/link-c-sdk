@@ -282,7 +282,7 @@ static void * uploadPicture(void *_pOpaque) {
         }
         
         if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
-                pSig->pPicUploader->picUpSettings_.getPictureFreeCallback(pSig->pData, pSig->nDataLen);
+                pSig->pPicUploader->picUpSettings_.getPictureFreeCallback((char *)pSig->pData, pSig->nDataLen);
         }
         
         if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {

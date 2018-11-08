@@ -441,7 +441,7 @@ int LinkInitSegmentMgr() {
         return LINK_SUCCESS;
 }
 
-int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
+int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
         if (!segMgrStarted) {
                 return LINK_NOT_INITED;
         }
@@ -462,7 +462,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                         if (pArg->nUpdateIntervalSeconds <= 0) {
                                 segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
                         }
-                        
+                        //TODO mgrTokenRequestUrl malloc and free
                         memcpy(segmentMgr.handles[*pSeg].mgrTokenRequestUrl, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
                         sprintf(segmentMgr.handles[*pSeg].mgrTokenRequestUrl + pArg->nMgrTokenRequestUrlLen, "/%s", segmentMgr.handles[i].ua);
                         segmentMgr.handles[*pSeg].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen + pArg->nDeviceIdLen + 1;

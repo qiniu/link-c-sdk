@@ -64,7 +64,7 @@ typedef struct _FFTsMuxUploader{
         int nUploadBufferSize;
         int nNewSegmentInterval;
         
-        char deviceId_[65];
+        char deviceId_[33];
         Token token_;
         LinkUploadArg uploadArg;
         PictureUploader *pPicUploader;
@@ -151,7 +151,7 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         return ret;
 }
 
-static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag){
+static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag){
 #ifndef USE_OWN_TSMUX
         AVPacket pkt;
         av_init_packet(&pkt);
@@ -317,7 +317,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         return 0;
 }
 
-static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
+static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -350,7 +350,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDa
         return ret;
 }
 
-static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
+static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -660,7 +660,7 @@ end:
 }
 #endif
 
-static int setToken(LinkTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen)
+static int setToken(LinkTsMuxUploader* _PTsMuxUploader, const char *_pToken, int _nTokenLen)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
@@ -759,7 +759,7 @@ static void setNewSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInter
         pFFTsMuxUploader->nNewSegmentInterval = nInterval;
 }
 
-int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg, int isWithPicAndSeg)
+int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg, const LinkUserUploadArg *_pUserUploadArg, int isWithPicAndSeg)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)malloc(sizeof(FFTsMuxUploader));
         if (pFFTsMuxUploader == NULL) {
@@ -775,7 +775,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         
         if (_pUserUploadArg->nDeviceIdLen_ >= sizeof(pFFTsMuxUploader->deviceId_)) {
                 free(pFFTsMuxUploader);
-                LinkLogError("device max support lenght is 64");
+                LinkLogError("device(ua) max support lenght is 32");
                 return LINK_ARG_TOO_LONG;
         }
         memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
@@ -827,7 +827,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         return LINK_SUCCESS;
 }
 
-int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
+int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg, const LinkUserUploadArg *_pUserUploadArg) {
         return linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 0);
 }
 
@@ -862,8 +862,8 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         return LINK_SUCCESS;
 }
 
-int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
-                                            LinkUserUploadArg *_pUserUploadArg, LinkPicUploadArg *_pPicArg, SegmentUserArg *_pSegArg) {
+int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
+                                            const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg, const SegmentUserArg *_pSegArg) {
         
         //LinkTsMuxUploader *pTsMuxUploader
         int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);

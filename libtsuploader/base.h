@@ -54,7 +54,7 @@ typedef struct _LinkUserUploadArg{
         char  *pToken_;
         int   nTokenLen_;
         LinkUploadZone uploadZone_;
-        char  *pDeviceId_;
+        const char  *pDeviceId_;
         int   nDeviceIdLen_;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;
@@ -63,7 +63,7 @@ typedef struct _LinkUserUploadArg{
 }LinkUserUploadArg;
 
 typedef struct {
-        char *pMgrTokenRequestUrl;
+        const char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
         int nUpdateIntervalSeconds;
         int useHttps;

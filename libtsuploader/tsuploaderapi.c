@@ -136,7 +136,7 @@ int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataL
         return ret;
 }
 
-int LinkUpdateToken(LinkTsMuxUploader *_pTsMuxUploader, char * _pToken, int _nTokenLen)
+int LinkUpdateToken(LinkTsMuxUploader *_pTsMuxUploader, const char * _pToken, int _nTokenLen)
 {
         if (_pTsMuxUploader == NULL || _pToken == NULL || _nTokenLen == 0) {
                 return LINK_ARG_ERROR;
@@ -282,7 +282,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, const char *pUrl)
 {
 #ifdef DISABLE_OPENSSL
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)

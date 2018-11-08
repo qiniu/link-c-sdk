@@ -23,7 +23,7 @@ void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
 
 void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone);
 
-int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);
+int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pToken, IN int nTokenLen);
 void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader, IN int nSize);
 int LinkGetUploadBufferUsedSize(IN LinkTsMuxUploader *pTsMuxUploader);
 void LinkSetNewSegmentInterval(IN LinkTsMuxUploader *pTsMuxUploader, IN int nIntervalSecond);
