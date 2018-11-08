@@ -71,10 +71,12 @@ typedef struct _FFTsMuxUploader{
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
         int8_t isPause;
+        int8_t isTypeOneshot;
+        char tsType[16];
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
-static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
+static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
 
 static int getAacFreqIndex(int _nFreq)
 {
@@ -789,8 +791,8 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         }
         
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
-        pFFTsMuxUploader->uploadArg.getTokenCallback = getTokenCallback;
-        pFFTsMuxUploader->uploadArg.pGetTokenCallbackArg = pFFTsMuxUploader;
+        pFFTsMuxUploader->uploadArg.getUploadParamCallback = getUploadParamCallback;
+        pFFTsMuxUploader->uploadArg.pGetUploadParamCallbackArg = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         
@@ -829,16 +831,34 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         return linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 0);
 }
 
-static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
+static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        if (nBuflen < pFFTsMuxUploader->token_.nTokenLen_) {
-                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, nBuflen);
+        if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
+                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_BUFFER_IS_SMALL;
         }
-        memcpy(pBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+        memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+        pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
+        pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+        
+        if (pParam->pTypeBuf != NULL && pParam->nTypeBufLen != 0) {
+                int nTypeLen = strlen(pFFTsMuxUploader->tsType);
+                if (pParam->nTypeBufLen > nTypeLen) {
+                        memcpy(pParam->pTypeBuf, pFFTsMuxUploader->tsType, nTypeLen);
+                        pParam->pTypeBuf[nTypeLen] = 0;
+                        pParam->nTypeBufLen = nTypeLen;
+                } else {
+                        pParam->nTypeBufLen = 0;
+                }
+        }
+        if (pFFTsMuxUploader->isTypeOneshot) {
+                pFFTsMuxUploader->isTypeOneshot = 0;
+                memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+        }
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
         return LINK_SUCCESS;
 }
 
@@ -861,8 +881,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         
         SegmentHandle segHandle;
         SegmentArg arg;
-        arg.getTokenCallback = getTokenCallback;
-        arg.pGetTokenCallbackArg = *_pTsMuxUploader;
+        arg.getUploadParamCallback = getUploadParamCallback;
+        arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
         arg.pDeviceId = pFFTsMuxUploader->deviceId_;
         arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
         arg.pMgrTokenRequestUrl = _pSegArg->pMgrTokenRequestUrl;
@@ -884,8 +904,8 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         fullArg.getPicCallback = _pPicArg->getPicCallback;
         fullArg.pGetPicCallbackOpaque = _pPicArg->pGetPicCallbackOpaque;
         fullArg.getPictureFreeCallback = _pPicArg->getPictureFreeCallback;
-        fullArg.getTokenCallback = getTokenCallback;
-        fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
+        fullArg.getUploadParamCallback = getUploadParamCallback;
+        fullArg.pGetUploadParamCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         fullArg.uploadZone = _pUserUploadArg->uploadZone_;
@@ -908,6 +928,54 @@ void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         
         LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
+        return;
+}
+
+int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
+        if (_pTsMuxUploader == NULL || _pType == NULL) {
+                return LINK_ARG_ERROR;
+        }
+        
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
+                return LINK_ARG_TOO_LONG;
+        }
+        pFFTsMuxUploader->isTypeOneshot = 1;
+        memcpy(pFFTsMuxUploader->tsType + strlen(pFFTsMuxUploader->tsType), _pType, nTypeLen);
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        
+        return LINK_SUCCESS;
+}
+
+int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
+        if (_pTsMuxUploader == NULL || _pType == NULL) {
+                return LINK_ARG_ERROR;
+        }
+        
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
+                return LINK_ARG_TOO_LONG;
+        }
+        pFFTsMuxUploader->isTypeOneshot = 0;
+        memcpy(pFFTsMuxUploader->tsType + strlen(pFFTsMuxUploader->tsType), _pType, nTypeLen);
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        
+        return LINK_SUCCESS;
+}
+
+void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
+        if (_pTsMuxUploader == NULL) {
+                return;
+        }
+        
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        pFFTsMuxUploader->isTypeOneshot = 0;
+        memcpy(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        
         return;
 }
 

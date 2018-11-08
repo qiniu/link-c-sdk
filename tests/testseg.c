@@ -6,9 +6,9 @@
 #include "tsuploaderapi.h"
 
 static char segStoreToken[1024];
-static int segGetTokenCallback(void *pOpaque, char *pBuf, int nBuflen) {
+static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam) {
         LinkLogDebug("in segGetTokenCallback");
-        memcpy(pBuf, segStoreToken, strlen(segStoreToken));
+        memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
         return strlen(segStoreToken);
 }
 
@@ -30,8 +30,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         
         SegmentHandle segHandle;
         SegmentArg arg;
-        arg.getTokenCallback = segGetTokenCallback;
-        arg.pGetTokenCallbackArg = NULL;
+        arg.getUploadParamCallback = segGetUploadParamCallback;
+        arg.pGetUploadParamCallbackArg = NULL;
         arg.pDeviceId = "abc";
         arg.nDeviceIdLen = 3;
         arg.pMgrTokenRequestUrl = (char *)pMgrUrl;

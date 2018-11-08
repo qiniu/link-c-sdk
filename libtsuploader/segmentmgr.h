@@ -5,13 +5,12 @@
 #define LINK_INVALIE_SEGMENT_HANDLE -1
 typedef int SegmentHandle;
 
-typedef int (*LinkSegmentGetTokenCallback)(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
 typedef struct {
         char *pDeviceId;
         int nDeviceIdLen;
-        LinkSegmentGetTokenCallback getTokenCallback;
-        void *pGetTokenCallbackArg;
+        LinkGetUploadParamCallback getUploadParamCallback;
+        void *pGetUploadParamCallbackArg;
         char *pMgrTokenRequestUrl;
         int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;

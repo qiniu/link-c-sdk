@@ -17,7 +17,6 @@ enum LinkGetPictureSyncMode {
 
 typedef enum LinkGetPictureSyncMode (*LinkGetPictureCallback)(void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType);
 typedef int (*LinkGetPictureFreeCallback)(char *pBuf, int nNameBufSize);
-typedef int (*LinkUploadPictureGetTokenCallback)(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
 typedef struct {
         LinkGetPictureCallback getPicCallback;
@@ -29,8 +28,8 @@ typedef struct {
         LinkGetPictureCallback getPicCallback;
         void *pGetPicCallbackOpaque;
         LinkGetPictureFreeCallback getPictureFreeCallback;
-        LinkUploadPictureGetTokenCallback getTokenCallback;
-        void *pGetTokenCallbackOpaque;
+        LinkGetUploadParamCallback getUploadParamCallback;
+        void *pGetUploadParamCallbackOpaque;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         LinkUploadZone uploadZone;

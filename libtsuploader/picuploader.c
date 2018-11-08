@@ -189,8 +189,12 @@ static void * uploadPicture(void *_pOpaque) {
         snprintf(key, sizeof(key), "frame/%s/%"PRId64"/0.jpg", pSig->deviceId, pSig->nTimestamp);
         
         char uptoken[1024] = {0};
-        int ret = pSig->pPicUploader->picUpSettings_.getTokenCallback(pSig->pPicUploader->picUpSettings_.pGetTokenCallbackOpaque,
-                                                                      uptoken, sizeof(uptoken));
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        param.pTokenBuf = uptoken;
+        param.nTokenBufLen = sizeof(uptoken);
+        int ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
+                                                                      &param);
         if (ret == LINK_BUFFER_IS_SMALL) {
                 LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
                 LinkPushFunction(pSig);
