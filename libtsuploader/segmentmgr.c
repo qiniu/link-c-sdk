@@ -27,8 +27,8 @@ typedef struct {
         SegmentHandle handle;
         int isRestart;
         char ua[32];
-        LinkSegmentGetTokenCallback getTokenCallback;
-        void *pGetTokenCallbackArg;
+        LinkGetUploadParamCallback getUploadParamCallback;
+        void *pGetUploadParamCallbackArg;
         char mgrTokenRequestUrl[256];
         int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;
@@ -265,8 +265,12 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         
-        int ret = segmentMgr.handles[idx].getTokenCallback(segmentMgr.handles[idx].pGetTokenCallbackArg,
-                                                                      uptoken, sizeof(uptoken));
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        param.pTokenBuf = uptoken;
+        param.nTokenBufLen = sizeof(uptoken);
+        int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
+                                                                      &param);
         if (ret == LINK_BUFFER_IS_SMALL) {
                 LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
                 return;
@@ -362,8 +366,8 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].nStart = 0;
                 segmentMgr.handles[seg].nEnd = 0;
                 segmentMgr.handles[seg].isRestart = 0;
-                segmentMgr.handles[seg].getTokenCallback = NULL;
-                segmentMgr.handles[seg].pGetTokenCallbackArg = NULL;
+                segmentMgr.handles[seg].getUploadParamCallback = NULL;
+                segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].useHttps = 0;
                 segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
                 segmentMgr.handles[seg].mgrTokenRequestUrl[0] = 0;
@@ -446,8 +450,8 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, SegmentArg *pArg) {
                 if (segmentMgr.handles[i].handle == -1) {
                         *pSeg = i;
                         segmentMgr.handles[i].handle  = i;
-                        segmentMgr.handles[i].getTokenCallback = pArg->getTokenCallback;
-                        segmentMgr.handles[i].pGetTokenCallbackArg = pArg->pGetTokenCallbackArg;
+                        segmentMgr.handles[i].getUploadParamCallback = pArg->getUploadParamCallback;
+                        segmentMgr.handles[i].pGetUploadParamCallbackArg = pArg->pGetUploadParamCallbackArg;
                         memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
                         
                         segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;

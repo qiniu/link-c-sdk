@@ -19,6 +19,15 @@
 #define IN
 #endif
 
+typedef struct {
+        IN char *pTokenBuf;
+        IN int nTokenBufLen;
+        IN char *pTypeBuf;
+        IN int nTypeBufLen;
+}LinkUploadParam;
+
+typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+
 typedef enum {
         LINK_UPLOAD_TS = 1,
         LINK_UPLOAD_PIC = 2,

@@ -29,11 +29,11 @@ static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
 }
 
 static char gtestToken[1024] = {0};
-static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
-        if (nBuflen < strlen(gtestToken)) {
+static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam) {
+        if (pParam->nTokenBufLen < strlen(gtestToken)) {
                 return LINK_BUFFER_IS_SMALL;
         }
-        memcpy(pBuf, gtestToken, strlen(gtestToken));
+        memcpy(pParam->pTokenBuf, gtestToken, strlen(gtestToken));
         return LINK_SUCCESS;
 }
 
@@ -47,10 +47,10 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
         
         LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
-        arg.getTokenCallback = getTokenCallback;
+        arg.getUploadParamCallback = getUploadParamCallback;
         arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
-        arg.pGetTokenCallbackOpaque = NULL;
+        arg.pGetUploadParamCallbackOpaque = NULL;
         arg.uploadZone = upzone;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
@@ -77,10 +77,10 @@ void justTestAsyncUploadPicture(char *pTokenUrl) {
         
         LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
-        arg.getTokenCallback = getTokenCallback;
+        arg.getUploadParamCallback = getUploadParamCallback;
         arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
-        arg.pGetTokenCallbackOpaque = NULL;
+        arg.pGetUploadParamCallbackOpaque = NULL;
         arg.uploadZone = upzone;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &arg);

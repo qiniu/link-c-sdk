@@ -281,15 +281,16 @@ static void * streamUpload(void *_pOpaque)
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
         
         char uptoken[1280] = {0};
+        char suffix[16] = {0};
         Qiniu_Client client;
         int ret = 0, freeClient = 1;
         
-        ret = pUploader->uploadArg.getTokenCallback(pUploader->uploadArg.pGetTokenCallbackArg,
-                                                        uptoken, sizeof(uptoken));
-        if (ret != LINK_SUCCESS) {
-                LinkLogError("ts up getTokenCallback fail:%d", ret);
-                return NULL;
-        }
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        param.pTokenBuf = uptoken;
+        param.nTokenBufLen = sizeof(uptoken);
+        param.pTypeBuf = suffix;
+        param.nTypeBufLen = sizeof(suffix);
 
         
         Qiniu_Io_PutRet putRet;
@@ -362,6 +363,13 @@ static void * streamUpload(void *_pOpaque)
                 goto END;
         }
         
+        ret = pUploader->uploadArg.getUploadParamCallback(pUploader->uploadArg.pGetUploadParamCallbackArg,
+                                                          &param);
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("ts up getUploadParamCallback fail:%d", ret);
+                return NULL;
+        }
+        
         int64_t tsStartTime = pUploader->nTsStartTimestamp;
         
         
@@ -397,9 +405,14 @@ static void * streamUpload(void *_pOpaque)
                 freeClient = 0;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
-                        //ts/uaid/startts/endts/segment_start_ts/expiry.ts
-                        sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                        //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
+                        if (suffix[0] != 0) {
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", pUploader->uploadArg.pDeviceId_,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
+                        } else {
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                        }
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);

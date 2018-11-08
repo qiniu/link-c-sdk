@@ -17,6 +17,10 @@ void LinkNotiryNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
+int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *pTsMuxUploader, IN const char *pType, IN int nTypeLen);
+int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader, IN const char *pType, IN int nTypeLen);
+void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
+
 void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone);
 
 int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);
