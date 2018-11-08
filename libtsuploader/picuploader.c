@@ -27,7 +27,7 @@ typedef struct {
         LinkAsyncInterface asyncWait_;
         enum LinkPicUploadSignalType signalType_;
         enum LinkPicUploadType upType_;
-        char *pData;
+        const char *pData;
         int nDataLen;
         int64_t nTimestamp; //file name need
         pthread_t uploadPicThread;
@@ -61,7 +61,7 @@ int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, con
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type) {
         PicUploader *pPicUp = (PicUploader *)pPicUploader;
         LinkPicUploadSignal* pSig = (LinkPicUploadSignal*)pOpaque;
-        pSig->pPicUploader = (char *)pPicUp;
+        pSig->pPicUploader = pPicUp;
         pSig->signalType_ = LinkPicUploadSignalUpload;
         pSig->pData = pBuf;
         pSig->nDataLen = nBuflen;
@@ -69,6 +69,11 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *
         int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
         free(pSig);
         return ret;
+}
+
+void LinkPicUploaderSetUploadZone(PictureUploader *pPicUploader, LinkUploadZone upzone) {
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        pPicUp->picUpSettings_.uploadZone = upzone;
 }
 
 static void * listenPicUpload(void *_pOpaque)
@@ -199,10 +204,8 @@ static void * uploadPicture(void *_pOpaque) {
         Qiniu_Io_PutExtra putExtra;
         Qiniu_Zero(putExtra);
 
-        //设置机房域名
-        LinkUploadZone upZone = LinkGetuploadZone();
 #ifdef DISABLE_OPENSSL
-        switch(upZone) {
+        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_False);
                         break;
@@ -220,7 +223,7 @@ static void * uploadPicture(void *_pOpaque) {
                         break;
         }
 #else
-        switch(upZone) {
+        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
                 case LINK_ZONE_HUABEI:
                         Qiniu_Use_Zone_Huabei(Qiniu_True);
                         break;

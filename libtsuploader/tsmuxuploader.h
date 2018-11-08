@@ -26,6 +26,7 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvAr
 int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg,
                                             LinkUserUploadArg *pUserUploadArg, LinkPicUploadArg *pPicArg,
                                             SegmentUserArg *pSegArg);
+int LinkTsMuxUploaderSetUploadZone(LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone upzone);
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *pTsMuxUploader);
 void LinkDestroyTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader);
 #endif

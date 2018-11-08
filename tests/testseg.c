@@ -3,6 +3,7 @@
 #include "servertime.h"
 #include <string.h>
 #include <time.h>
+#include "tsuploaderapi.h"
 
 static char segStoreToken[1024];
 static int segGetTokenCallback(void *pOpaque, char *pBuf, int nBuflen) {

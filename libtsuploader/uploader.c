@@ -200,10 +200,10 @@ static int getExpireDays(char * pToken)
 }
 
 static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserData) {
-        char **pResp = (char **)resp;
+        char **pResp = (char **)pUserData;
         int len = size * nmemb ;
         char *respTxt = (char *)malloc(len +1);
-        memcpy(respTxt, pUserData, len);
+        memcpy(respTxt, resp, len);
         
         respTxt[len] = 0;
         *pResp = respTxt;
@@ -239,7 +239,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         curl_easy_setopt(easy, CURLOPT_URL, uphost);
         CURLcode curlCode = curl_easy_perform(easy);
         
-        int httpCode = 0;
+        int64_t httpCode = 0;
         int retCode = -1;
         if (curlCode != 0) { //curl error
                 const char *pCurlErrMsg = curl_easy_strerror(curlCode);
@@ -401,10 +401,12 @@ static void * streamUpload(void *_pOpaque)
                         sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
-                        int64_t nBufDataLen = l;
+
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
-                        if (linkPutBuffer(upHost, uptoken, key, bufData, l) == LINK_SUCCESS)
+                        int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l);
+                        if (putRet == LINK_SUCCESS) {
                                 uploadResult = LINK_UPLOAD_RESULT_OK;
+                        }
                         if (pUploader->uploadArg.pUploadStatisticCb) {
                                 pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
                         }

@@ -73,7 +73,7 @@ typedef struct _FFTsMuxUploader{
         int8_t isPause;
 }FFTsMuxUploader;
 
-static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
+//static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
 static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen);
 
 static int getAacFreqIndex(int _nFreq)
@@ -176,7 +176,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
         }
         
         int ret = 0;
-        int isAdtsAdded = 0;
         
         if (_nFlag == LINK_STREAM_TYPE_AUDIO){
                 //fprintf(stderr, "audio frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
@@ -185,12 +184,12 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         return 0;
                 }
 #ifndef USE_OWN_TSMUX
+                int isAdtsAdded = 0;
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                 pkt.dts = pkt.pts;
                 pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
 #endif
-                
                 unsigned char * pAData = (unsigned char * )_pData;
                 if (pFFTsMuxUploader->avArg.nAudioFormat ==  LINK_AUDIO_AAC && (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0)) {
                         LinkADTSFixheader fixHeader;
@@ -222,12 +221,13 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, char * _pData, int _nDataLen,
                         LinkConvertAdtsHeader2Char(&fixHeader, &varHeader, pFFTsMuxUploader->pAACBuf);
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
                         memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
-                        isAdtsAdded = 1;
+
 #ifdef USE_OWN_TSMUX
                         LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t *)pFFTsMuxUploader->pAACBuf, varHeader.aac_frame_length, _nTimestamp);
 #else
                         pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
                         pkt.size = varHeader.aac_frame_length;
+                        isAdtsAdded = 1;
 #endif
                 } 
 #ifdef USE_OWN_TSMUX
@@ -517,7 +517,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         avArg.nAudioChannels = _pAvArg->nChannels;
         avArg.nAudioSampleRate = _pAvArg->nSamplerate;
         
-        avArg.output = writeTsPacketToMem;
+        avArg.output = (LinkTsPacketCallback)writeTsPacketToMem;
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
         
@@ -757,7 +757,7 @@ static void setNewSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInter
         pFFTsMuxUploader->nNewSegmentInterval = nInterval;
 }
 
-int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg)
+int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg, int isWithPicAndSeg)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)malloc(sizeof(FFTsMuxUploader));
         if (pFFTsMuxUploader == NULL) {
@@ -779,8 +779,15 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
         pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
         
-        pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-        pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
+        
+        if (isWithPicAndSeg) {
+                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
+                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
+        } else {
+                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = NULL;
+                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = NULL;
+        }
+        
         pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_;
         pFFTsMuxUploader->uploadArg.getTokenCallback = getTokenCallback;
         pFFTsMuxUploader->uploadArg.pGetTokenCallbackArg = pFFTsMuxUploader;
@@ -809,12 +816,17 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAv
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
         pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
+        pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
         *_pTsMuxUploader = (LinkTsMuxUploader *)pFFTsMuxUploader;
         
         return LINK_SUCCESS;
+}
+
+int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
+        return linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 0);
 }
 
 static int getTokenCallback(IN void *pOpaque, OUT char *pBuf, IN int nBuflen) {
@@ -834,7 +846,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
                                             LinkUserUploadArg *_pUserUploadArg, LinkPicUploadArg *_pPicArg, SegmentUserArg *_pSegArg) {
         
         //LinkTsMuxUploader *pTsMuxUploader
-        int ret = LinkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
+        int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
@@ -857,6 +869,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        arg.uploadZone = _pUserUploadArg->uploadZone_;
         arg.useHttps = _pSegArg->useHttps;
         arg.nUpdateIntervalSeconds = _pSegArg->nUpdateIntervalSeconds;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
@@ -875,6 +888,7 @@ int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader,
         fullArg.pGetTokenCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        fullArg.uploadZone = _pUserUploadArg->uploadZone_;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
@@ -955,6 +969,19 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        return LINK_SUCCESS;
+}
+
+int LinkTsMuxUploaderSetUploadZone(LinkTsMuxUploader *_pTsMuxUploader, LinkUploadZone _upzone) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        assert(pFFTsMuxUploader->pTsMuxCtx == NULL);
+        if (pFFTsMuxUploader->pPicUploader) {
+                LinkPicUploaderSetUploadZone(pFFTsMuxUploader->pPicUploader, _upzone);
+        }
+        if (pFFTsMuxUploader->segmentHandle != LINK_INVALIE_SEGMENT_HANDLE) {
+                LinkSetSegmentUploadZone(pFFTsMuxUploader->segmentHandle, _upzone);
+        }
         return LINK_SUCCESS;
 }
 

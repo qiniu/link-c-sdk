@@ -8,14 +8,12 @@
 #ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
 #endif
-#ifndef DISABLE_OPENSSL
 #include <qiniu/io.h>
 #include <qiniu/rs.h>
-#endif
 #include "fixjson.h"
+#include "segmentmgr.h"
 
 static int volatile nProcStatus = 0;
-static LinkUploadZone gUploadZone;
 
 int LinkInitUploader()
 {
@@ -182,12 +180,8 @@ int LinkIsProcStatusQuit()
         return 0;
 }
 
-void LinkSetuploadZone(LinkUploadZone zone) {
-        gUploadZone = zone;
-}
-
-LinkUploadZone LinkGetuploadZone() {
-        return gUploadZone;
+void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone) {
+        LinkTsMuxUploaderSetUploadZone(pTsMuxUploader, zone);
 }
 
 void LinkUninitUploader()

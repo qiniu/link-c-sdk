@@ -58,6 +58,7 @@ typedef struct {
         int nMgrTokenRequestUrlLen;
         int nUpdateIntervalSeconds;
         int useHttps;
+        LinkUploadZone uploadZone;
 }SegmentUserArg;
 
 typedef enum {

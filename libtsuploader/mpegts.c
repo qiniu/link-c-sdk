@@ -1,5 +1,6 @@
 #include "mpegts.h"
 
+
 // CRC32 lookup table for polynomial 0x04c11db7
 static uint32_t crc_table[256] = {
         0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9, 0x130476dc, 0x17c56b6b,
@@ -146,6 +147,7 @@ static int writeAdaptationFieldJustWithPCR(uint8_t *_pBuf, int64_t _nPcr)
         return nPcrLen+2;
 }
 
+#if 0
 static int writeAdaptationFieldJustWithPravatePadding(uint8_t *_pBuf)
 {
         _pBuf[1] = 0x00; //discontinuity_indicator 1bit(0); random_access_indicator 1bit(0); elementary_stream_priority_indicator 1bit(0)
@@ -155,16 +157,19 @@ static int writeAdaptationFieldJustWithPravatePadding(uint8_t *_pBuf)
         _pBuf[0] = 9; //adaptation_field_length 8bit
         return 10;
 }
+#endif
 
 #define AV_RB16(x)                           \
 ((((const uint8_t*)(x))[0] << 8) |          \
 ((const uint8_t*)(x))[1])
+#ifdef TSMUX_DEBUG_PTS
 static void printPts(uint8_t *buf){
         int64_t pts = (int64_t)(*buf & 0x0e) << 29 |
         (AV_RB16(buf+1) >> 1) << 15 |
         AV_RB16(buf+3) >> 1;
         printf("pes pts:%"PRId64"\n", pts/90);
 }
+#endif
 
 static int getPESHeaderJustWithPtsLen(LinkPES *_pPes)
 {
@@ -179,7 +184,9 @@ static int getPESHeaderJustWithPtsLen(LinkPES *_pPes)
 
 static int writePESHeaderJustWithPts(LinkPES *_pPes, uint8_t *pData)
 {
+#ifdef TSMUX_DEBUG_PTS
         uint8_t * pPts = NULL;
+#endif
         int nRetLen = 0;
         pData[0] = 0; //packet_start_code_prefix 3bit(0x000001)
         pData[1] = 0;
@@ -234,11 +241,12 @@ static int writePESHeaderJustWithPts(LinkPES *_pPes, uint8_t *pData)
                 memcpy(&pData[nRetLen], h265Aud, sizeof(h265Aud));
                 nRetLen += sizeof(h265Aud);
         }
-        
+#ifdef TSMUX_DEBUG_PTS
         pPts=pData+9; //for debug
         
-        //if (pPts != NULL && (_pPes->videoFormat == LINK_VIDEO_H264 || _pPes->videoFormat == LINK_VIDEO_H265))
-        //        printPts(pPts);
+        if (pPts != NULL && (_pPes->videoFormat == LINK_VIDEO_H264 || _pPes->videoFormat == LINK_VIDEO_H265))
+                printPts(pPts);
+#endif
         
         return nRetLen;
 }
