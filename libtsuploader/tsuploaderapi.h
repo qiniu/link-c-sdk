@@ -13,7 +13,7 @@ int LinkCreateAndStartAVUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsM
                                                     IN SegmentUserArg *pSegArg);
 int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type);
 void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader, int64_t nSeconds);
-void LinkNotiryNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
+void LinkNotifyNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 

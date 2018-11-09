@@ -1053,7 +1053,7 @@ int LinkTsMuxUploaderSetUploadZone(LinkTsMuxUploader *_pTsMuxUploader, LinkUploa
         return LINK_SUCCESS;
 }
 
-void LinkNotiryNomoreData(IN LinkTsMuxUploader *_pTsMuxUploader) {
+void LinkNotifyNomoreData(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
         if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
                 return;
