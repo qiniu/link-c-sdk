@@ -18,8 +18,8 @@
 #endif
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl);
-void justTestSyncUploadPicture(char *pTokenUrl);
-void justTestAsyncUploadPicture(char *pTokenUrl);
+void justTestSyncUploadPicture(const char *pTokenUrl);
+void justTestAsyncUploadPicture(const char *pTokenUrl);
 
 typedef struct {
         bool IsInputFromFFmpeg;
@@ -56,7 +56,7 @@ typedef struct {
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
-        bool IsNoNet;
+        bool InvalidToken;
         bool IsQuit;
         bool IsDropFirstKeyFrame;
         int64_t nKeyFrameCount;
@@ -71,6 +71,7 @@ typedef struct {
         bool IsJustTestSegment;
         const char *pMgrToken;
         LinkTsMuxUploader * pFirstUploader;
+        LinkTsMuxUploader * pSecondUploader;
         int nSigQuitTimes;
 }CmdArg;
 
@@ -82,8 +83,8 @@ typedef struct {
         int segStartCount;
         int nByteCount;
         int nVideoKeyframeAccLen;
-        char * pAFile;
-        char * pVFile;
+        const char * pAFile;
+        const char * pVFile;
         char * pUrl;
         
 }AVuploader;
@@ -206,7 +207,7 @@ static inline int64_t getCurrentMilliSecond(){
         return (tv.tv_sec*1000 + tv.tv_usec/1000);
 }
 
-static int getFileAndLength(char *_pFname, FILE **_pFile, int *_pLen)
+static int getFileAndLength(const char *_pFname, FILE **_pFile, int *_pLen)
 {
         FILE * f = fopen(_pFname, "r");
         if ( f == NULL ) {
@@ -220,7 +221,7 @@ static int getFileAndLength(char *_pFname, FILE **_pFile, int *_pLen)
         return 0;
 }
 
-static int readFileToBuf(char * _pFilename, char ** _pBuf, int *_pLen)
+static int readFileToBuf(const char * _pFilename, char ** _pBuf, int *_pLen)
 {
         int ret;
         FILE * pFile;
@@ -267,7 +268,7 @@ static int is_h265_picture(int t)
 }
 
 static int gnVideoFrameCount=50;
-int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callback, void *opaque)
+int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCallback callback, void *opaque)
 {
         assert(!(_pAudioFile == NULL && _pVideoFile == NULL));
         
@@ -353,6 +354,10 @@ int start_file_test(char * _pAudioFile, char * _pVideoFile, DataCallback callbac
                                                         nIDR++;
                                                         if(cmdArg.IsTestMove && !IsFirst) {;
                                                                 printf("sleep %dms to wait timeout start:%"PRId64"\n", cmdArg.nSleeptime, nNextVideoTime);
+                                                                if (cmdArg.IsWithPicUpload) {
+                                                                        AVuploader *pAvuploader = (AVuploader*)opaque;
+                                                                        LinkNotifyNomoreData(pAvuploader->pTsMuxUploader);
+                                                                }
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
                                                                 nNextVideoTime += cmdArg.nSleeptime;
@@ -663,11 +668,19 @@ void signalHander(int s){
         if (SIGQUIT == s) {
                 printf("SIGQUIT catched\n");
                 if (cmdArg.nSigQuitTimes % 2 == 0) {
-                        LinkLogDebug("=======>pause upload");
+                        LinkLogDebug("%p(first)=======>pause upload", cmdArg.pFirstUploader);
                         LinkPauseUpload(cmdArg.pFirstUploader);
+                        if (cmdArg.pSecondUploader) {
+                                LinkLogDebug("%p(second)=======>pause upload", cmdArg.pSecondUploader);
+                                LinkPauseUpload(cmdArg.pSecondUploader);
+                        }
                 } else {
-                        LinkLogDebug("=======>resume upload");
+                        LinkLogDebug("%p(first)=======>resume upload", cmdArg.pFirstUploader);
                         LinkResumeUpload(cmdArg.pFirstUploader);
+                        if (cmdArg.pSecondUploader) {
+                                LinkLogDebug("%p(second)=======>resume upload", cmdArg.pSecondUploader);
+                                LinkResumeUpload(cmdArg.pSecondUploader);
+                        }
                 }
                 cmdArg.nSigQuitTimes++;
         }
@@ -682,7 +695,7 @@ typedef struct {
         void * pData;
 }GetPicSaver;
 
-static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
+static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
         const char *file = MATERIAL_PATH"3c.jpg";
         
         int n = strlen(file);
@@ -894,6 +907,7 @@ static void * second_file_test(void * opaque) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
         }
+        cmdArg.pSecondUploader = avuploader.pTsMuxUploader;
         
         do_start_file_test(&avuploader);
         sleep(1);
@@ -961,7 +975,7 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pZone, "zone", "upload zone(huadong huabei huanan beimei dongnanya). default huadong");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
-        flag_bool(&cmdArg.IsNoNet, "nonet", "no network");
+        flag_bool(&cmdArg.InvalidToken, "invalidtoken", "use invalid token");
         flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
 
         flag_parse(argc, argv, VERSION);
@@ -1005,8 +1019,8 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-        char *pVFile = NULL;
-        char *pAFile = NULL;
+        const char *pVFile = NULL;
+        const char *pAFile = NULL;
 
         if(cmdArg.IsTestAAC) {
                 pAFile = MATERIAL_PATH"h265_aac_1_16000_a.aac";
@@ -1057,7 +1071,7 @@ int main(int argc, const char** argv)
         
         AVuploader avuploader;
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
-        if (!cmdArg.IsNoNet) {
+        if (!cmdArg.InvalidToken) {
                 if (cmdArg.pToken == NULL) {
                         ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, cmdArg.pTokenUrl);
                         if (ret != 0)

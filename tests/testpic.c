@@ -7,7 +7,7 @@
 static void *gSvaeWhenAsync; //may race risk. but for test is enough
 enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
 
-static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
+static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
 #ifdef __APPLE__
         const char *file = "../../../tests/material/3c.jpg";
 #else
@@ -37,7 +37,7 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         return LINK_SUCCESS;
 }
 
-void justTestSyncUploadPicture(char *pTokenUrl) {
+void justTestSyncUploadPicture(const char *pTokenUrl) {
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, pTokenUrl);
         assert(ret == LINK_SUCCESS);
@@ -66,7 +66,7 @@ void justTestSyncUploadPicture(char *pTokenUrl) {
         
 }
 
-void justTestAsyncUploadPicture(char *pTokenUrl) {
+void justTestAsyncUploadPicture(const char *pTokenUrl) {
         gSyncMode = LinkGetPictureModeAsync;
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, pTokenUrl);

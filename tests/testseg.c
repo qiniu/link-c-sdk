@@ -3,7 +3,8 @@
 #include "servertime.h"
 #include <string.h>
 #include <time.h>
-#include "tsuploaderapi.h"
+#include "localkey.h"
+#include <unistd.h>
 
 static char segStoreToken[1024];
 static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam) {
