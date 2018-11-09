@@ -15,8 +15,8 @@ enum LinkGetPictureSyncMode {
         LinkGetPictureModeAsync = 2
 };
 
-typedef enum LinkGetPictureSyncMode (*LinkGetPictureCallback)(void *pOpaque, void *pSvaeWhenAsync, OUT char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType);
-typedef int (*LinkGetPictureFreeCallback)(char *pBuf, int nNameBufSize);
+typedef enum LinkGetPictureSyncMode (*LinkGetPictureCallback)(void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType);
+typedef int (*LinkGetPictureFreeCallback)(IN char *pBuf, IN int nNameBufSize);
 
 typedef struct {
         LinkGetPictureCallback getPicCallback;

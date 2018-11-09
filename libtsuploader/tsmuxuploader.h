@@ -14,19 +14,19 @@ typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
 
 
 typedef struct _LinkTsMuxUploader{
-        int(*PushVideo)(LinkTsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp, int nIsKeyFrame, int nIsSegStart);
-        int(*PushAudio)(LinkTsMuxUploader *pTsMuxUploader, char * pData, int nDataLen, int64_t nTimestamp);
-        int (*SetToken)(LinkTsMuxUploader*, char *, int);
-        void (*SetUploaderBufferSize)(LinkTsMuxUploader*, int);
-        int (*GetUploaderBufferUsedSize)(LinkTsMuxUploader*);
-        void (*SetNewSegmentInterval)(LinkTsMuxUploader*, int);
+        int(*PushVideo)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp, IN int nIsKeyFrame, IN int nIsSegStart);
+        int(*PushAudio)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp);
+        int (*SetToken)(IN LinkTsMuxUploader*, IN const char *pToken, IN int nTokenLen);
+        void (*SetUploaderBufferSize)(IN LinkTsMuxUploader* pTsMuxUploader, int);
+        int (*GetUploaderBufferUsedSize)(IN LinkTsMuxUploader* pTsMuxUploader);
+        void (*SetNewSegmentInterval)(IN LinkTsMuxUploader* pTsMuxUploader, IN int nInterval);
 }LinkTsMuxUploader;
 
-int LinkNewTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg, LinkUserUploadArg *pUserUploadArg);
-int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **pTsMuxUploader, LinkMediaArg *pAvArg,
-                                            LinkUserUploadArg *pUserUploadArg, LinkPicUploadArg *pPicArg,
-                                            SegmentUserArg *pSegArg);
-int LinkTsMuxUploaderSetUploadZone(LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone upzone);
-int LinkTsMuxUploaderStart(LinkTsMuxUploader *pTsMuxUploader);
-void LinkDestroyTsMuxUploader(LinkTsMuxUploader **pTsMuxUploader);
+int LinkNewTsMuxUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg, IN const LinkUserUploadArg *pUserUploadArg);
+int LinkNewTsMuxUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg,
+                                            IN const LinkUserUploadArg *pUserUploadArg, IN const LinkPicUploadArg *pPicArg,
+                                            IN const SegmentUserArg *pSegArg);
+int LinkTsMuxUploaderSetUploadZone(IN LinkTsMuxUploader *pTsMuxUploader, IN LinkUploadZone upzone);
+int LinkTsMuxUploaderStart(IN LinkTsMuxUploader *pTsMuxUploader);
+void LinkDestroyTsMuxUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
 #endif

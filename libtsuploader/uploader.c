@@ -569,7 +569,7 @@ static void streamUploadStop(LinkTsUploader * _pUploader)
         return;
 }
 
-static int streamPushData(LinkTsUploader *pTsUploader, char * pData, int nDataLen)
+static int streamPushData(LinkTsUploader *pTsUploader, const char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
@@ -657,7 +657,7 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
         return pKodoUploader->state;
 }
 
-int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewUploader(LinkTsUploader ** _pUploader, const LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {

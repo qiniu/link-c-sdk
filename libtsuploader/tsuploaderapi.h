@@ -13,7 +13,7 @@ int LinkCreateAndStartAVUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsM
                                                     IN SegmentUserArg *pSegArg);
 int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type);
 void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader, int64_t nSeconds);
-void LinkNotiryNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
+void LinkNotifyNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
@@ -23,7 +23,7 @@ void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
 
 void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone);
 
-int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN char * pToken, IN int nTokenLen);
+int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pToken, IN int nTokenLen);
 void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader, IN int nSize);
 int LinkGetUploadBufferUsedSize(IN LinkTsMuxUploader *pTsMuxUploader);
 void LinkSetNewSegmentInterval(IN LinkTsMuxUploader *pTsMuxUploader, IN int nIntervalSecond);

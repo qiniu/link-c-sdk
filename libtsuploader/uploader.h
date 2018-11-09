@@ -28,17 +28,17 @@ typedef void (*StreamUploadStop)(LinkTsUploader*);
 typedef struct _LinkTsUploader{
         StreamUploadStart UploadStart;
         StreamUploadStop UploadStop;
-        LinkUploadState (*GetUploaderState)(LinkTsUploader *pTsUploader);
-        void (*NotifyDataPrapared)(LinkTsUploader *pTsUploader);
-        int(*Push)(LinkTsUploader *pTsUploader, char * pData, int nDataLen);
-        void (*GetStatInfo)(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *pStatInfo);
-        void (*RecordTimestamp)(LinkTsUploader *pTsUploader, int64_t nTimestamp);
+        LinkUploadState (*GetUploaderState)(IN LinkTsUploader *pTsUploader);
+        void (*NotifyDataPrapared)(IN LinkTsUploader *pTsUploader);
+        int(*Push)(IN LinkTsUploader *pTsUploader, IN const char * pData, int nDataLen);
+        void (*GetStatInfo)(IN LinkTsUploader *pTsUploader, IN LinkUploaderStatInfo *pStatInfo);
+        void (*RecordTimestamp)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp);
 }LinkTsUploader;
 
 typedef void (*LinkTsStartUploadCallback)(void *pOpaque, int64_t nTimestamp);
 
-int LinkNewUploader(LinkTsUploader ** _pUploader, LinkUploadArg *pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount);
-void LinkUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque);
-void LinkDestroyUploader(LinkTsUploader ** _pUploader);
+int LinkNewUploader(OUT LinkTsUploader ** _pUploader, IN const LinkUploadArg *pArg, IN enum CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);
+void LinkUploaderSetTsStartUploadCallback(IN LinkTsUploader * _pUploader, IN LinkTsStartUploadCallback cb, IN void *pOpaque);
+void LinkDestroyUploader(IN OUT LinkTsUploader ** _pUploader);
 
 #endif
