@@ -79,13 +79,13 @@ void LinkPicUploaderSetUploadZone(PictureUploader *pPicUploader, LinkUploadZone 
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
-
-        while(!pPicUploader->nQuit_) {
+        LinkUploaderStatInfo info;
+        while(!pPicUploader->nQuit_ || info.nLen_ != 0) {
                 LinkPicUploadSignal sig;
                 int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60);
                 fprintf(stderr, "----->pu receive a signal:%d\n", sig.signalType_);
-                LinkUploaderStatInfo info;
+                memset(&info, 0, sizeof(info));
                 pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
                 LinkLogDebug("signal queue:%d", info.nLen_);
                 if (ret == LINK_TIMEOUT) {

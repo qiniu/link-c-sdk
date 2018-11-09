@@ -77,6 +77,9 @@ static int getTimeFromServer(int64_t *pStime) {
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
+        if (curl == NULL) {
+                return LINK_NO_MEMORY;
+        }
         
         curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/timestamp");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeTime);
