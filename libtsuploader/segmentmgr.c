@@ -131,11 +131,18 @@ static int doMove(const char *pUrl, const char *pToken) {
         CURL *curl;
         curl_global_init(CURL_GLOBAL_ALL);
         curl = curl_easy_init();
+        if (curl == NULL) {
+                return LINK_NO_MEMORY;
+        }
         
         //printf("------->url:%s\n------->token:%s\n", pUrl, pToken);
         
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+        if (headers == NULL) {
+                curl_easy_cleanup(curl);
+                return LINK_NO_MEMORY;
+        }
         char authHeader[1024] = {0};
         snprintf(authHeader, sizeof(authHeader), "Authorization: QBox %s", pToken);
         headers = curl_slist_append(headers, authHeader);
@@ -145,9 +152,11 @@ static int doMove(const char *pUrl, const char *pToken) {
 
         int ret =curl_easy_perform(curl);
         if (ret != 0) {
+                curl_slist_free_all(headers);
                 curl_easy_cleanup(curl);
                 return ret;
         }
+        curl_slist_free_all(headers);
         curl_easy_cleanup(curl);
         return 0;
 }
