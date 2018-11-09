@@ -361,6 +361,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
 }
 
 static void linkReleaseSegmentHandle(SegmentHandle seg) {
+        pthread_mutex_lock(&segMgrMutex);
         if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
                 segmentMgr.handles[seg].handle = -1;
                 segmentMgr.handles[seg].nStart = 0;
@@ -377,12 +378,14 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
                 segmentMgr.handles[seg].nUpdateIntervalSeconds = 30 * 1000000000LL;
         }
+        pthread_mutex_unlock(&segMgrMutex);
+        return;
 }
 
 static void * segmetMgrRun(void *_pOpaque) {
         
         LinkUploaderStatInfo info = {0};
-        while(!segmentMgr.nQuit_ && info.nLen_ == 0) {
+        while(!segmentMgr.nQuit_ || info.nLen_ != 0) {
                 SegInfo segInfo;
                 segInfo.handle = -1;
                 int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60);
@@ -418,6 +421,7 @@ static void * segmetMgrRun(void *_pOpaque) {
 int LinkInitSegmentMgr() {
         pthread_mutex_lock(&segMgrMutex);
         if (segMgrStarted) {
+                pthread_mutex_unlock(&segMgrMutex);
                 return LINK_SUCCESS;
         }
         int i = 0;
@@ -445,7 +449,9 @@ int LinkInitSegmentMgr() {
 }
 
 int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
+       pthread_mutex_lock(&segMgrMutex);
         if (!segMgrStarted) {
+                pthread_mutex_unlock(&segMgrMutex);
                 return LINK_NOT_INITED;
         }
         int i = 0;
@@ -455,6 +461,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         int nMoveUrlLen = pArg->nMgrTokenRequestUrlLen + 1;
                         char *pTmp = (char *)malloc(nMoveUrlLen);
                         if (pTmp == NULL) {
+                                pthread_mutex_unlock(&segMgrMutex);
                                 return LINK_NO_MEMORY;
                         }
                         memcpy(pTmp, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
@@ -467,6 +474,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         segmentMgr.handles[i].getUploadParamCallback = pArg->getUploadParamCallback;
                         segmentMgr.handles[i].pGetUploadParamCallbackArg = pArg->pGetUploadParamCallbackArg;
                         memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
+                        segmentMgr.handles[i].ua[pArg->nDeviceIdLen] = 0;
                         
                         segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
@@ -476,11 +484,11 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         if (pArg->nUpdateIntervalSeconds <= 0) {
                                 segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
                         }
-                        
-                        
+                        pthread_mutex_unlock(&segMgrMutex);
                         return LINK_SUCCESS;
                 }
         }
+        pthread_mutex_unlock(&segMgrMutex);
         return LINK_MAX_SEG;
 }
 
@@ -540,7 +548,6 @@ int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRes
         segInfo.nEndOrInt = nEnd;
         segInfo.isRestart = isRestart;
         segInfo.nOperation = SEGMENT_UPDATE;
-        
         return segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
