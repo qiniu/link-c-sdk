@@ -13,3 +13,4 @@ build-mips
 build-linux
 build-mac
 tags
+libs

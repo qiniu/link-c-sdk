@@ -22,6 +22,7 @@
 #include "mymalloc.h"
 #include "dev_core.h"
 #include "stream.h"
+#include "picuploader.h"
 
 /* global variable */
 App gIpc;
@@ -34,6 +35,10 @@ int AlarmCallback( int alarm, void *data )
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
+        LinkNotifyNomoreData( gIpc.stream[STREAM_MAIN].uploader );
+        if ( gIpc.stream[STREAM_SUB].uploader ) {
+            LinkNotifyNomoreData( gIpc.stream[STREAM_SUB].uploader );
+        }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         //DBG_LOG( "data = %s\n", (char *)data );
         char *file = (char *) malloc(  strlen((char *)data)+1 );
@@ -86,8 +91,7 @@ static int CaptureDevDeinit()
     return 0;
 }
 
-
-static enum LinkGetPictureSyncMode getPicCallback ( void *pOpaque, void *pSvaeWhenAsync, 
+static enum LinkGetPictureSyncMode GetPicCallback ( void *pOpaque, void *pSvaeWhenAsync, 
                                                    OUT char **pBuf, OUT int *pBufSize,
                                                    OUT enum LinkPicUploadType *pType) 
 {
@@ -140,9 +144,12 @@ int TsUploaderSdkInit()
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
     SegmentUserArg segArg;
+    LinkUserUploadArg userUploadArg;
 
+    memset(&userUploadArg, 0, sizeof(userUploadArg));
+    memset( &segArg, 0, sizeof(segArg) );
 
-    arg.getPicCallback = getPicCallback;
+    arg.getPicCallback = GetPicCallback;
     arg.getPictureFreeCallback = getPictureFreeCallback;
 
     DBG_LOG("start to init ts uploader sdk \n");
@@ -182,7 +189,7 @@ int TsUploaderSdkInit()
             pUrl = url;
         }
         DBG_LOG("pUrl = %s, i = %d\n", pUrl, i );
-        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), NULL, pUrl );
+        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), &segArg.uploadZone, pUrl );
         if ( ret != 0 ) {
             DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
             sleep(2);
@@ -207,8 +214,6 @@ int TsUploaderSdkInit()
     sprintf( gIpc.stream[STREAM_MAIN].devId, "%s%s", gIpc.devId, "a" );
     sprintf( gIpc.stream[STREAM_SUB].devId, "%s%s", gIpc.devId, "b" );
 
-    LinkUserUploadArg userUploadArg;
-    memset(&userUploadArg, 0, sizeof(userUploadArg));
     userUploadArg.pToken_ = gIpc.stream[STREAM_MAIN].token;
     userUploadArg.nTokenLen_ = strlen(gIpc.stream[STREAM_MAIN].token);
     userUploadArg.pDeviceId_ = gIpc.stream[STREAM_MAIN].devId;
@@ -251,7 +256,7 @@ int TsUploaderSdkInit()
 
         for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
             DBG_LOG("i = %d\n", i );
-            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), NULL, pUrl );
+            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), &segArg.uploadZone, pUrl );
             if ( ret != 0 ) {
                 DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
                 continue;
@@ -349,6 +354,8 @@ static void * UpadateToken() {
                                   strlen(gIpc.stream[STREAM_SUB].token));
             if (ret != 0) {
                 DBG_ERROR("UpdateToken error, ret = %d\n", ret );
+                DBG_ERROR("gIpc.stream[STREAM_SUB].uploader = 0x%x\n", gIpc.stream[STREAM_SUB].uploader);
+                DBG_ERROR("gIpc.stream[STREAM_SUB].token = %s\n", gIpc.stream[STREAM_SUB].token );
                 sleep(2);
                 continue;
             }
@@ -477,7 +484,9 @@ int main()
     DBG_LOG("commit id : %s\n", CODE_VERSION );
     for (;; ) {
         sleep( gIpc.config.heartBeatInterval );
-        DBG_LOG("[ %s ] [ HEART BEAT] main thread is running\n", gIpc.devId );
+        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d \n token_url : %s\n reanme_url : %s\n",
+                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,
+                gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
     }
 
     CaptureDevDeinit();
