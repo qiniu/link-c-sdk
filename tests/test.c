@@ -71,6 +71,7 @@ typedef struct {
         bool IsJustTestSegment;
         const char *pMgrToken;
         LinkTsMuxUploader * pFirstUploader;
+        LinkTsMuxUploader * pSecondUploader;
         int nSigQuitTimes;
 }CmdArg;
 
@@ -353,6 +354,10 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                         nIDR++;
                                                         if(cmdArg.IsTestMove && !IsFirst) {;
                                                                 printf("sleep %dms to wait timeout start:%"PRId64"\n", cmdArg.nSleeptime, nNextVideoTime);
+                                                                if (cmdArg.IsWithPicUpload) {
+                                                                        AVuploader *pAvuploader = (AVuploader*)opaque;
+                                                                        LinkNotifyNomoreData(pAvuploader->pTsMuxUploader);
+                                                                }
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
                                                                 nNextVideoTime += cmdArg.nSleeptime;
@@ -663,11 +668,19 @@ void signalHander(int s){
         if (SIGQUIT == s) {
                 printf("SIGQUIT catched\n");
                 if (cmdArg.nSigQuitTimes % 2 == 0) {
-                        LinkLogDebug("=======>pause upload");
+                        LinkLogDebug("%p(first)=======>pause upload", cmdArg.pFirstUploader);
                         LinkPauseUpload(cmdArg.pFirstUploader);
+                        if (cmdArg.pSecondUploader) {
+                                LinkLogDebug("%p(second)=======>pause upload", cmdArg.pSecondUploader);
+                                LinkPauseUpload(cmdArg.pSecondUploader);
+                        }
                 } else {
-                        LinkLogDebug("=======>resume upload");
+                        LinkLogDebug("%p(first)=======>resume upload", cmdArg.pFirstUploader);
                         LinkResumeUpload(cmdArg.pFirstUploader);
+                        if (cmdArg.pSecondUploader) {
+                                LinkLogDebug("%p(second)=======>resume upload", cmdArg.pSecondUploader);
+                                LinkResumeUpload(cmdArg.pSecondUploader);
+                        }
                 }
                 cmdArg.nSigQuitTimes++;
         }
@@ -894,6 +907,7 @@ static void * second_file_test(void * opaque) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
         }
+        cmdArg.pSecondUploader = avuploader.pTsMuxUploader;
         
         do_start_file_test(&avuploader);
         sleep(1);
