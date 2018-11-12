@@ -862,7 +862,7 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         return LINK_SUCCESS;
 }
 
-int LinkNewTsMuxUploaderWithPictureUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
+int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
                                             const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg, const SegmentUserArg *_pSegArg) {
         
         //LinkTsMuxUploader *pTsMuxUploader
