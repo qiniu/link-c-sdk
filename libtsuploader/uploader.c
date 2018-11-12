@@ -212,11 +212,18 @@ static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserDa
 
 static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize) {
         CURL *easy = curl_easy_init();
+        if (easy == NULL) {
+                return LINK_NO_MEMORY;
+        }
         curl_mime *mime;
         curl_mimepart *part;
         
         /* Build an HTTP form with a single field named "data", */
         mime = curl_mime_init(easy);
+        if (mime == NULL) {
+                curl_easy_cleanup(easy);
+                return LINK_NO_MEMORY;
+        }
         
         part = curl_mime_addpart(mime);
         curl_mime_name(part, "token");

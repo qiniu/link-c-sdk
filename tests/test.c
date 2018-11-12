@@ -355,6 +355,7 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                         if(cmdArg.IsTestMove && !IsFirst) {;
                                                                 printf("sleep %dms to wait timeout start:%"PRId64"\n", cmdArg.nSleeptime, nNextVideoTime);
                                                                 if (cmdArg.IsWithPicUpload) {
+                                                                        fprintf(stderr, "----->stop push(motion stop)");
                                                                         AVuploader *pAvuploader = (AVuploader*)opaque;
                                                                         LinkNotifyNomoreData(pAvuploader->pTsMuxUploader);
                                                                 }
@@ -746,7 +747,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
-                ret = LinkCreateAndStartAVUploaderWithPictureUploader(_pTsMuxUploader, _pAvArg,
+                ret = LinkCreateAndStartAll(_pTsMuxUploader, _pAvArg,
                                                                       _pUserUploadArg, &picArg, &segArg);
                 saver->pData = *_pTsMuxUploader;
         }

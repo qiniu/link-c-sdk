@@ -8,9 +8,9 @@
 int LinkInitUploader();
 
 int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg, IN LinkUserUploadArg *pUserUploadArg);
-int LinkCreateAndStartAVUploaderWithPictureUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg,
-                                                    IN LinkUserUploadArg *pUserUploadArg, IN LinkPicUploadArg *pPicArg,
-                                                    IN SegmentUserArg *pSegArg);
+int LinkCreateAndStartAll(OUT LinkTsMuxUploader **pTsMuxUploader, IN LinkMediaArg *pAvArg,
+                          IN LinkUserUploadArg *pUserUploadArg, IN LinkPicUploadArg *pPicArg,
+                          IN SegmentUserArg *pSegArg);
 int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type);
 void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader, int64_t nSeconds);
 void LinkNotifyNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
