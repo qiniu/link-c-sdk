@@ -24,8 +24,7 @@ typedef struct _LinkTsMuxUploader{
 
 int LinkNewTsMuxUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg, IN const LinkUserUploadArg *pUserUploadArg);
 int LinkNewTsMuxUploaderWillPicAndSeg(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg,
-                                            IN const LinkUserUploadArg *pUserUploadArg, IN const LinkPicUploadArg *pPicArg,
-                                            IN const SegmentUserArg *pSegArg);
+                                            IN const LinkUserUploadArg *pUserUploadArg, IN const LinkPicUploadArg *pPicArg);
 int LinkTsMuxUploaderSetUploadZone(IN LinkTsMuxUploader *pTsMuxUploader, IN LinkUploadZone upzone);
 int LinkTsMuxUploaderStart(IN LinkTsMuxUploader *pTsMuxUploader);
 void LinkDestroyTsMuxUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);

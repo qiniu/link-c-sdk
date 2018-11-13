@@ -729,13 +729,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         picArg.getPictureFreeCallback = getPictureFreeCallback;
         picArg.pGetPicCallbackOpaque = NULL;
         
-        SegmentUserArg segArg;
-        segArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
-        if (cmdArg.pMgrToken != NULL)
-                segArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
-        segArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
-        segArg.uploadZone = _pUserUploadArg->uploadZone_;
-        segArg.useHttps = 0;
+
         
         if (!cmdArg.IsWithPicUpload)
                 ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
@@ -747,8 +741,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
-                ret = LinkCreateAndStartAll(_pTsMuxUploader, _pAvArg,
-                                                                      _pUserUploadArg, &picArg, &segArg);
+                ret = LinkCreateAndStartAll(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
                 saver->pData = *_pTsMuxUploader;
         }
         return ret;
@@ -902,7 +895,12 @@ static void * second_file_test(void * opaque) {
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
-        
+        avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
+        if (cmdArg.pMgrToken != NULL)
+                avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
+        avuploader.userUploadArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
+        avuploader.userUploadArg.useHttps = 0;
+
         int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
@@ -1135,6 +1133,11 @@ int main(int argc, const char** argv)
                 LinkLogDebug("set upload zone to:%d", upzone);
                 avuploader.userUploadArg.uploadZone_ = upzone;
         }
+        avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
+        if (cmdArg.pMgrToken != NULL)
+                avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
+        avuploader.userUploadArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
+        avuploader.userUploadArg.useHttps = 0;
         
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
