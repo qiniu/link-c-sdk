@@ -72,6 +72,7 @@ typedef enum {
 }LinkVideoFormat;
 
 typedef enum {
+        LINK_AUDIO_NONE = 0,
         LINK_AUDIO_PCMU = 1,
         LINK_AUDIO_PCMA = 2,
         LINK_AUDIO_AAC = 3

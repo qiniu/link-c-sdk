@@ -67,7 +67,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
                 pTsMuxUploader->SetUploaderBufferSize(pTsMuxUploader, _pUserUploadArg->nUploaderBufferSize);
         }
         if (_pUserUploadArg->nNewSegmentInterval != 0) {
-                pTsMuxUploader->SetNewSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
+                pTsMuxUploader->SetUpdateSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
         }
         
         ret = LinkTsMuxUploaderStart(pTsMuxUploader);
@@ -101,7 +101,7 @@ int LinkCreateAndStartAll(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pA
                 pTsMuxUploader->SetUploaderBufferSize(pTsMuxUploader, _pUserUploadArg->nUploaderBufferSize);
         }
         if (_pUserUploadArg->nNewSegmentInterval != 0) {
-                pTsMuxUploader->SetNewSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
+                pTsMuxUploader->SetUpdateSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
         }
         
         ret = LinkTsMuxUploaderStart(pTsMuxUploader);
@@ -157,13 +157,13 @@ int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
         return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);
 }
 
-void LinkSetNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
+void LinkUpdateNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
 {
         if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {
                 LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
                 return;
         }
-        _pTsMuxUploader->SetNewSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
+        _pTsMuxUploader->SetUpdateSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
 }
 
 void LinkDestroyAVUploader(LinkTsMuxUploader **pTsMuxUploader)

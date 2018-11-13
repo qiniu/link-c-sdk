@@ -62,7 +62,7 @@ typedef struct _FFTsMuxUploader{
         LinkUploadState ffMuxSatte;
         
         int nUploadBufferSize;
-        int nNewSegmentInterval;
+        int nUpdateSegmentInterval;
         
         char deviceId_[33];
         Token token_;
@@ -714,7 +714,7 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
                 return;
         }
 
-        int64_t nDiff = pFFTsMuxUploader->nNewSegmentInterval * 1000000000LL;
+        int64_t nDiff = pFFTsMuxUploader->nUpdateSegmentInterval * 1000000000LL;
         if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
                 _pUploadArg->nSegmentId_ = nNow;
@@ -749,14 +749,14 @@ static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
         return nUsed + (nUsed/188) * 4;
 }
 
-static void setNewSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInterval)
+static void setUpdateSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInterval)
 {
         if (nInterval < 15) {
                 LinkLogWarn("setNewSegmentInterval is to small:%d. ge 15 required", nInterval);
                 return;
         }
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
-        pFFTsMuxUploader->nNewSegmentInterval = nInterval;
+        pFFTsMuxUploader->nUpdateSegmentInterval = nInterval;
 }
 
 int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg, const LinkUserUploadArg *_pUserUploadArg, int isWithPicAndSeg)
@@ -796,7 +796,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         
-        pFFTsMuxUploader->nNewSegmentInterval = 30;
+        pFFTsMuxUploader->nUpdateSegmentInterval = 30;
         
         pFFTsMuxUploader->nFirstTimestamp = -1;
         
@@ -816,7 +816,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
-        pFFTsMuxUploader->tsMuxUploader_.SetNewSegmentInterval = setNewSegmentInterval;
+        pFFTsMuxUploader->tsMuxUploader_.SetUpdateSegmentInterval = setUpdateSegmentInterval;
         pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
         pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
