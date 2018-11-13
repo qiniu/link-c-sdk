@@ -82,8 +82,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 }
 
 int LinkCreateAndStartAll(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
-                          LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg,
-                          IN SegmentUserArg *_pSegArg)
+                          LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
 {
         if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
             _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
@@ -93,7 +92,7 @@ int LinkCreateAndStartAll(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pA
         }
         
         LinkTsMuxUploader *pTsMuxUploader;
-        int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg, _pSegArg);
+        int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg);
         if (ret != 0) {
                 LinkLogError("LinkNewTsMuxUploaderWillPicAndSeg fail");
                 return ret;

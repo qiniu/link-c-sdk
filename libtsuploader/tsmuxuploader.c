@@ -863,7 +863,7 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 }
 
 int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
-                                            const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg, const SegmentUserArg *_pSegArg) {
+                                            const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg) {
         
         //LinkTsMuxUploader *pTsMuxUploader
         int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
@@ -885,13 +885,13 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
         arg.pDeviceId = pFFTsMuxUploader->deviceId_;
         arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
-        arg.pMgrTokenRequestUrl = _pSegArg->pMgrTokenRequestUrl;
-        arg.nMgrTokenRequestUrlLen = strlen(_pSegArg->pMgrTokenRequestUrl);
+        arg.pMgrTokenRequestUrl = _pUserUploadArg->pMgrTokenRequestUrl;
+        arg.nMgrTokenRequestUrlLen = strlen(_pUserUploadArg->pMgrTokenRequestUrl);
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         arg.uploadZone = _pUserUploadArg->uploadZone_;
-        arg.useHttps = _pSegArg->useHttps;
-        arg.nUpdateIntervalSeconds = _pSegArg->nUpdateIntervalSeconds;
+        arg.useHttps = _pUserUploadArg->useHttps;
+        arg.nUpdateIntervalSeconds = _pUserUploadArg->nUpdateIntervalSeconds;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
                 LinkDestroyTsMuxUploader(_pTsMuxUploader);

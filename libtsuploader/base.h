@@ -53,22 +53,18 @@ typedef enum _LinkUploadZone{
 typedef struct _LinkUserUploadArg{
         char  *pToken_;
         int   nTokenLen_;
-        LinkUploadZone uploadZone_;
-        const char  *pDeviceId_;
+        const char *pDeviceId_;
         int   nDeviceIdLen_;
+        const char *pMgrTokenRequestUrl;
+        int   nMgrTokenRequestUrlLen;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;
+        int   nUpdateIntervalSeconds;
+        int   useHttps;
+        LinkUploadZone uploadZone_;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
 }LinkUserUploadArg;
-
-typedef struct {
-        const char *pMgrTokenRequestUrl;
-        int nMgrTokenRequestUrlLen;
-        int nUpdateIntervalSeconds;
-        int useHttps;
-        LinkUploadZone uploadZone;
-}SegmentUserArg;
 
 typedef enum {
         LINK_VIDEO_H264 = 1,
