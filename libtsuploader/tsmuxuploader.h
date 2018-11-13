@@ -19,7 +19,7 @@ typedef struct _LinkTsMuxUploader{
         int (*SetToken)(IN LinkTsMuxUploader*, IN const char *pToken, IN int nTokenLen);
         void (*SetUploaderBufferSize)(IN LinkTsMuxUploader* pTsMuxUploader, int);
         int (*GetUploaderBufferUsedSize)(IN LinkTsMuxUploader* pTsMuxUploader);
-        void (*SetNewSegmentInterval)(IN LinkTsMuxUploader* pTsMuxUploader, IN int nInterval);
+        void (*SetUpdateSegmentInterval)(IN LinkTsMuxUploader* pTsMuxUploader, IN int nInterval);
 }LinkTsMuxUploader;
 
 int LinkNewTsMuxUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg, IN const LinkUserUploadArg *pUserUploadArg);
