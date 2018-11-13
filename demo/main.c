@@ -143,14 +143,14 @@ int TsUploaderSdkInit()
     char *pUrl = NULL;
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
-    SegmentUserArg segArg;
     LinkUserUploadArg userUploadArg;
+    int mem = 0;
 
     memset(&userUploadArg, 0, sizeof(userUploadArg));
-    memset( &segArg, 0, sizeof(segArg) );
 
     arg.getPicCallback = GetPicCallback;
     arg.getPictureFreeCallback = getPictureFreeCallback;
+
 
     DBG_LOG("start to init ts uploader sdk \n");
     gIpc.version = "00.00.01";
@@ -189,7 +189,7 @@ int TsUploaderSdkInit()
             pUrl = url;
         }
         DBG_LOG("pUrl = %s, i = %d\n", pUrl, i );
-        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), &segArg.uploadZone, pUrl );
+        ret = LinkGetUploadToken( gIpc.stream[STREAM_MAIN].token, sizeof(gIpc.stream[STREAM_MAIN].token), &userUploadArg.uploadZone_, pUrl );
         if ( ret != 0 ) {
             DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
             sleep(2);
@@ -221,15 +221,15 @@ int TsUploaderSdkInit()
     userUploadArg.nUploaderBufferSize = 512;
     userUploadArg.pUploadStatisticCb = ReportUploadStatistic;
 
-    segArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
+    userUploadArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
     if ( gIpc.config.renameTokenUrl )
-        segArg.nMgrTokenRequestUrlLen = strlen(gIpc.config.renameTokenUrl);
+        userUploadArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
     else
-        segArg.nMgrTokenRequestUrlLen = 0;
+        userUploadArg.nMgrTokenRequestUrlLen = 0;
 
-    segArg.useHttps = 0;
+    userUploadArg.useHttps = 0;
 
-    ret = LinkCreateAndStartAll(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg , &segArg );
+    ret = LinkCreateAndStartAll(&gIpc.stream[STREAM_MAIN].uploader, &mediaArg, &userUploadArg, &arg );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
@@ -256,7 +256,7 @@ int TsUploaderSdkInit()
 
         for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
             DBG_LOG("i = %d\n", i );
-            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), &segArg.uploadZone, pUrl );
+            ret = LinkGetUploadToken( gIpc.stream[STREAM_SUB].token, sizeof(gIpc.stream[STREAM_SUB].token), &userUploadArg.uploadZone_, pUrl );
             if ( ret != 0 ) {
                 DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
                 continue;
@@ -268,7 +268,7 @@ int TsUploaderSdkInit()
         userUploadArg.pDeviceId_ = gIpc.stream[STREAM_SUB].devId;
         userUploadArg.pToken_ = gIpc.stream[STREAM_SUB].token;
         userUploadArg.nTokenLen_ = strlen(gIpc.stream[STREAM_SUB].token);
-        ret = LinkCreateAndStartAll(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg, &segArg );
+        ret = LinkCreateAndStartAll(&gIpc.stream[STREAM_SUB].uploader, &mediaArg, &userUploadArg, &arg );
         if (ret != 0) {
             DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
             return ret;
@@ -455,6 +455,7 @@ int TsUploaderSdkDeInit()
 int main()
 {
     char *logFile = NULL;
+    char used[1024] = { 0 };
 
     InitConfig();
     UpdateConfig();
@@ -484,8 +485,9 @@ int main()
     DBG_LOG("commit id : %s\n", CODE_VERSION );
     for (;; ) {
         sleep( gIpc.config.heartBeatInterval );
-        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d \n token_url : %s\n reanme_url : %s\n",
-                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,
+        DbgGetMemUsed( used );
+        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d \n memeory used : %s kB token_url : %s\n reanme_url : %s\n",
+                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used,
                 gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
     }
 

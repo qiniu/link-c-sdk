@@ -1,4 +1,4 @@
-// Last Update:2018-11-07 15:03:08
+// Last Update:2018-11-13 12:27:00
 /**
  * @file dbg.c
  * @brief 
@@ -166,5 +166,36 @@ void DbgReportLog( int stream, int streamType, char *reason )
                  );
         start = end;
     }
+}
+
+int DbgGetMemUsed( char *memUsed )
+{
+    pid_t pid = 0;
+    char buffer[1024] = { 0 };
+    char line[256] = { 0 }, key[32] = { 0 }, value[32] = { 0 };
+    FILE *fp = NULL;
+    char *ret = NULL;
+
+    pid = getpid();
+    sprintf( buffer, "/proc/%d/status", pid );
+    fp = fopen( buffer, "r" );
+    if ( !fp ) {
+        printf("open %s error\n", buffer );
+        return -1;
+    }
+
+    for (;;) {
+        ret = fgets( line, sizeof(line), fp );
+        if (ret) {
+            sscanf( line, "%s %s", key, value );
+            printf("key : %s, value : %s\n", key, value );
+            if (strcmp( key, "VmRSS:" ) == 0 ) {
+                memcpy( memUsed, value, strlen(value) );
+                return 0;
+            }
+        }
+    }
+
+    return -1;
 }
 

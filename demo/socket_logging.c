@@ -1,4 +1,4 @@
-// Last Update:2018-11-07 15:00:16
+// Last Update:2018-11-13 11:35:36
 /**
  * @file socket_logging.c
  * @brief 
@@ -104,10 +104,17 @@ void DbgSendFileName( char *logfile )
 {
     char message[256] = { 0 };
     int ret = 0;
+    int flags = 0;
+
+#ifdef __APPLE__
+    flags = SO_NOSIGPIPE;
+#else
+    flags = MSG_NOSIGNAL;
+#endif
 
     sprintf( message, "%s.log", logfile );
     printf("%s %s %d send file name %s\n", __FILE__, __FUNCTION__, __LINE__, message );
-    ret = send(gsock , message , strlen(message) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    ret = send(gsock , message , strlen(message) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("%s %s %d Send failed, ret = %d, %s\n", __FILE__, __FUNCTION__, __LINE__,  ret, strerror(errno) );
     }
@@ -184,6 +191,13 @@ void *SocketLoggingTask( void *param )
 {
     char log[1024] = { 0 };
     int ret = 0;
+    int flags = 0;
+
+#ifdef __APPLE__
+    flags = SO_NOSIGPIPE;
+#else
+    flags = MSG_NOSIGNAL;
+#endif
 
     for (;;) {
         if ( !gStatus.logStop && ( gIpc.config.logOutput == OUTPUT_SOCKET) ) {
@@ -196,7 +210,7 @@ void *SocketLoggingTask( void *param )
                     return NULL;
                 }
                 //printf("log = %s", log);
-                ret = send(gsock , log , strlen(log) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+                ret = send(gsock , log , strlen(log) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
                 if(  ret < 0 ) {
                     DBG_ERROR("Send failed, ret = %d, %s\n", ret, strerror(errno) );
                     gStatus.connecting = 0;
@@ -309,6 +323,13 @@ void CmdHnadleDump( char *param )
     char buffer[1024] = { 0 } ;
     int ret = 0;
     Config *pConfig = &gIpc.config;
+    int flags = 0;
+
+#ifdef __APPLE__
+    flags = SO_NOSIGPIPE;
+#else
+    flags = MSG_NOSIGNAL;
+#endif
 
     printf("%s %s %d get command dump\n", __FILE__, __FUNCTION__, __LINE__ );
     sprintf( buffer, "\n%s", "Config :\n" );
@@ -451,9 +472,15 @@ void CmdHandleGetVersion( char *param )
 {
     char buffer[1024] = { 0 };
     int ret = 0;
+    int flags = 0;
 
     sprintf( buffer, "version : %s, compile time : %s %s\n", gIpc.version,  __DATE__, __TIME__ );
-    ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+#ifdef __APPLE__
+    flags = SO_NOSIGPIPE;
+#else
+    flags = MSG_NOSIGNAL;
+#endif
+    ret = send(gsock , buffer , strlen(buffer) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }
