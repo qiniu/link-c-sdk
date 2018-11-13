@@ -71,6 +71,7 @@ extern int dbg( unsigned logLevel, const char *file, const char *function, int l
 extern void DbgReportLog( int stream, int streamType, char *reason );
 extern void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream );
 extern void DbgReportLog( int stream, int streamType, char *reason );
+extern int DbgGetMemUsed();
 
 
 #endif  /*DBG_H*/
