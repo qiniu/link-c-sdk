@@ -153,7 +153,7 @@ int LinkMuxerAudio(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
         return 0;
 }
 
-int LinkMuxerVideo(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts)
+int LinkMuxerVideo(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen, int64_t _nPts, int nIsKeyframe)
 {
         writeTable(_pMuxCtx, 0);
         pthread_mutex_lock(&_pMuxCtx->tsMutex_);
