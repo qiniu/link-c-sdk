@@ -77,6 +77,7 @@ typedef struct _FFTsMuxUploader{
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
 static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
 
 static int getAacFreqIndex(int _nFreq)
 {
@@ -342,6 +343,9 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
+        }
+        if (pFFTsMuxUploader->nKeyFrameCount && nIsKeyFrame) {
+                linkCapturePictureCallback(_pTsMuxUploader, _nTimestamp);
         }
         
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO, nIsKeyFrame);
@@ -1048,7 +1052,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
+        //LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return LINK_SUCCESS;
