@@ -13,6 +13,8 @@ typedef struct {
         LinkVideoFormat nVideoFormat;
         LinkTsPacketCallback output;
         void *pOpaque;
+        LinkSetKeyframeMetaInfo setKeyframeMetaInfo;
+        void *pMetaInfoUserArg;
 }LinkTsMuxerArg;
 
 int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **pTsMuxerContext);

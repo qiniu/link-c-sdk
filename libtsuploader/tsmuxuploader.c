@@ -522,6 +522,8 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         avArg.output = (LinkTsPacketCallback)writeTsPacketToMem;
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
+        avArg.setKeyframeMetaInfo = LinkAppendKeyframeMetaInfo;
+        avArg.pMetaInfoUserArg = pTsMuxCtx->pTsUploader_;
         
         ret = LinkNewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
         if (ret != 0) {

@@ -20,6 +20,14 @@
 #endif
 
 typedef struct {
+        int64_t nTimestamp90Khz;
+        int nOffset;
+        int nLength;
+}LinkKeyFrameMetaInfo;
+
+typedef void (*LinkSetKeyframeMetaInfo)(void *pUserArg, LinkKeyFrameMetaInfo *pMetaInfo);
+
+typedef struct {
         IN char *pTokenBuf;
         IN int nTokenBufLen;
         IN char *pTypeBuf;

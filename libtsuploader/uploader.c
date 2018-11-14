@@ -51,6 +51,8 @@ typedef struct _KodoUploader{
         enum WaitFirstFlag nWaitFirstMutexLocked_;
         LinkTsStartUploadCallback tsStartUploadCallback;
         void *pTsStartUploadCallbackArg;
+        LinkKeyFrameMetaInfo metaInfo[10];
+        int nMetaInfoLen;
 }KodoUploader;
 
 static struct timespec tmResolution;
@@ -210,7 +212,7 @@ static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserDa
         return len;
 }
 
-static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize) {
+static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize, const char *pOffset, int nOffsetLen) {
         CURL *easy = curl_easy_init();
         if (easy == NULL) {
                 return LINK_NO_MEMORY;
@@ -232,6 +234,15 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         part = curl_mime_addpart(mime);
         curl_mime_name(part, "key");
         curl_mime_data(part, key, CURL_ZERO_TERMINATED);
+        
+        part = curl_mime_addpart(mime);
+        curl_mime_name(part, "x-qn-meta-meta_key");
+
+        //TODO meta data support binary data?
+        //fprintf(stderr, "=====------->:%d %ld\n", nOffsetLen, sizeof(LinkKeyFrameMetaInfo));
+        char buff[20]={0};curl_mime_data(part, buff, 20);
+        //curl_mime_data(part, pOffset, nOffsetLen);
+        //curl_mime_data(part, "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", CURL_ZERO_TERMINATED);
         
         part = curl_mime_addpart(mime);
         curl_mime_name(part, "file");
@@ -423,7 +434,8 @@ static void * streamUpload(void *_pOpaque)
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
-                        int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l);
+                        int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, (const char *)&pUploader->metaInfo,
+                                                   pUploader->nMetaInfoLen * sizeof(LinkKeyFrameMetaInfo));
                         if (putRet == LINK_SUCCESS) {
                                 uploadResult = LINK_UPLOAD_RESULT_OK;
                         }
@@ -735,4 +747,17 @@ void LinkDestroyUploader(LinkTsUploader ** _pUploader)
         free(pKodoUploader);
         * _pUploader = NULL;
         return;
+}
+
+void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo) {
+        if (pOpaque == NULL || pMediaInfo == NULL) {
+                return;
+        }
+        KodoUploader * pKodoUploader = (KodoUploader *)(pOpaque);
+        if (pKodoUploader->nMetaInfoLen < sizeof(pKodoUploader->metaInfo) / sizeof(LinkKeyFrameMetaInfo)) {
+                int idx = pKodoUploader->nMetaInfoLen++;
+                pKodoUploader->metaInfo[idx] = *pMediaInfo;
+                pKodoUploader->metaInfo[idx].nTimestamp90Khz |= 0x00000001FFFFFFFFLL;
+                //fprintf(stderr, "==========------->%lld %d %d %x\n", pMediaInfo->nTimestamp, pMediaInfo->nOffset, pMediaInfo->nLength, pOpaque);
+        }
 }

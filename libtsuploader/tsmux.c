@@ -26,6 +26,7 @@ typedef struct _LinkTsMuxerContext{
         int isTableWrited;
         
         uint8_t nPcrFlag; //分析ffmpeg，pcr只在pes中出现一次在最开头
+        int nCurrentPos;
 }LinkTsMuxerContext;
 
 static uint16_t getPidCounter(LinkTsMuxerContext* _pMuxCtx, uint64_t _nPID)
@@ -90,6 +91,7 @@ static void writeTable(LinkTsMuxerContext* _pMuxCtx, int64_t _nPts)
                 _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque,_pMuxCtx->tsPacket, 188);
         }
         _pMuxCtx->isTableWrited = 1;
+        _pMuxCtx->nCurrentPos = 188 * 2;
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
 }
 
@@ -117,10 +119,12 @@ int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **_pTsMuxerCt
         return 0;
 }
 
-static int makeTsPacket(LinkTsMuxerContext* _pMuxCtx, int _nPid)
+static int makeTsPacket(LinkTsMuxerContext* _pMuxCtx, int _nPid, int64_t _nPts, int _nIsKeyframe)
 {
         int nReadLen = 0;
         int nCount = 0;
+        int nKeyFrameLen = 0;
+        int nKeyframePos = _pMuxCtx->nCurrentPos;
         do {
                 int nRet = 0;
                 nReadLen = LinkGetPESData(&_pMuxCtx->pes, 0, _nPid, _pMuxCtx->tsPacket, 188);
@@ -131,8 +135,22 @@ static int makeTsPacket(LinkTsMuxerContext* _pMuxCtx, int _nPid)
                         if (nRet < 0) {
                                 return nRet;
                         }
+                        
+                        _pMuxCtx->nCurrentPos += 188;
+                        nKeyFrameLen += 188;
                 }
+                
         }while(nReadLen != 0);
+        
+        if (_nIsKeyframe) {
+                LinkKeyFrameMetaInfo metaInfo;
+                metaInfo.nLength = nKeyFrameLen;
+                metaInfo.nOffset = nKeyframePos;
+                metaInfo.nTimestamp90Khz = _nPts;
+                if (_pMuxCtx->arg.setKeyframeMetaInfo) {
+                        _pMuxCtx->arg.setKeyframeMetaInfo(_pMuxCtx->arg.pMetaInfoUserArg, &metaInfo);
+                }
+        }
         return 0;
 }
 
@@ -146,7 +164,7 @@ int LinkMuxerAudio(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
                 LinkInitPrivateTypePES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         }
         
-        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID);
+        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID, _nPts, 0);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
@@ -164,7 +182,7 @@ int LinkMuxerVideo(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
                 LinkInitVideoPES(&_pMuxCtx->pes, _pMuxCtx->arg.nVideoFormat, _pData, _nDataLen, _nPts);
         }
         
-        int nRet = makeTsPacket(_pMuxCtx, LINK_VIDEO_PID);
+        int nRet = makeTsPacket(_pMuxCtx, LINK_VIDEO_PID, _nPts, nIsKeyframe);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
