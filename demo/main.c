@@ -45,6 +45,7 @@ int AlarmCallback( int alarm, void *data )
 
         memset( file, 0, strlen((char *)data)+1 );
         memcpy( file, (char *)data, strlen((char *)data) );
+        DBG_LOG("gIpc.stream[STREAM_MAIN].pOpaque = %p, file : %s \n", gIpc.stream[STREAM_MAIN].pOpaque, file );
         LinkSendUploadPictureSingal( gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].pOpaque,
                                      file, strlen( (char *)data)+1, LinkPicUploadTypeFile );
     } else {
@@ -98,11 +99,19 @@ static enum LinkGetPictureSyncMode GetPicCallback ( void *pOpaque, void *pSvaeWh
     static unsigned int count = 0;
     char file[128] = { 0 };
     char *path = "/tmp";
+    static struct timeval start = { 0, 0 }, end = { 0, 0 };
+    int interval = 0;
+
+    gettimeofday( &end, NULL );
+    interval = GetTimeDiffMs( &start, &end );
 
     sprintf( file, "capture%d.jpeg", count++ );
     *pType = LinkPicUploadTypeFile;
     gIpc.stream[STREAM_MAIN].pOpaque = pSvaeWhenAsync;
+    DBG_LOG("pSvaeWhenAsync = %p, file : %s interval = %d \n", pSvaeWhenAsync, file, interval  );
     gIpc.dev->captureJpeg( 0, 0, path, file );
+
+    start = end;
 
     return LinkGetPictureModeAsync;
 }
@@ -482,7 +491,7 @@ int main()
 
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
-    DBG_LOG("commit id : %s\n", CODE_VERSION );
+    DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
     for (;; ) {
         sleep( gIpc.config.heartBeatInterval );
         DbgGetMemUsed( used );

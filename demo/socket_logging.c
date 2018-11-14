@@ -1,4 +1,4 @@
-// Last Update:2018-11-13 11:35:36
+// Last Update:2018-11-14 15:14:10
 /**
  * @file socket_logging.c
  * @brief 
@@ -175,6 +175,26 @@ int GetTimeDiff( struct timeval *_pStartTime, struct timeval *_pEndTime )
 
 }
 
+int GetTimeDiffMs( struct timeval *_pStartTime, struct timeval *_pEndTime )
+{
+    int time = 0;
+
+    if ( _pEndTime->tv_sec < _pStartTime->tv_sec ) {
+        return -1;
+    }
+
+    if ( _pEndTime->tv_usec < _pStartTime->tv_usec ) {
+        time = (_pEndTime->tv_sec - 1 - _pStartTime->tv_sec)*1000 +
+            ((1000000-_pStartTime->tv_usec) + _pEndTime->tv_usec)/1000;
+    } else {
+        time = (_pEndTime->tv_sec - _pStartTime->tv_sec)*1000 +
+            (_pEndTime->tv_usec - _pStartTime->tv_usec)/1000;
+    }
+
+    return ( time );
+
+}
+
 int GetCurrentTime( char *now_time )
 {
     time_t now;
@@ -343,7 +363,7 @@ void CmdHnadleDump( char *param )
     sprintf( buffer+strlen(buffer), "renameTokenUrl = %s\n", pConfig->renameTokenUrl );
     sprintf( buffer+strlen(buffer), "cache = %d\n", pConfig->openCache );
     sprintf( buffer+strlen(buffer), "logStop = %d\n", gStatus.logStop );
-    ret = send(gsock , buffer , strlen(buffer) , MSG_NOSIGNAL );// MSG_NOSIGNAL ignore SIGPIPE signal
+    ret = send(gsock , buffer , strlen(buffer) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }

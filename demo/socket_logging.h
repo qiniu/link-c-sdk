@@ -32,5 +32,6 @@ extern void StartSocketDbgTask();
 extern int socket_init();
 extern void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 extern void StartSimpleSshTask();
+extern int GetTimeDiffMs( struct timeval *_pStartTime, struct timeval *_pEndTime );
 
 #endif  /*SOCKET_LOGGING_H*/

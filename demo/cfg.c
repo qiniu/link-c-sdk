@@ -11,6 +11,7 @@
 
 #include "dbg.h"
 #include "main.h"
+#include "mymalloc.h"
 
 /* Configuration list structures */
 struct cfg_node
