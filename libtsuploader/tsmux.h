@@ -13,11 +13,13 @@ typedef struct {
         LinkVideoFormat nVideoFormat;
         LinkTsPacketCallback output;
         void *pOpaque;
+        LinkSetKeyframeMetaInfo setKeyframeMetaInfo;
+        void *pMetaInfoUserArg;
 }LinkTsMuxerArg;
 
 int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **pTsMuxerContext);
 int LinkMuxerAudio(LinkTsMuxerContext* pMuxerCtx, uint8_t *pData, int nDataLen, int64_t nPts);
-int LinkMuxerVideo(LinkTsMuxerContext* pMuxerCtx, uint8_t *pData, int nDataLen,  int64_t nPts);
+int LinkMuxerVideo(LinkTsMuxerContext* pMuxerCtx, uint8_t *pData, int nDataLen,  int64_t nPts, int nIsKeyframe);
 int LinkMuxerFlush(LinkTsMuxerContext* pMuxerCtx);
 void LinkDestroyTsMuxerContext(LinkTsMuxerContext *pTsMuxerCtx);
 

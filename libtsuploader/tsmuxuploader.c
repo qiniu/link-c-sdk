@@ -137,8 +137,10 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         int ret = pTsMuxCtx->pTsUploader_->Push(pTsMuxCtx->pTsUploader_, (char *)buf, buf_size);
         if (ret < 0){
                 if (ret == LINK_Q_OVERWRIT) {
-                        LinkLogDebug("write ts to queue overwrite:%d", ret);
-                } else {
+                        LinkLogWarn("write ts to queue overwrite:%d", ret);
+                } else if (ret == LINK_NO_MEMORY){
+                        LinkLogWarn("write ts to queue no memory:%d", ret);
+                }else {
                         LinkLogDebug("write ts to queue fail:%d", ret);
                 }
                 return ret;
@@ -151,7 +153,7 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         return ret;
 }
 
-static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag){
+static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag, int _nIsKeyframe){
 #ifndef USE_OWN_TSMUX
         AVPacket pkt;
         av_init_packet(&pkt);
@@ -244,7 +246,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         return 0;
                 }
 #ifdef USE_OWN_TSMUX
-                ret = LinkMuxerVideo(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp);
+                ret = LinkMuxerVideo(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp, _nIsKeyframe);
 #else
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
@@ -342,9 +344,14 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return 0;
         }
         
-        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO);
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO, nIsKeyFrame);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
+        }
+        if (ret == LINK_NO_MEMORY) {
+                //LinkNotifyNomoreData;
+                if (pFFTsMuxUploader->pTsMuxCtx)
+                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
@@ -367,9 +374,14 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 LinkLogDebug("no keyframe. drop audio frame");
                 return 0;
         }
-        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO);
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
+        }
+        if (ret == LINK_NO_MEMORY) {
+                //LinkNotifyNomoreData;
+                if (pFFTsMuxUploader->pTsMuxCtx)
+                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
@@ -522,6 +534,8 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         avArg.output = (LinkTsPacketCallback)writeTsPacketToMem;
         avArg.nVideoFormat = _pAvArg->nVideoFormat;
         avArg.pOpaque = pTsMuxCtx;
+        avArg.setKeyframeMetaInfo = LinkAppendKeyframeMetaInfo;
+        avArg.pMetaInfoUserArg = pTsMuxCtx->pTsUploader_;
         
         ret = LinkNewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
         if (ret != 0) {
