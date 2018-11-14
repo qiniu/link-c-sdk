@@ -10,6 +10,7 @@
 #include <time.h>
 #include <curl/curl.h>
 #include "fixjson.h"
+#include <b64/b64.h>
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -212,7 +213,21 @@ static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserDa
         return len;
 }
 
-static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize, const char *pOffset, int nOffsetLen) {
+// ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
+static void inttoBCD(int64_t m, char *buf)
+{
+        int n = 10, a = 0;
+        memset(buf, 0, 5);
+        while(m) {
+                a = (m%10) << ((n%2) * 4);
+                m=m/10;
+                buf[(n+1)/2 - 1] |= a;
+                n--;
+        }
+        return;
+}
+
+static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize, LinkKeyFrameMetaInfo *pMetas, int nMetaLen) {
         CURL *easy = curl_easy_init();
         if (easy == NULL) {
                 return LINK_NO_MEMORY;
@@ -238,10 +253,19 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         part = curl_mime_addpart(mime);
         curl_mime_name(part, "x-qn-meta-meta_key");
 
-        //TODO meta data support binary data?
-        //fprintf(stderr, "=====------->:%d %ld\n", nOffsetLen, sizeof(LinkKeyFrameMetaInfo));
-        char buff[20]={0};curl_mime_data(part, buff, 20);
-        //curl_mime_data(part, pOffset, nOffsetLen);
+        char metaValue[200];
+        char metaBcd[150];
+        int i = 0;
+        for(i = 0; i < nMetaLen; i++) {
+                inttoBCD(pMetas[i].nTimestamp90Khz, metaBcd + 15 * i);
+                inttoBCD(pMetas[i].nOffset, metaBcd + 15 * i + 5);
+                inttoBCD(pMetas[i].nLength, metaBcd + 15 * i + 10);
+        }
+        int nMetaValueLen = b64_encode(metaBcd, nMetaLen * 15, metaValue, sizeof(metaValue));
+        
+        fprintf(stderr, "=====------->:%d %d\n", nMetaLen, nMetaValueLen);
+        //char buff[20]={0};curl_mime_data(part, buff, 20);
+        curl_mime_data(part, metaValue, nMetaValueLen);
         //curl_mime_data(part, "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", CURL_ZERO_TERMINATED);
         
         part = curl_mime_addpart(mime);
@@ -434,8 +458,8 @@ static void * streamUpload(void *_pOpaque)
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
                         //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
-                        int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, (const char *)&pUploader->metaInfo,
-                                                   pUploader->nMetaInfoLen * sizeof(LinkKeyFrameMetaInfo));
+                        int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUploader->metaInfo,
+                                                   pUploader->nMetaInfoLen);
                         if (putRet == LINK_SUCCESS) {
                                 uploadResult = LINK_UPLOAD_RESULT_OK;
                         }
