@@ -137,8 +137,10 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         int ret = pTsMuxCtx->pTsUploader_->Push(pTsMuxCtx->pTsUploader_, (char *)buf, buf_size);
         if (ret < 0){
                 if (ret == LINK_Q_OVERWRIT) {
-                        LinkLogDebug("write ts to queue overwrite:%d", ret);
-                } else {
+                        LinkLogWarn("write ts to queue overwrite:%d", ret);
+                } else if (ret == LINK_NO_MEMORY){
+                        LinkLogWarn("write ts to queue no memory:%d", ret);
+                }else {
                         LinkLogDebug("write ts to queue fail:%d", ret);
                 }
                 return ret;
@@ -346,6 +348,11 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
+        if (ret == LINK_NO_MEMORY) {
+                //LinkNotifyNomoreData;
+                if (pFFTsMuxUploader->pTsMuxCtx)
+                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
 }
@@ -370,6 +377,11 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
+        }
+        if (ret == LINK_NO_MEMORY) {
+                //LinkNotifyNomoreData;
+                if (pFFTsMuxUploader->pTsMuxCtx)
+                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
