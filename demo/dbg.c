@@ -24,7 +24,7 @@ static Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
-    DBG_LOG( log );
+    //DBG_LOG( log );
 }
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )

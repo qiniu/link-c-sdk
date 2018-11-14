@@ -13,6 +13,7 @@
 #include "dev_core.h"
 #include "main.h"
 #include "dbg.h"
+#include "mymalloc.h"
 
 int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
                  int _nStreamType, char *_pFrame,
