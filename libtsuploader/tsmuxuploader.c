@@ -56,6 +56,7 @@ typedef struct _FFTsMuxUploader{
         
         int64_t nLastTimestamp;
         int64_t nFirstTimestamp; //initial to -1
+        int64_t nLastPicCallbackSystime; //upload picture need
         int nKeyFrameCount;
         int nFrameCount;
         LinkMediaArg avArg;
@@ -305,8 +306,14 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
                         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
+                        int64_t nSystime = LinkGetCurrentNanosecond();
+                        int64_t nDiff = (nSystime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
+                        if (nDiff < 1000) {
+                                LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
+                        }
+                        pFFTsMuxUploader->nLastPicCallbackSystime = nSystime;
                         if (_nIsSegStart) {
-                                pFFTsMuxUploader->uploadArg.nSegmentId_ = LinkGetCurrentNanosecond();
+                                pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
                         ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
                         if (ret != 0) {
@@ -345,7 +352,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return 0;
         }
         if (pFFTsMuxUploader->nKeyFrameCount == 1 && nIsKeyFrame) {
-                linkCapturePictureCallback(_pTsMuxUploader, _nTimestamp);
+                linkCapturePictureCallback(_pTsMuxUploader, pFFTsMuxUploader->nLastPicCallbackSystime / 1000000);
         }
         
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO, nIsKeyFrame);
