@@ -1,4 +1,4 @@
-// Last Update:2018-11-15 16:05:07
+// Last Update:2018-11-15 16:08:16
 /**
  * @file stream.c
  * @brief 
@@ -126,7 +126,7 @@ int VideoGetFrameCb( char *_pFrame,
     if ( _nIskey ) {
         gettimeofday( &end, NULL );
         interval = GetTimeDiffMs( &start, &end );
-        DBG_LOG("video key frame interval = %d\n", interval );
+    //    DBG_LOG("video key frame interval = %d\n", interval );
         start = end;
     }
 
