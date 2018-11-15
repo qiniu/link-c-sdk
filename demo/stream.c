@@ -1,4 +1,4 @@
-// Last Update:2018-10-31 09:30:46
+// Last Update:2018-11-15 16:05:07
 /**
  * @file stream.c
  * @brief 
@@ -120,6 +120,15 @@ int VideoGetFrameCb( char *_pFrame,
                    int streamno )
 {
     static int first = 1;
+    static struct timeval start = { 0, 0 }, end = { 0, 0 };
+    int interval = 0;
+
+    if ( _nIskey ) {
+        gettimeofday( &end, NULL );
+        interval = GetTimeDiffMs( &start, &end );
+        DBG_LOG("video key frame interval = %d\n", interval );
+        start = end;
+    }
 
     if ( first ) {
         printf("%s thread id = %d\n", __FUNCTION__, (int)pthread_self() );

@@ -24,7 +24,7 @@ static Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
-    //DBG_LOG( log );
+    DBG_LOG( log );
 }
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
@@ -188,7 +188,7 @@ int DbgGetMemUsed( char *memUsed )
         ret = fgets( line, sizeof(line), fp );
         if (ret) {
             sscanf( line, "%s %s", key, value );
-            printf("key : %s, value : %s\n", key, value );
+//            printf("key : %s, value : %s\n", key, value );
             if (strcmp( key, "VmRSS:" ) == 0 ) {
                 memcpy( memUsed, value, strlen(value) );
                 return 0;

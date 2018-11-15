@@ -1,4 +1,4 @@
-// Last Update:2018-10-31 09:29:18
+// Last Update:2018-11-15 11:46:00
 /**
  * @file sim_dev.c
  * @brief 
@@ -226,7 +226,7 @@ int start_video_file_test(void *opaque)
         ret = readFileToBuf(pStream->file, &pVideoData, &nVideoDataLen);
         if (ret != 0) {
                 free(pVideoData);
-                printf( "map data to buffer fail:%s", pStream->file);
+                printf( "map data to buffer fail:%s, please modify ipc.conf and specify the h264 and aac file\n", pStream->file);
                 return -2;
         }
 
@@ -448,8 +448,17 @@ void simdev_set_video_format(int camera, int stream, int isH265)
 
 int simdev_init( )
 {
+    extern char *GetH264File();
+    extern char *GetAacFile();
+
         memset(&cameras, 0, sizeof(cameras));
         int i = 0;
+        char *h264,*aac;
+
+        h264 = GetH264File();
+        aac = GetAacFile();
+        printf("h264 = %s\n", h264);
+        printf("aac = %s\n", aac);
         for (i = 0; i < sizeof(cameras) / sizeof(Camera); i++) {
                 cameras[i].nId = i;
                 cameras[i].audioStreams[0].nStreamNo = 0;
@@ -459,10 +468,14 @@ int simdev_init( )
                 cameras[i].audioStreams[0].isAac = 1;
                 cameras[i].audioStreams[1].isAac = 1;
                 //TODO default file
-                strcpy(cameras[i].audioStreams[0].file, "h265_aac_1_16000_a.aac");
-                strcpy(cameras[i].audioStreams[1].file, "h265_aac_1_16000_a.aac");
-                strcpy(cameras[i].videoStreams[0].file, "len.h264");
-                strcpy(cameras[i].videoStreams[1].file, "len.h264");
+                if ( h264 ) {
+                strcpy(cameras[i].videoStreams[0].file, h264 );
+                strcpy(cameras[i].videoStreams[1].file, h264 );
+                }
+                if ( aac) {
+                    strcpy(cameras[i].audioStreams[1].file, aac );
+                    strcpy(cameras[i].audioStreams[0].file, aac );
+                }
         }
         
         return 0;
