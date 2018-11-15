@@ -14,3 +14,4 @@ build-linux
 build-mac
 tags
 libs
+doc/html/
