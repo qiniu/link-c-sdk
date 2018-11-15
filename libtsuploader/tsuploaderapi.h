@@ -71,13 +71,11 @@ int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader,
                                 );
 
 /**
- * 设置视频片段分段间隔
+ * 片段文件更新间隔时间
  *
- * 用于索引视频片段时判断是否为同一视频片段，
- * 小于视频分段间隔的两个视频文件被认为同一个视频片段
  *
  * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] nSeconds 视频分段间隔
+ * @param[in] nSeconds 片段文件重命名间隔时间
  * @return NULL
  */
 void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader,
@@ -195,10 +193,14 @@ void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader,
 int LinkGetUploadBufferUsedSize(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
+ * 设置视频片段分段间隔
  *
+ * 用于索引视频片段时判断是否为同一视频片段，
+ * 小于视频分段间隔的两个视频文件被认为同一个视频片段
  *
- * @param[]
- * @return
+ * @param[in] pTsMuxUploader 切片上传实例
+ * @param[in] nSeconds 视频分段间隔
+ * @return NULL
  */
 void LinkUpdateNewSegmentInterval(IN LinkTsMuxUploader *pTsMuxUploader,
                                   IN int nIntervalSecond);
