@@ -365,6 +365,8 @@ void CfgGetIntItem( char *item, int *out )
 static CfgItem cfg_items[] =
 {
     { CFG_MEMBER(logFile), "LOG_FILE", 1 },
+    { CFG_MEMBER(h264_file), "H264_FILE", 1 },
+    { CFG_MEMBER(aac_file), "AAC_FILE", 1 },
     { CFG_MEMBER(ak), "AK", 1 },
     { CFG_MEMBER(sk), "SK", 1 },
     { CFG_MEMBER(url), "NETWORK_CHECK_URL", 1 },
@@ -377,6 +379,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(multiChannel), "MULTI_CHANNEL", 0 },
     { CFG_MEMBER(useLocalToken), "USE_LOCAL_TOKEN", 0 },
     { CFG_MEMBER(serverPort), "SERVER_PORT", 0 },
+    { CFG_MEMBER(simpleSshEnable), "SIMPLE_SSH", 0 },
 };
 
 void CfgGetItem()

@@ -460,6 +460,16 @@ int TsUploaderSdkDeInit()
     return 0;
 }
 
+char *GetH264File()
+{
+    return gIpc.config.h264_file;
+}
+
+char *GetAacFile()
+{
+    return gIpc.config.aac_file;
+}
+
 
 int main()
 {

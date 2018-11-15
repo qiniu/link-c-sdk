@@ -41,6 +41,8 @@ typedef struct {
     char *serverIp;
     int serverPort;
     char *renameTokenUrl;
+    char *h264_file;
+    char *aac_file;
 } Config;
 
 struct cfg_struct;
