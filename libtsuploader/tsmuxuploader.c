@@ -344,7 +344,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
-        if (pFFTsMuxUploader->nKeyFrameCount && nIsKeyFrame) {
+        if (pFFTsMuxUploader->nKeyFrameCount == 1 && nIsKeyFrame) {
                 linkCapturePictureCallback(_pTsMuxUploader, _nTimestamp);
         }
         
