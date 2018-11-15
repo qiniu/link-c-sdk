@@ -183,9 +183,6 @@ static void setSegmentInt(SegInfo segInfo) {
                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                 return;
         }
-        if (!checkShouldUpdate(&segmentMgr.handles[idx])) {
-                return;
-        }
         
         segmentMgr.handles[idx].nUpdateIntervalSeconds = segInfo.nEndOrInt;
 }
