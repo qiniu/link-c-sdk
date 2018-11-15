@@ -263,7 +263,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         }
         int nMetaValueLen = b64_encode(metaBcd, nMetaLen * 15, metaValue, sizeof(metaValue));
         
-        fprintf(stderr, "=====------->:%d %d\n", nMetaLen, nMetaValueLen);
+        //fprintf(stderr, "=====------->:%d %d\n", nMetaLen, nMetaValueLen);
         //char buff[20]={0};curl_mime_data(part, buff, 20);
         curl_mime_data(part, metaValue, nMetaValueLen);
         //curl_mime_data(part, "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", CURL_ZERO_TERMINATED);
