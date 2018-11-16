@@ -781,7 +781,7 @@ void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo)
         if (pKodoUploader->nMetaInfoLen < sizeof(pKodoUploader->metaInfo) / sizeof(LinkKeyFrameMetaInfo)) {
                 int idx = pKodoUploader->nMetaInfoLen++;
                 pKodoUploader->metaInfo[idx] = *pMediaInfo;
-                pKodoUploader->metaInfo[idx].nTimestamp90Khz |= 0x00000001FFFFFFFFLL;
+                pKodoUploader->metaInfo[idx].nTimestamp90Khz &= 0x00000001FFFFFFFFLL;
                 //fprintf(stderr, "==========------->%lld %d %d %x\n", pMediaInfo->nTimestamp, pMediaInfo->nOffset, pMediaInfo->nLength, pOpaque);
         }
 }

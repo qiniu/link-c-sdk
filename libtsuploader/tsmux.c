@@ -164,7 +164,7 @@ int LinkMuxerAudio(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
                 LinkInitPrivateTypePES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         }
         
-        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID, _nPts, 0);
+        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID, _pMuxCtx->pes.nPts, 0);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
@@ -182,7 +182,7 @@ int LinkMuxerVideo(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
                 LinkInitVideoPES(&_pMuxCtx->pes, _pMuxCtx->arg.nVideoFormat, _pData, _nDataLen, _nPts);
         }
         
-        int nRet = makeTsPacket(_pMuxCtx, LINK_VIDEO_PID, _nPts, nIsKeyframe);
+        int nRet = makeTsPacket(_pMuxCtx, LINK_VIDEO_PID, _pMuxCtx->pes.nPts, nIsKeyframe);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
