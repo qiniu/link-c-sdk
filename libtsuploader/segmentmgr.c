@@ -26,6 +26,7 @@ typedef struct {
         int64_t nEnd;
         SegmentHandle handle;
         int isRestart;
+        int segUploadOk;
         char ua[32];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
@@ -217,8 +218,10 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                 return;
         }
-        if (!checkShouldUpdate(&segmentMgr.handles[idx])) {
-                return;
+        if (segmentMgr.handles[idx].segUploadOk) {
+                if (!checkShouldUpdate(&segmentMgr.handles[idx])) {
+                        return;
+                }
         }
         
         char key[64] = {0};
@@ -226,7 +229,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         char oldKey[64] = {0};
         memset(oldKey, 0, sizeof(oldKey));
         int isNewSeg = 1;
-        if (segmentMgr.handles[idx].nStart <= 0 || segInfo.isRestart) {
+        if (segmentMgr.handles[idx].segUploadOk == 0) {
                 snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua, segInfo.nStart, segInfo.nEndOrInt);
                 segmentMgr.handles[idx].nStart = segInfo.nStart;
                 segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
@@ -353,6 +356,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         }
                 }
         } else {
+                segmentMgr.handles[idx].segUploadOk = 1;
                 uploadResult = LINK_UPLOAD_RESULT_OK;
                 LinkLogDebug("upload segment key:%s success", key);
         }
@@ -376,6 +380,7 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].useHttps = 0;
+                segmentMgr.handles[seg].segUploadOk = 0;
                 segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
                 if (segmentMgr.handles[seg].pMgrTokenRequestUrl) {
                         free(segmentMgr.handles[seg].pMgrTokenRequestUrl);
