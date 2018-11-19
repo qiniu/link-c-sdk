@@ -1,4 +1,4 @@
-// Last Update:2018-11-19 10:59:19
+// Last Update:2018-11-19 11:10:28
 /**
  * @file sim_dev.c
  * @brief 
@@ -731,8 +731,10 @@ static int SimDevCaptureJpeg( int stream, int quality, char *path, char *filenam
 {
     pthread_t thread = 0;
     char file[256] = { 0 };
+    char cmdbuf[256] = { 0 };
 
     sprintf( file, "%s/%s", path, filename );
+    sprintf( cmdbuf, "echo aaaaaaaaaaaaa > %s", file );
     pthread_create( &thread, NULL, CaptureJpegNotifyTask, file );
     return 0;
 }
