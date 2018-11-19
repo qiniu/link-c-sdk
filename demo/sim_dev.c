@@ -1,4 +1,4 @@
-// Last Update:2018-11-15 11:46:00
+// Last Update:2018-11-19 11:10:28
 /**
  * @file sim_dev.c
  * @brief 
@@ -580,7 +580,7 @@ int simdev_register_callback(alarm_callback_t alarmcb , void *pcontext)
 {
         pthread_t thread = 0;
         
-//        pthread_create( &thread, NULL, AlarmTask, (void *)alarmcb );
+        pthread_create( &thread, NULL, AlarmTask, (void *)alarmcb );
         return 0;
 }
 
@@ -715,11 +715,27 @@ static int SimDevRegisterAlarmCb( int (*alarmCallback)(int alarm, void *data ) )
     return 0;
 }
 
+void *CaptureJpegNotifyTask( void *arg )
+{
+    int alarm;
+    char *file = (char*)arg;
+
+    usleep( 500000 );// 500ms
+    alarm = ALARM_JPEG_CAPTURED;
+    if ( gSimDevCaptureDev.alarmCallback )
+        gSimDevCaptureDev.alarmCallback( alarm, file );
+    return NULL;
+}
+
 static int SimDevCaptureJpeg( int stream, int quality, char *path, char *filename)
 {
-    int ret = 0;
+    pthread_t thread = 0;
+    char file[256] = { 0 };
+    char cmdbuf[256] = { 0 };
 
-    printf("%s %s %d ret = %d\n", __FILE__, __FUNCTION__, __LINE__, ret );
+    sprintf( file, "%s/%s", path, filename );
+    sprintf( cmdbuf, "echo aaaaaaaaaaaaa > %s", file );
+    pthread_create( &thread, NULL, CaptureJpegNotifyTask, file );
     return 0;
 }
 
