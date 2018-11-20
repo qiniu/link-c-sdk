@@ -1,4 +1,4 @@
-// Last Update:2018-11-13 12:27:00
+// Last Update:2018-11-20 15:54:43
 /**
  * @file dbg.c
  * @brief 
@@ -13,6 +13,10 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "dbg.h"
 #include "socket_logging.h"
@@ -20,7 +24,7 @@
 #include "stream.h"
 #include "main.h"
 
-static Logger gLogger;
+Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
@@ -83,7 +87,7 @@ int dbg( unsigned logLevel, const char *file, const char *function, int line, co
         WriteLog( buffer ); 
         break;
     case OUTPUT_SOCKET:
-        log_send( buffer );
+        SendLog( buffer );
         break;
     case OUTPUT_MQTT:
         break;
@@ -170,21 +174,18 @@ void DbgReportLog( int stream, int streamType, char *reason )
 
 int DbgGetMemUsed( char *memUsed )
 {
-    pid_t pid = 0;
-    char buffer[1024] = { 0 };
     char line[256] = { 0 }, key[32] = { 0 }, value[32] = { 0 };
     FILE *fp = NULL;
     char *ret = NULL;
 
-    pid = getpid();
-    sprintf( buffer, "/proc/%d/status", pid );
-    fp = fopen( buffer, "r" );
+    fp = fopen( "/proc/self/status", "r" );
     if ( !fp ) {
-        printf("open %s error\n", buffer );
+        printf("open /proc/self/status error\n" );
         return -1;
     }
 
     for (;;) {
+        memset( line, 0, sizeof(line) );
         ret = fgets( line, sizeof(line), fp );
         if (ret) {
             sscanf( line, "%s %s", key, value );
@@ -198,4 +199,77 @@ int DbgGetMemUsed( char *memUsed )
 
     return -1;
 }
+
+int *parser_result(const char *buf, int size){
+    static int ret[10];
+    int i, j = 0, start = 0;
+
+    for(i=0; i<size; i++){
+        char c = buf[i];
+        if(c >= '0' && c <= '9'){
+            if(!start){
+                start = 1;
+                ret[j] = c-'0';
+            } else {
+                ret[j] *= 10;
+                ret[j] += c-'0';
+            }
+        } else if(c == '\n'){
+            break;
+        } else {
+            if(start){
+                j++;
+                start = 0;
+            }
+        }
+    }
+
+    return ret;
+}
+
+float DbgGetCpuUsage()
+{
+    char buf[256];
+    int size, *nums, prev_idle = 0, prev_total = 0, idle, total, i;
+    static int fd = 0;
+
+    if ( !fd )
+        fd = open("/proc/stat", O_RDONLY);
+
+    size = read(fd, buf, sizeof(buf));
+    if(size <= 0)
+        return 0;
+
+    nums = parser_result(buf, size);
+
+    idle=nums[3];
+
+    for(i=0, total=0; i<10; i++){
+        total += nums[i];
+    }
+
+
+    int diff_idle = idle-prev_idle;
+    int diff_total = total-prev_total;
+    float usage = (float)(((float)(1000*(diff_total-diff_idle))/(float)diff_total+5)/(float)10);
+    fflush(stdout);
+
+    prev_total = total;
+    prev_idle = idle;
+
+    sleep(3);
+    lseek(fd, 0, SEEK_SET);
+
+    return usage;
+}
+
+__attribute__((no_instrument_function))
+    void __cyg_profile_func_enter(void *this_fn, void *call_site) {
+        printf("enter func => %p\n", this_fn);
+    }
+
+__attribute__((no_instrument_function))
+    void __cyg_profile_func_exit(void *this_fn, void *call_site) {
+        printf("exit func <= %p\n", this_fn);
+    }
 

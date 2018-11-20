@@ -1,4 +1,4 @@
-// Last Update:2018-10-23 14:09:09
+// Last Update:2018-11-20 16:00:18
 /**
  * @file dbg.h
  * @brief 
@@ -11,6 +11,7 @@
 #define DBG_H
 
 #include <stdio.h>
+#include "queue.h"
 
 typedef enum {
     OUTPUT_NONE,
@@ -32,6 +33,7 @@ typedef struct {
     int printTime;
     unsigned logLevel;
     int logVerbose;
+    Queue *logQueue;
 } Logger;
 
 #define NONE                 "\e[0m"
@@ -65,6 +67,9 @@ typedef struct {
 #define LOG(args...) dbg( DBG_LEVEL_DEBUG, __FILE__, __FUNCTION__, __LINE__, args )
 #define DBG_ERROR(args...) dbg( DBG_LEVEL_FATAL, __FILE__, __FUNCTION__, __LINE__, args )
 #define DBG_LOG(args...) LOG(args)
+#define BASIC() printf("[ %s %s() +%d] ", __FILE__, __FUNCTION__, __LINE__ )
+#define LOGE(args...) BASIC();printf(args)
+#define LOGI(args...) BASIC();printf(args)
 
 extern int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose );
 extern int dbg( unsigned logLevel, const char *file, const char *function, int line, const char *format, ...  );
@@ -72,6 +77,8 @@ extern void DbgReportLog( int stream, int streamType, char *reason );
 extern void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream );
 extern void DbgReportLog( int stream, int streamType, char *reason );
 extern int DbgGetMemUsed();
+extern float DbgGetCpuUsage();
+extern Logger gLogger;
 
 
 #endif  /*DBG_H*/
