@@ -101,6 +101,8 @@ int ghttp_is_timeout(ghttp_request *a_request)
 			else
 				return 0;
 #endif
+		default:
+			break;
 	}
 	return 0;
 }
@@ -366,7 +368,8 @@ ghttp_prepare(ghttp_request *a_request)
       a_request->conn->port = a_request->uri->port;
       a_request->conn->proxy_host = a_request->proxy->host;
       a_request->conn->proxy_port = a_request->proxy->port;
-      int rr = http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri);
+      if (http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri) != 0)
+          return HTTP_TRANS_ERR;
       
       /* close the socket if it looks open */
       if (a_request->conn->sock >= 0)
@@ -618,6 +621,8 @@ ghttp_get_error(ghttp_request *a_request)
         case http_trans_err_type_ssl:
             a_request->errstr = ERR_reason_error_string(a_request->conn->error);
             return a_request->errstr;
+	default:
+	    break;
 #endif
     }
 

@@ -58,7 +58,7 @@ static char *qn_memconcat(char *dst_buffer, const char *src_buffer, size_t src_b
  * **/
 static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_boundary_len,
                       const char *field_name,
-                      char *field_value, size_t field_value_len,
+                      const char *field_value, size_t field_value_len,
                       const char *field_mime_type, size_t *form_data_len, int isFieldValueFile) {
     size_t delta_len = 0;
     size_t field_name_len = strlen(field_name);

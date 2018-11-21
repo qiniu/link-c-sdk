@@ -66,9 +66,7 @@ static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
 {
     struct addrinfo        *ailist, *aip;
     struct addrinfo        hint;
-    const char             *addr;
     int                 err;
-    char                 abuf[INET_ADDRSTRLEN];
 
     hint.ai_flags = AI_CANONNAME;
     hint.ai_family = AF_INET;
@@ -309,6 +307,7 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl)
                 return 0;
             } else {
                 a_conn->error_type = http_trans_err_type_local_ca;
+                a_conn->error = ERR_get_error();        
                 return -4;
             }
           }
@@ -318,6 +317,7 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl)
 #else
   a_conn->use_ssl = 0;
 #endif
+  return -6;
 }
 
 const char *
