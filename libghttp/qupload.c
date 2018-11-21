@@ -107,7 +107,8 @@ static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_
 	field_value_len = file_len;
 
     } else {
-        dst_buffer_p = qn_memconcat(dst_buffer_p, field_value, field_value_len);
+        if (field_value_len > 0)
+            dst_buffer_p = qn_memconcat(dst_buffer_p, field_value, field_value_len);
     }
     dst_buffer_p = qn_memconcat(dst_buffer_p, "\r\n--", 4);
     delta_len += 4;
@@ -129,12 +130,13 @@ static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_
  *
  * @return 0 on success, -1 on failure
  * */
-static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * upHost, const char *upload_token,
-	       	const char *file_key, const char *mime_type, LinkPutret *put_ret) {
+static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
+	       	const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
 
     if (file_key == NULL || upload_token == NULL || filepathOrBufer == NULL) {
 	    return -1;
     }
+    memset(put_ret, 0, sizeof(LinkPutret));
 
     //form boundary
     const char *form_prefix = "--------LINKFormBoundary"; //24
@@ -167,6 +169,11 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
     form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "key", (char *) file_key,
                                   strlen(file_key),
                                   NULL, &form_data_len, 0);
+
+    if (nCustomMetaLen > 0) {
+        form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "x-qn-meta-meta_key", customMeta, nCustomMetaLen,
+                                  mime_type, &form_data_len, 1);
+    }
 
     if (bufferLen) {
         form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "file",  filepathOrBufer, bufferLen,
@@ -232,12 +239,19 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
     return 0;
 }
 
-int LinkUploadBuffer(const char *buffer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key, const char *mime_type,
-                LinkPutret *put_ret) {
-	return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, mime_type, put_ret);
+int LinkUploadBuffer(const char *buffer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
+	       	const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
+	return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen, mime_type, put_ret);
 }
 
 int LinkUploadFile(const char *local_path, const char * upHost, const char *upload_token, const char *file_key, const char *mime_type,
 		LinkPutret *put_ret) {
-	return linkUpload(local_path, 0,upHost, upload_token, file_key, mime_type, put_ret);
+	return linkUpload(local_path, 0 ,upHost, upload_token, file_key, NULL, 0,  mime_type, put_ret);
+}
+
+void LinkFreePutret(LinkPutret *put_ret) {
+	if(put_ret->body) {
+		free(put_ret->body);
+	}
+	put_ret->body = NULL;
 }
