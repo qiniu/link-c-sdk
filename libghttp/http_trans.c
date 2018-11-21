@@ -110,13 +110,13 @@ http_trans_connect(http_trans_conn *a_conn)
       a_conn->error = errno;
       goto ec;
     }
-  if (!a_conn->use_ssl) {
-     struct timeval tv;
-     tv.tv_sec = a_conn->nTimeoutInSecond;
-     tv.tv_usec = 0;
-     setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-     setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-  }
+
+  struct timeval tv;
+  tv.tv_sec = a_conn->nTimeoutInSecond;
+  tv.tv_usec = 0;
+  setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
   /* set up the socket */
   if (connect(a_conn->sock,
 	      (struct sockaddr *)&a_conn->saddr,

@@ -348,8 +348,6 @@ ghttp_prepare(ghttp_request *a_request)
       a_request->conn->proxy_port = a_request->proxy->port;
       a_request->conn->hostinfo = NULL;
       int rr = http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri);
-      if (rr == 0 && a_request->secure_uri)
-          wolfSSL_set_timeout(a_request->conn->ssl_conn, a_request->nTimeoutInSecond);
       
       /* close the socket if it looks open */
       if (a_request->conn->sock >= 0)
