@@ -8,6 +8,8 @@ int testhttps(char * p)
     if (p != NULL) {
 	uri = p;
     }
+    printf("in testhttps: url:%s\n", uri);
+
     ghttp_request *request = NULL;
     ghttp_status status;
     char *buf;
@@ -44,6 +46,7 @@ int testpost(char *p) {
     if (p != NULL) {
 	uri = p;
     }
+    printf("in testpost: url:%s\n", uri);
     char szXML[2048];
     char szVal[256];
      
@@ -84,6 +87,7 @@ int testget(char *p) {
     if (p != NULL) {
         uri = p;
     }
+    printf("in testget: url:%s\n", uri);
 
     ghttp_request *request = NULL;
     ghttp_status status;
@@ -97,10 +101,12 @@ int testget(char *p) {
     ghttp_prepare(request);
     status = ghttp_process(request);
     if (status == ghttp_error) {
-    	ghttp_clean(request);
 	if (ghttp_is_timeout(request)) {
 		printf("---------->timeout [%s]\n", ghttp_get_error(request));
+	} else {
+		printf("ghttp_process err:%d\n", status);
 	}
+    	ghttp_clean(request);
     	return -1;
     }
     char *buf = ghttp_get_body(request);//test

@@ -62,32 +62,61 @@ void ghttp_set_global_cert_file_path(const char *file, const char *path)
     return;
 }
 
+static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
+{
+    struct addrinfo        *ailist, *aip;
+    struct addrinfo        hint;
+    const char             *addr;
+    int                 err;
+    char                 abuf[INET_ADDRSTRLEN];
+
+    hint.ai_flags = AI_CANONNAME;
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = SOCK_STREAM;
+    hint.ai_protocol = 0;
+    hint.ai_addrlen = 0;
+    hint.ai_canonname = NULL;
+    hint.ai_addr = NULL;
+    hint.ai_next = NULL;
+
+    if ((err = getaddrinfo(host, NULL, &hint, &ailist)) != 0)
+            return err;
+
+    for (aip = ailist; aip != NULL; aip = aip->ai_next) {
+        if (aip->ai_family == AF_INET) {
+            memcpy(sinp, (struct sockaddr_in *)aip->ai_addr, sizeof(struct sockaddr_in));
+            break;
+        }
+    }
+    freeaddrinfo(ailist);
+    return 0;
+}
+
 int
 http_trans_connect(http_trans_conn *a_conn)
 {
   int err_ret;
+  int dnserr = 0;
 
   if ((a_conn == NULL) || (a_conn->host == NULL))
     goto ec;
-  if (a_conn->hostinfo == NULL)
-    {
       /* look up the name of the proxy if it's there. */
       if (a_conn->proxy_host)
 	{
-	  if ((a_conn->hostinfo = gethostbyname(a_conn->proxy_host)) == NULL)
+	  if ((dnserr = get_host_by_name(a_conn->proxy_host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
-	      a_conn->error = h_errno;
+	      a_conn->error = dnserr;
 	      goto ec;
 	    }
 	}
       else
 	{
 	  /* look up the name */
-	  if ((a_conn->hostinfo = gethostbyname(a_conn->host)) == NULL)
+	  if ((dnserr = get_host_by_name(a_conn->host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
-	      a_conn->error = h_errno;
+	      a_conn->error = dnserr;
 	      goto ec;
 	    }
 	}
@@ -98,11 +127,6 @@ http_trans_connect(http_trans_conn *a_conn)
 	a_conn->saddr.sin_port = htons(a_conn->proxy_port);
       else
 	a_conn->saddr.sin_port = htons(a_conn->port);
-      /* copy the name info */
-      memcpy(&a_conn->saddr.sin_addr.s_addr,
-	     a_conn->hostinfo->h_addr_list[0],
-	     sizeof(unsigned long));
-    }
   /* set up the socket */
   if ((a_conn->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {

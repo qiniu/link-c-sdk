@@ -366,7 +366,6 @@ ghttp_prepare(ghttp_request *a_request)
       a_request->conn->port = a_request->uri->port;
       a_request->conn->proxy_host = a_request->proxy->host;
       a_request->conn->proxy_port = a_request->proxy->port;
-      a_request->conn->hostinfo = NULL;
       int rr = http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri);
       
       /* close the socket if it looks open */
@@ -425,7 +424,7 @@ ghttp_process (ghttp_request *a_request)
 	      if (a_request->conn->error_type == http_trans_err_type_errno)
 		a_request->errstr = strerror(a_request->conn->error);
 	      else if(a_request->conn->error_type == http_trans_err_type_host)
-		a_request->errstr = http_trans_get_host_error(h_errno);
+		a_request->errstr = gai_strerror(a_request->conn->error);
 	      return ghttp_error;
 	    }
 #ifdef USE_SSL 

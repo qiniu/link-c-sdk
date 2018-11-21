@@ -43,7 +43,6 @@ typedef enum http_trans_err_type_tag {
 } http_trans_err_type;
 
 typedef struct http_trans_conn_tag {
-  struct hostent      *hostinfo;
   struct sockaddr_in   saddr;
   char                *host;
   char                *proxy_host;
