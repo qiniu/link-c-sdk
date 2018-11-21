@@ -16,7 +16,6 @@ int testhttps(char * p)
  
  
     request = ghttp_request_new();
-    ghttp_enable_ssl(request);
     if((ret = ghttp_set_uri(request, uri)) == -1) {
        fprintf(stderr, "ghttp_set_uri fail:%d\n", ret);
        return -1;

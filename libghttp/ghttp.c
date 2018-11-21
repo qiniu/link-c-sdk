@@ -50,7 +50,7 @@ struct _ghttp_request
   char               *proxy_password;
   char               *proxy_authtoken;
   int                 secure_uri;
-  int                 ssl_allowed;
+  int                 nTimeoutInSecond;
 #ifdef USE_SSL
   ghttp_ssl_cert_cb   cert_cb;
   void               *cert_cb_data;
@@ -75,8 +75,13 @@ ghttp_request_new(void)
   l_return->resp = http_resp_new();
   l_return->conn = http_trans_conn_new();
   l_return->secure_uri = 0;
-  l_return->ssl_allowed = 0;
+  l_return->nTimeoutInSecond = 10;
   return l_return;
+}
+
+void ghttp_set_timeout(ghttp_request *a_request, int nTimeoutInSecond)
+{
+  a_request->nTimeoutInSecond = nTimeoutInSecond;
 }
 
 void
@@ -192,8 +197,7 @@ ghttp_set_uri(ghttp_request *a_request, char *a_uri)
 	}
 
 #ifdef USE_SSL
-      if (!strcmp(a_request->uri->proto, "https") &&
-          a_request->ssl_allowed)
+      if (!strcmp(a_request->uri->proto, "https"))
         {
           a_request->secure_uri = 1;
         }
@@ -801,28 +805,6 @@ ghttp_set_proxy_authinfo(ghttp_request *a_request,
   a_request->proxy_authtoken = l_final_auth;
   
   return 0;
-}
-
-int
-ghttp_enable_ssl(ghttp_request *a_request) {
-#ifdef USE_SSL 
-  if(!a_request) return -1;
-  a_request->ssl_allowed = 1;
-  return 0;
-#else
-  return -1;
-#endif
-}
-
-int
-ghttp_disable_ssl(ghttp_request *a_request) {
-#ifdef USE_SSL 
-  if(!a_request) return -1;
-  a_request->ssl_allowed = 0;
-  return 0;
-#else
-  return -1;
-#endif
 }
 
 void

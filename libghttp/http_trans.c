@@ -36,13 +36,31 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <assert.h>
 
 static int          ssl_initialized = 0;
 static SSL_METHOD * ssl_method = NULL;
 static SSL_CTX    * ssl_context = NULL;
 #endif
 
+
+
 static int http_trans_buf_free(http_trans_conn *a_conn);
+
+static char cert_file[256]={"/etc/ssl/certs/ca-certificates.crt"};
+static char cert_path[256];
+void ghttp_set_global_cert_file_path(const char *file, const char *path)
+{
+    int lenf = strlen(file);
+    int lenp = strlen(path);
+    assert(lenf < sizeof(cert_file));
+    assert(lenp < sizeof(cert_path));
+    memcpy(cert_file, file, lenf);
+    cert_file[lenf] = 0;
+    memcpy(cert_path, path, lenp);
+    cert_path[lenp] = 0;
+    return;
+}
 
 int
 http_trans_connect(http_trans_conn *a_conn)
@@ -255,7 +273,7 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl)
         else 
           {
             //SSL_CTX_set_verify(ssl_context, SSL_VERIFY_NONE, 0);
-            if(SSL_CTX_load_verify_locations(ssl_context, "/etc/ssl/certs/ca-certificates.crt", NULL) != 0) 
+            if(SSL_CTX_load_verify_locations(ssl_context, cert_file, NULL) != 0) 
                 ssl_initialized = 1;
           }
       }    

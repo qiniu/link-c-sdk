@@ -198,7 +198,6 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         free(form_data);
         return -4;
     }
-    ghttp_enable_ssl(request);
 
     ghttp_set_uri(request, upHost);
     ghttp_set_header(request, "Content-Type", form_content_type);
