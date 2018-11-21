@@ -38,7 +38,8 @@
 typedef enum http_trans_err_type_tag {
   http_trans_err_type_host = 0,
   http_trans_err_type_errno,
-  http_trans_err_type_ssl
+  http_trans_err_type_ssl,
+  http_trans_err_type_local_ca,
 } http_trans_err_type;
 
 typedef struct http_trans_conn_tag {
@@ -61,6 +62,7 @@ typedef struct http_trans_conn_tag {
 					    read in and out be? */
   int                  last_read;         /* the size of the last read */
   int                  chunk_len;         /* length of a chunk. */
+  int                  nTimeoutInSecond;
   char                *errstr;            /* a hint as to an error */
 
   /* SSL support. we always have a use_ssl var, even if compiled
@@ -73,7 +75,7 @@ typedef struct http_trans_conn_tag {
 } http_trans_conn;
 
 http_trans_conn *
-http_trans_conn_new(void);
+http_trans_conn_new(int nTimeoutInSecond);
 
 void
 http_trans_conn_destroy(http_trans_conn *a_conn);
@@ -90,7 +92,7 @@ http_trans_buf_clip(http_trans_conn *a_conn, char *a_clip_to);
 int
 http_trans_connect(http_trans_conn *a_conn);
 
-void
+int
 http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl);
 
 const char *

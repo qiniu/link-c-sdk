@@ -73,15 +73,16 @@ ghttp_request_new(void)
   l_return->proxy = http_uri_new();
   l_return->req = http_req_new();
   l_return->resp = http_resp_new();
-  l_return->conn = http_trans_conn_new();
-  l_return->secure_uri = 0;
   l_return->nTimeoutInSecond = 10;
+  l_return->conn = http_trans_conn_new(l_return->nTimeoutInSecond);
+  l_return->secure_uri = 0;
   return l_return;
 }
 
 void ghttp_set_timeout(ghttp_request *a_request, int nTimeoutInSecond)
 {
   a_request->nTimeoutInSecond = nTimeoutInSecond;
+  a_request->conn->nTimeoutInSecond = nTimeoutInSecond;
 }
 
 void
@@ -346,7 +347,9 @@ ghttp_prepare(ghttp_request *a_request)
       a_request->conn->proxy_host = a_request->proxy->host;
       a_request->conn->proxy_port = a_request->proxy->port;
       a_request->conn->hostinfo = NULL;
-      http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri);
+      int rr = http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri);
+      if (rr == 0 && a_request->secure_uri)
+          wolfSSL_set_timeout(a_request->conn->ssl_conn, a_request->nTimeoutInSecond);
       
       /* close the socket if it looks open */
       if (a_request->conn->sock >= 0)

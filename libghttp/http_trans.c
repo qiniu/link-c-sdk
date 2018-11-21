@@ -110,6 +110,13 @@ http_trans_connect(http_trans_conn *a_conn)
       a_conn->error = errno;
       goto ec;
     }
+  if (!a_conn->use_ssl) {
+     struct timeval tv;
+     tv.tv_sec = a_conn->nTimeoutInSecond;
+     tv.tv_usec = 0;
+     setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+     setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+  }
   /* set up the socket */
   if (connect(a_conn->sock,
 	      (struct sockaddr *)&a_conn->saddr,
@@ -164,7 +171,7 @@ http_trans_connect(http_trans_conn *a_conn)
 }
 
 http_trans_conn *
-http_trans_conn_new(void)
+http_trans_conn_new(int nTimeoutInSecond)
 {
   http_trans_conn *l_return = NULL;
 
@@ -183,6 +190,7 @@ http_trans_conn_new(void)
   l_return->sock = -1;
   /* don't use SSL until told to */
   l_return->use_ssl = 0;
+  l_return->nTimeoutInSecond = nTimeoutInSecond;
 #ifdef USE_SSL
   l_return->ssl_conn = NULL;
   l_return->ssl_cert = NULL;
@@ -243,14 +251,14 @@ http_trans_conn_close(http_trans_conn * a_conn)
     }
 }
 
-void
+int
 http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl) 
 {
   if(a_conn == NULL)
-    return;
+    return -1;
   
   if(use_ssl == a_conn->use_ssl) 
-    return;
+    return -2;
 
 #ifdef USE_SSL
   if(use_ssl) {
@@ -267,14 +275,18 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int use_ssl)
           {
             a_conn->error_type = http_trans_err_type_ssl;
             a_conn->error = ERR_get_error();        
-            return;
-            ssl_initialized = 0;
+            return -3;
           }
         else 
           {
             //SSL_CTX_set_verify(ssl_context, SSL_VERIFY_NONE, 0);
-            if(SSL_CTX_load_verify_locations(ssl_context, cert_file, NULL) != 0) 
+            if(SSL_CTX_load_verify_locations(ssl_context, cert_file, NULL) != 0) {
                 ssl_initialized = 1;
+                return 0;
+            } else {
+                a_conn->error_type = http_trans_err_type_local_ca;
+                return -4;
+            }
           }
       }    
   }

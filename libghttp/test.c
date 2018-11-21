@@ -79,6 +79,32 @@ int testpost(char *p) {
     return 0;
 }
 
+int testget(char *p) {
+    char *uri = "http://www.baidu.com";
+    if (p != NULL) {
+        uri = p;
+    }
+
+    ghttp_request *request = NULL;
+    ghttp_status status;
+    char retbuf[1024];
+    int len;
+
+    request = ghttp_request_new();
+    if (ghttp_set_uri(request, uri) == -1)
+    return -1;
+
+    ghttp_prepare(request);
+    status = ghttp_process(request);
+    if (status == ghttp_error)
+    return -1;
+    char *buf = ghttp_get_body(request);//test
+    snprintf(retbuf, sizeof(retbuf), "%s", buf);
+    ghttp_clean(request);
+    printf("ret:%s\n", retbuf);
+    return 0;
+}
+
 void testupfile(char * file, char * token) {
 	int ret;
 	LinkPutret putret={0};
@@ -130,6 +156,11 @@ int main(int argc, char **argv) {
 			testpost(NULL);
 		else
 			testpost(argv[2]);
+	} else if (memcmp("testget", argv[1], 8) == 0) {
+		if (argc == 2)
+			testget(NULL);
+		else
+			testget(argv[2]);
 	} else if (memcmp("testupfile", argv[1], 8) == 0) {
 		if (argc != 4) {
 			printf("usage as:%s testupfile filepath token\n", argv[0]);
