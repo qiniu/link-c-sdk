@@ -96,6 +96,7 @@ ghttp_uri_validate(char *a_uri);
  * This will return -1 if the uri is invalid
  */
 
+int ghttp_is_timeout(ghttp_request *a_request);
 void ghttp_set_timeout(ghttp_request *a_request, int nTimeoutInSecond);
 void ghttp_set_global_cert_file_path(const char *file, const char *path);
 

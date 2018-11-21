@@ -96,8 +96,13 @@ int testget(char *p) {
 
     ghttp_prepare(request);
     status = ghttp_process(request);
-    if (status == ghttp_error)
-    return -1;
+    if (status == ghttp_error) {
+    	ghttp_clean(request);
+	if (ghttp_is_timeout(request)) {
+		printf("---------->timeout\n");
+	}
+    	return -1;
+    }
     char *buf = ghttp_get_body(request);//test
     snprintf(retbuf, sizeof(retbuf), "%s", buf);
     ghttp_clean(request);

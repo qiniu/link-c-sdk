@@ -364,6 +364,8 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
                     l_bytes_to_read)) < 0)
         {
           long int sslerr = SSL_get_error(a_conn->ssl_conn, l_read);
+          a_conn->error_type = http_trans_err_type_ssl;
+          a_conn->error = sslerr;
           if((sslerr == SSL_ERROR_WANT_READ) ||
              (sslerr == SSL_ERROR_WANT_WRITE)) 
             l_read = 0;
@@ -382,6 +384,8 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
                  &a_conn->io_buf[a_conn->io_buf_alloc],
                  l_bytes_to_read)) < 0)
     {
+      a_conn->error_type = http_trans_err_type_errno;
+      a_conn->error = errno;
       if (errno == EINTR)
 	l_read = 0;
       else
@@ -422,6 +426,8 @@ http_trans_write_buf(http_trans_conn *a_conn)
                      a_conn->io_buf_io_left)) <= 0) 
         {
           long int sslerr = SSL_get_error(a_conn->ssl_conn, l_written);
+          a_conn->error_type = http_trans_err_type_ssl;
+          a_conn->error = sslerr;
           if ((sslerr == SSL_ERROR_WANT_READ) ||
               (sslerr == SSL_ERROR_WANT_WRITE)) 
             l_written = 0;
@@ -436,6 +442,8 @@ http_trans_write_buf(http_trans_conn *a_conn)
                                                    &a_conn->io_buf[a_conn->io_buf_io_done],
                                                    a_conn->io_buf_io_left)) <= 0)
     {
+      a_conn->error_type = http_trans_err_type_errno;
+      a_conn->error = errno;
       if (errno == EINTR)
         l_written = 0;
       else

@@ -85,6 +85,26 @@ void ghttp_set_timeout(ghttp_request *a_request, int nTimeoutInSecond)
   a_request->conn->nTimeoutInSecond = nTimeoutInSecond;
 }
 
+int ghttp_is_timeout(ghttp_request *a_request)
+{
+	switch(a_request->conn->error_type) {
+		//case http_trans_err_type_host:
+		case http_trans_err_type_errno:
+			if (a_request->conn->error == EAGAIN || a_request->conn->error == EWOULDBLOCK)
+				return 1;
+			else
+				return 0;
+#ifdef USE_SSL
+		case http_trans_err_type_ssl:
+			if (a_request->conn->error==SSL_ERROR_WANT_READ || a_request->conn->error==SSL_ERROR_WANT_WRITE)
+				return 1;
+			else
+				return 0;
+#endif
+	}
+	return 0;
+}
+
 void
 ghttp_request_destroy(ghttp_request *a_request)
 {
