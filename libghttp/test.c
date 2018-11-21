@@ -99,7 +99,7 @@ int testget(char *p) {
     if (status == ghttp_error) {
     	ghttp_clean(request);
 	if (ghttp_is_timeout(request)) {
-		printf("---------->timeout\n");
+		printf("---------->timeout [%s]\n", ghttp_get_error(request));
 	}
     	return -1;
     }

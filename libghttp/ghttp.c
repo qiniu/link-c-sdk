@@ -607,9 +607,22 @@ ghttp_get_header_names(ghttp_request *a_request,
 const char *
 ghttp_get_error(ghttp_request *a_request)
 {
-  if (a_request->errstr == NULL)
+  if (a_request->errstr)
+      return a_request->errstr;
+
+    switch(a_request->conn->error_type) {
+        case http_trans_err_type_errno:
+            a_request->errstr = strerror(a_request->conn->error);
+            return a_request->errstr;
+            if (a_request->conn->error == EAGAIN || a_request->conn->error == EWOULDBLOCK)
+#ifdef USE_SSL
+        case http_trans_err_type_ssl:
+            a_request->errstr = ERR_reason_error_string(a_request->conn->error);
+            return a_request->errstr;
+#endif
+    }
+
     return "Unknown Error.";
-  return a_request->errstr;
 }
 
 time_t
