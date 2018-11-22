@@ -1,4 +1,4 @@
-// Last Update:2018-11-20 15:54:43
+// Last Update:2018-11-21 12:28:12
 /**
  * @file dbg.c
  * @brief 
@@ -40,6 +40,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
     gLogger.logFile = pLogFile;
     gLogger.printTime = printTime;
     gLogger.logVerbose = logVerbose;
+    gLogger.logQueue = NULL;
 
     printf("output = %d\n", output );
     switch( output ) {
@@ -47,6 +48,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
         FileOpen( gLogger.logFile );
         break;
     case OUTPUT_SOCKET:
+        gLogger.logQueue = NewQueue();
         StartSocketDbgTask();
         break;
     case OUTPUT_MQTT:
@@ -192,11 +194,13 @@ int DbgGetMemUsed( char *memUsed )
 //            printf("key : %s, value : %s\n", key, value );
             if (strcmp( key, "VmRSS:" ) == 0 ) {
                 memcpy( memUsed, value, strlen(value) );
+                fclose( fp );
                 return 0;
             }
         }
     }
 
+    fclose( fp );
     return -1;
 }
 

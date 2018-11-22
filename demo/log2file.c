@@ -1,4 +1,4 @@
-// Last Update:2018-11-06 16:42:26
+// Last Update:2018-11-20 16:07:16
 /**
  * @file log2file.c
  * @brief 
@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include "dbg.h"
 
 static FILE *gFd = NULL;
 
@@ -30,6 +31,11 @@ int FileOpen( char *_pLogFile )
 int WriteLog( char *log )
 {
     size_t ret = 0;
+
+    if ( !gFd ) {
+        LOGE("check fd error\n");
+        return -1;
+    }
 
     ret = fwrite( log, strlen(log), 1, gFd );
     if ( ret != 1 ) {

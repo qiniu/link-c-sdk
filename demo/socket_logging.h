@@ -1,4 +1,4 @@
-// Last Update:2018-11-06 16:58:05
+// Last Update:2018-11-20 12:48:14
 /**
  * @file socket_logging.h
  * @brief 
@@ -12,8 +12,7 @@
 
 #include "tsuploaderapi.h"
 typedef struct {
-    int connecting;
-    int retry_count;
+    int connected;
     int logStop;
 } socket_status;
 
@@ -22,14 +21,12 @@ typedef struct {
     void (*pCmdHandle)(char *param);
 } DemoCmd;
 
-extern int log_send( char *message );
-extern int log_send( char *message );
+extern int SendLog( char *message );
 extern int report_status( int code, char *_pFileNmae );
 extern int GetTimeDiff( struct timeval *_pStartTime, struct timeval *_pEndTime );
 extern int GetCurrentTime( char *now_time );
 extern void DbgSendFileName( char *logfile );
 extern void StartSocketDbgTask();
-extern int socket_init();
 extern void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 extern void StartSimpleSshTask();
 extern int GetTimeDiffMs( struct timeval *_pStartTime, struct timeval *_pEndTime );
