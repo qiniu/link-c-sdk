@@ -277,7 +277,7 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         ghttp_set_type(pRequest, ghttp_type_post);
         
         char tokenBuf[512];
-        snprintf(tokenBuf, sizeof(tokenBuf), "Box %s", pMoveToken);
+        snprintf(tokenBuf, sizeof(tokenBuf), "QBox %s", pMoveToken);
         ghttp_set_header(pRequest, "Authorization", tokenBuf);
         ghttp_set_header(pRequest, "Content-Type", "application/x-www-form-urlencoded");
         

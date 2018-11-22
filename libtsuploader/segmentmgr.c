@@ -101,7 +101,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         
         char requetBody[256] = {0};
         snprintf(requetBody, sizeof(requetBody), "{\"key\":\"/move/%s/%s/force/false\"}", oldkeyB64, keyB64);
-        printf("=======>move url:%s\n", pUrl);
+        //printf("=======>move url:%s\n", pUrl);
         
         char httpResp[1024+256];
         int nHttpRespBufLen = sizeof(httpResp);
