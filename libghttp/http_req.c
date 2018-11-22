@@ -86,10 +86,12 @@ http_req_prepare(http_req *a_req)
       (a_req->type == http_req_type_put) ||
       (a_req->type == http_req_type_trace))
     {
+      if (a_req->body_len > 0) {
       sprintf(l_buf, "%d", a_req->body_len);
       http_hdr_set_value(a_req->headers,
 			 http_hdr_Content_Length,
 			 l_buf);
+      }
     }
   /* if the user agent isn't set then set a default */
   if (http_hdr_get_value(a_req->headers, http_hdr_User_Agent) == NULL)
