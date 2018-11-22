@@ -4,9 +4,6 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <stdlib.h>
-#include <curl/curl.h>
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -23,6 +20,7 @@
 #include "dev_core.h"
 #include "stream.h"
 #include "picuploader.h"
+#include "httptools.h"
 
 /* global variable */
 App gIpc;
@@ -396,31 +394,27 @@ int StartTokenUpdateTask()
 
 int WaitForNetworkOk()
 {
-    CURL *curl;
-    CURLcode res;
-    int i = 0;
     char *url = NULL;
-
     if ( gIpc.config.url ) {
         url = gIpc.config.url;
     } else {
         url = gIpc.config.defaultUrl;
     }
 
+    char buf[256];
+    int nRespLen = 0;
+    int i = 0;
+        
     printf("start to check network, url = %s ....\n", gIpc.config.url );
-    curl = curl_easy_init();
-    if ( curl != NULL ) {
-        for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
-            curl_easy_setopt( curl, CURLOPT_URL, url );
-            res = curl_easy_perform( curl );
-            if ( res == CURLE_OK ) {
-                return 0;
-            } else {
-                sleep(1);
-            }
+    for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
+        int ret = LinkSimpleHttpGet(url, buf, sizeof(buf), &nRespLen);
+        if (ret == LINK_SUCCESS || ret == LINK_BUFFER_IS_SMALL) {
+            return 0;
+        } else {
+            sleep(1);
         }
-        curl_easy_cleanup( curl );
     }
+
     printf("finished to check network \n");
     return 0;
 }

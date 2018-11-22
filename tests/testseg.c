@@ -56,6 +56,6 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
                 LinkUpdateSegment(segHandle, nStart, nEnd, 0);
                 nEnd+=5222;
                 count--;
-                sleep(5);
+                sleep(8);
         }
 }

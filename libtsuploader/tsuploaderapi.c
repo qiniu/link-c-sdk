@@ -3,15 +3,13 @@
 #include <assert.h>
 #include "log.h"
 #include <pthread.h>
-#include <curl/curl.h>
 #include "servertime.h"
 #ifndef USE_OWN_TSMUX
 #include <libavformat/avformat.h>
 #endif
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
 #include "fixjson.h"
 #include "segmentmgr.h"
+#include "httptools.h"
 
 static int volatile nProcStatus = 0;
 
@@ -26,8 +24,6 @@ int LinkInitUploader()
     #endif
 #endif
         setenv("TZ", "GMT-8", 1);
-
-        Qiniu_Global_Init(-1);
 
         int ret = 0;
         ret = LinkInitTime();
@@ -190,7 +186,6 @@ void LinkUninitUploader()
         nProcStatus = 2;
         LinkUninitSegmentMgr();
         LinkStopMgr();
-        Qiniu_Global_Cleanup();
         
         return;
 }
@@ -245,20 +240,20 @@ void LinkSetDeleteAfterDays(int nDays)
         nDeleteAfterDays = nDays;
 }
 
-struct CurlToken {
+struct HttpToken {
         char * pData;
         int nDataLen;
-        int nCurlRet;
+        int nHttpRet; //use with curl not ghttp
         LinkUploadZone *pZone;
 };
 
 size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
-        struct CurlToken *pToken = (struct CurlToken *)pUserData;
+        struct HttpToken *pToken = (struct HttpToken *)pUserData;
         
         int len = pToken->nDataLen;
         int ret = GetJsonContentByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
         if (ret != LINK_SUCCESS) {
-                pToken->nCurlRet = ret;
+                pToken->nHttpRet = ret;
                 return 0;
         }
         
@@ -283,52 +278,33 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
 
 int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, const char *pUrl)
 {
-#ifdef DISABLE_OPENSSL
+        
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
-        memset(pBuf, 0, nBufLen);
-        CURL *curl;
-        curl_global_init(CURL_GLOBAL_ALL);
-        curl = curl_easy_init();
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeData);
-        curl_easy_setopt(curl, CURLOPT_URL, pUrl);
+        char httpResp[1024+256]={0};
+        int nHttpRespLen = sizeof(httpResp);
+        int nRespLen = 0;
+        int ret = LinkSimpleHttpGet(pUrl, httpResp, nHttpRespLen, &nRespLen);
         
-        struct CurlToken token;
-        token.pData = pBuf;
-        token.nDataLen = nBufLen;
-        token.nCurlRet = 0;
-        token.pZone = pZone;
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token);
-        int ret =curl_easy_perform(curl);
-        if (ret != 0) {
-                curl_easy_cleanup(curl);
+        if (ret != LINK_SUCCESS) {
+                if (ret == LINK_BUFFER_IS_SMALL) {
+                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRespLen);
+                }
                 return ret;
         }
-        curl_easy_cleanup(curl);
-        return token.nCurlRet;
-#else
-        if (gAk[0] == 0 || gSk[0] == 0 || gBucket[0] == 0)
-                return -11;
+        
         memset(pBuf, 0, nBufLen);
-        Qiniu_Mac mac;
-        mac.accessKey = gAk;
-        mac.secretKey = gSk;
+
+        struct HttpToken token;
+        token.pData = pBuf;
+        token.nDataLen = nBufLen;
+        token.nHttpRet = 0;
+        token.pZone = pZone;
         
-        Qiniu_RS_PutPolicy putPolicy;
-        Qiniu_Zero(putPolicy);
-        putPolicy.scope = gBucket;
-        putPolicy.expires = 40;
-        putPolicy.deleteAfterDays = 7;
-        putPolicy.callbackBody = "{\"key\":\"$(key)\",\"hash\":\"$(etag)\",\"fsize\":$(fsize),\"bucket\":\"$(bucket)\",\"name\":\"$(x:name)\",\"duration\":\"$(avinfo.format.duration)\"}";
-        putPolicy.callbackUrl = pUrl;
-        putPolicy.callbackBodyType = "application/json";
+        if (writeData(httpResp, nRespLen,  1,  &token) == 0){
+                LinkLogError("maybe response format error:%s", httpResp);
+                return LINK_JSON_FORMAT;
+        }
         
-        char *uptoken;
-        uptoken = Qiniu_RS_PutPolicy_Token(&putPolicy, &mac);
-        assert(nBufLen > strlen(uptoken));
-        fprintf(stderr,"token from local:\n");
-        strcpy(pBuf, uptoken);
-        Qiniu_Free(uptoken);
         return LINK_SUCCESS;
-#endif
 }

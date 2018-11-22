@@ -4,16 +4,12 @@ project(libghttp)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions("-Wall -g")
-if (USE_SSL)
+if (WITH_OPENSSL)
     add_definitions(-DUSE_SSL)
-    if (NOT SSL_DIR) 
-	message(FATAL, "must give SSL_DIR when USE_SSL")
-    endif()
-    message("${USE_SSL} ${SSL_DIR}")
-    set(SSL_INC_DIR "$SSL_INC_DIR")
-    include_directories("${SSL_DIR}/include")
-    include_directories("${SSL_DIR}/include/wolfssl")
-    link_directories("${SSL_DIR}/lib")
+
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
+    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include")
+    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include/wolfssl")
 endif()
 
 add_library(ghttp STATIC
@@ -35,11 +31,13 @@ add_library(ghttp STATIC
 	http_trans.h
 	http_uri.c
 	http_uri.h
+	qupload.h
+	qupload.c
 )
 
 
 add_executable(testghttp test.c qupload.c qupload.h)
-if (USE_SSL)
+if (WITH_OPENSSL)
     target_link_libraries(testghttp ghttp wolfssl m)
 else()
     target_link_libraries(testghttp ghttp m)

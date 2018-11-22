@@ -1,5 +1,3 @@
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
 #include "uploader.h"
 #include <string.h>
 #include <stdlib.h>
@@ -8,9 +6,10 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
-#include <curl/curl.h>
 #include "fixjson.h"
-#include <b64/b64.h>
+#include "b64/b64.h"
+#include <qupload.h>
+#include "httptools.h"
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -43,8 +42,6 @@ typedef struct _KodoUploader{
         LinkUploadState state;
         
         int64_t getDataBytes;
-        curl_off_t nLastUlnow;
-        int64_t nUlnowRecTime;
         int nLowSpeedCnt;
         int isTimeoutWithData;
         
@@ -57,54 +54,8 @@ typedef struct _KodoUploader{
 }KodoUploader;
 
 static struct timespec tmResolution;
-int timeoutCallback(void *clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow)
-{
-        if (ulnow == 0) {
-                return 0;
-        }
-        
-        if (tmResolution.tv_nsec == 0) {
-                clock_getres(CLOCK_MONOTONIC, &tmResolution);
-        }
-        struct timespec tp;
-        clock_gettime(CLOCK_MONOTONIC, &tp);
-        int64_t nNow = (int64_t)(tp.tv_sec * 1000000000ll + tp.tv_nsec / tmResolution.tv_nsec);
-        
-        KodoUploader * pUploader = (KodoUploader *)clientp;
-        if (pUploader->nUlnowRecTime == 0) {
-                pUploader->nLastUlnow = ulnow;
-                pUploader->nUlnowRecTime = nNow;
-                return 0;
-        }
-        
-        int nDiff = (int)((nNow - pUploader->nUlnowRecTime) / 1000000000);
-        if (nDiff > 0) {
-                //printf("%d,==========dltotal:%"PRId64" dlnow:%"PRId64" ultotal:%"PRId64" ulnow-reculnow=%"PRId64", now - lastrectime=%"PRId64"\n",
-                //       pUploader->nLowSpeedCnt, dltotal, dlnow, ultotal, ulnow - pUploader->nLastUlnow, (nNow - pUploader->nUlnowRecTime)/1000000);
-                if ((ulnow - pUploader->nLastUlnow) / nDiff < 1024) { //} && !pUploader->isTimeoutWithData) {
-                        pUploader->nLowSpeedCnt += nDiff;
-                        if (pUploader->nLowSpeedCnt > 3) {
-                                LinkLogError("accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
-                                return -1;
-                        }
-                }
-                if (nDiff >= 10) {
-                        LinkLogError("upload timeout directly:%d", nDiff); 
-                        return -1;
-                } else if (nDiff >= 5) {
-                        if (pUploader->nLowSpeedCnt > 1) {
-                                LinkLogError("half accumulate upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
-                                return -1;
-                        }
-                        LinkLogWarn("accumulate2 upload timeout:%d %d", pUploader->nLowSpeedCnt, nDiff);
-                        pUploader->nLowSpeedCnt = 2;
-                        
-                }
-                pUploader->nLastUlnow = ulnow;
-                pUploader->nUlnowRecTime = nNow;
-        }
-        return 0;
-}
+     
+         
 
 static const unsigned char pr2six[256] = {
         64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
@@ -227,32 +178,9 @@ static void inttoBCD(int64_t m, char *buf)
         return;
 }
 
-static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize, LinkKeyFrameMetaInfo *pMetas, int nMetaLen) {
-        CURL *easy = curl_easy_init();
-        if (easy == NULL) {
-                return LINK_NO_MEMORY;
-        }
-        curl_mime *mime;
-        curl_mimepart *part;
-        
-        /* Build an HTTP form with a single field named "data", */
-        mime = curl_mime_init(easy);
-        if (mime == NULL) {
-                curl_easy_cleanup(easy);
-                return LINK_NO_MEMORY;
-        }
-        
-        part = curl_mime_addpart(mime);
-        curl_mime_name(part, "token");
-        curl_mime_data(part, token, CURL_ZERO_TERMINATED);
-        
-        part = curl_mime_addpart(mime);
-        curl_mime_name(part, "key");
-        curl_mime_data(part, key, CURL_ZERO_TERMINATED);
-        
-        part = curl_mime_addpart(mime);
-        curl_mime_name(part, "x-qn-meta-meta_key");
-
+static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize,
+                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen) {
+       
         char metaValue[200];
         char metaBcd[150];
         int i = 0;
@@ -263,54 +191,29 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         }
         int nMetaValueLen = b64_encode(metaBcd, nMetaLen * 15, metaValue, sizeof(metaValue));
         
-        //fprintf(stderr, "=====------->:%d %d\n", nMetaLen, nMetaValueLen);
-        //char buff[20]={0};curl_mime_data(part, buff, 20);
-        curl_mime_data(part, metaValue, nMetaValueLen);
-        //curl_mime_data(part, "1234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890", CURL_ZERO_TERMINATED);
+        LinkPutret putret;
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaValue, nMetaValueLen, /*mimetype*/NULL, &putret);
+
         
-        part = curl_mime_addpart(mime);
-        curl_mime_name(part, "file");
-        curl_mime_data(part, data, datasize);
-        
-        char *resp = NULL;
-        curl_easy_setopt(easy, CURLOPT_WRITEFUNCTION, writeResult);
-        curl_easy_setopt(easy, CURLOPT_WRITEDATA, &resp);
-        
-        /* Post and send it. */
-        curl_easy_setopt(easy, CURLOPT_MIMEPOST, mime);
-        curl_easy_setopt(easy, CURLOPT_URL, uphost);
-        CURLcode curlCode = curl_easy_perform(easy);
-        
-        int64_t httpCode = 0;
+
         int retCode = -1;
-        if (curlCode != 0) { //curl error
-                const char *pCurlErrMsg = curl_easy_strerror(curlCode);
-                if (pCurlErrMsg != NULL) {
-                        LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, datasize, curlCode, pCurlErrMsg);
-                } else {
-                        LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"unknown error\"}", key, datasize, curlCode);
-                }
+        if (ret != 0) { //http error
+                LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, datasize, ret, putret.error);
+                return LINK_GHTTP_FAIL;
         } else {
-                curl_easy_getinfo(easy, CURLINFO_RESPONSE_CODE, &httpCode);
-                if (httpCode / 100 == 2) {
+                if (putret.code / 100 == 2) {
                         retCode = LINK_SUCCESS;
                         LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
-                        if (resp != NULL) {
-                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg=%s", key, datasize, httpCode, resp);
+                        if (putret.body != NULL) {
+                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg=%s", key, datasize, putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg={not receive response}", key, datasize, httpCode);
+                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg={not receive response}", key, datasize, putret.code);
                         }
                 }
         }
-        
-        if (resp != NULL) {
-                free(resp);
-        }
-        
-        /* Clean-up. */
-        curl_easy_cleanup(easy);
-        curl_mime_free(mime);
+
+        LinkFreePutret(&putret);
         
         return retCode;
 }
@@ -324,7 +227,6 @@ static void * streamUpload(void *_pOpaque)
         
         char uptoken[1280] = {0};
         char suffix[16] = {0};
-        Qiniu_Client client;
         int ret = 0, freeClient = 1;
         
         LinkUploadParam param;
@@ -335,62 +237,7 @@ static void * streamUpload(void *_pOpaque)
         param.nTypeBufLen = sizeof(suffix);
 
         
-        Qiniu_Io_PutRet putRet;
-        Qiniu_Io_PutExtra putExtra;
-        Qiniu_Zero(putExtra);
-        
-        const char *upHost;
-        //设置机房域名
-#ifdef DISABLE_OPENSSL
-        switch(pUploader->uploadArg.uploadZone) {
-        case LINK_ZONE_HUABEI:
-                upHost = "http://upload-z1.qiniup.com";
-                Qiniu_Use_Zone_Huabei(Qiniu_False);
-                break;
-        case LINK_ZONE_HUANAN:
-                upHost = "http://upload-z2.qiniup.com";
-                Qiniu_Use_Zone_Huanan(Qiniu_False);
-                break;
-        case LINK_ZONE_BEIMEI:
-                upHost = "http://upload-na0.qiniup.com";
-                Qiniu_Use_Zone_Beimei(Qiniu_False);
-                break;
-        case LINK_ZONE_DONGNANYA:
-                upHost = "http://upload-as0.qiniup.com";
-                Qiniu_Use_Zone_Dongnanya(Qiniu_False);
-                break;
-        default:
-                upHost = "http://upload.qiniup.com";
-                Qiniu_Use_Zone_Huadong(Qiniu_False);
-                break;
-        }
-#else
-        switch(pUploader->uploadArg.uploadZone) {
-        case LINK_ZONE_HUABEI:
-                upHost = "https://up-z1.qiniup.com";
-                Qiniu_Use_Zone_Huabei(Qiniu_True);
-                break;
-        case LINK_ZONE_HUANAN:
-                upHost = "https://up-z2.qiniup.com";
-                Qiniu_Use_Zone_Huanan(Qiniu_True);
-                break;
-        case LINK_ZONE_BEIMEI:
-                upHost = "https://up-na0.qiniup.com";
-                Qiniu_Use_Zone_Beimei(Qiniu_True);
-                break;
-        case LINK_ZONE_DONGNANYA:
-                upHost = "https://up-as0.qiniup.com";
-                Qiniu_Use_Zone_Dongnanya(Qiniu_True);
-                break;
-        default:
-                upHost = "https://up.qiniup.com";
-                Qiniu_Use_Zone_Huadong(Qiniu_True);
-                break;
-        }
-#endif
-        
-        //put extra
-        //putExtra.upHost="http://nbxs-gate-up.qiniu.com";
+        const char *upHost = LinkGetUploadHost(0, pUploader->uploadArg.uploadZone);
         
         char key[128] = {0};
         
@@ -402,14 +249,15 @@ static void * streamUpload(void *_pOpaque)
         }
         
         if (qtype != TSQ_APPEND && pUploader->nWaitFirstMutexLocked_ != WF_FIRST) {
-                goto END;
+                LinkLogWarn("nWaitFirstMutexLocked_ status abnormal");
+                return NULL;
         }
-        
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         ret = pUploader->uploadArg.getUploadParamCallback(pUploader->uploadArg.pGetUploadParamCallbackArg,
                                                           &param);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("ts up getUploadParamCallback fail:%d", ret);
-                return NULL;
+                goto END;
         }
         
         int64_t tsStartTime = pUploader->nTsStartTimestamp;
@@ -435,12 +283,7 @@ static void * streamUpload(void *_pOpaque)
                 pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, tsStartTime / 1000000);
         }
         
-        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
-        
-        Qiniu_Error error;
-#ifdef LINK_STREAM_UPLOAD
-        client.xferinfoData = _pOpaque;
-        client.xferinfoCb = timeoutCallback;
+
         if (qtype == TSQ_APPEND) {
                 int r, l;
                 char *bufData;
@@ -457,129 +300,33 @@ static void * streamUpload(void *_pOpaque)
                         }
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
-                        //error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, bufData, nBufDataLen, &putExtra);
                         int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUploader->metaInfo,
                                                    pUploader->nMetaInfoLen);
                         if (putRet == LINK_SUCCESS) {
                                 uploadResult = LINK_UPLOAD_RESULT_OK;
+                                pUploader->state = LINK_UPLOAD_OK;
+                        } else {
+                                pUploader->state = LINK_UPLOAD_FAIL;
                         }
                         if (pUploader->uploadArg.pUploadStatisticCb) {
                                 pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
                         }
-                        return NULL;
+                        goto END;
                 } else {
                         LinkLogError("LinkGetQueueBuffer get no data:%d", r);
                         goto END;
                 }
-        }else {
-                Qiniu_Client_InitNoAuth(&client, 1024);
-                //ts/uaid/startts/fragment_start_ts/expiry.ts
-                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
-                        tsStartTime / 1000000, nSegmentId / 1000000, nDeleteAfterDays_);
-                LinkLogDebug("upload start:%s q:%p", key, pUploader->pQueue_);
-                error = Qiniu_Io_PutStream(&client, &putRet, uptoken, key, pUploader, -1, getDataCallback, &putExtra);
         }
-#else
-        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pUploader->pTsData,
-                                               pUploader->nTsDataLen, &putExtra);
-#endif
-        
-        if (error.code != 200) {
-                pUploader->state = LINK_UPLOAD_FAIL;
-                if (error.code == 401) {
-                        LinkLogError("upload file :%s expsize:%"PRId64" httpcode=%d errmsg=%s", key, pUploader->getDataBytes, error.code, Qiniu_Buffer_CStr(&client.b));
-                } else if (error.code >= 500) {
-                        const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
-                        char errMsg[256];
-                        char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
-                        if (pMsg) {
-                                LinkLogError("upload file :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
-                        }else {
-                                LinkLogError("upload file :%s httpcode=%d errmsg=%s", key, error.code,
-                                         pFullErrMsg);
-                        }
-                } else {
-                        const char *pCurlErrMsg = curl_easy_strerror(error.code);
-                        if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload file :%s expsize:%"PRId64" errorcode=%d errmsg={\"error\":\"%s\"}", key, pUploader->getDataBytes, error.code, pCurlErrMsg);
-                        } else {
-                                LinkLogError("upload file :%s expsize:%"PRId64" errorcode=%d errmsg={\"error\":\"unknown error\"}", key, pUploader->getDataBytes, error.code);
-                        }
-                }
-                //debug_log(&client, error);
-        } else {
-                pUploader->state = LINK_UPLOAD_OK;
-                LinkLogDebug("upload file size:(exp:%"PRId64" real:%"PRId64") key:%s success",
-                         pUploader->getDataBytes, pUploader->nLastUlnow, key);
-        }
-        
-        if (pUploader->state == LINK_UPLOAD_OK) {
-                uploadResult = LINK_UPLOAD_RESULT_OK;
-        }
-                
+
+END:
         if (pUploader->uploadArg.pUploadStatisticCb) {
                 pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
         }
-        
-END:
-        if (freeClient)
-                Qiniu_Client_Cleanup(&client);
-        
+
         return NULL;
 }
 
 #ifdef LINK_STREAM_UPLOAD
-size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr)
-{
-        KodoUploader * pUploader = (KodoUploader *) rptr;
-        int nPopLen = 0;
-        if (pUploader->isTimeoutWithData != 0) {
-                pUploader->isTimeoutWithData++;
-                LinkLogInfo("isTimeoutWithData:%d\n", pUploader->isTimeoutWithData);;
-                return 0;
-        }
-        nPopLen = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, buffer, size * n);
-        if (nPopLen < 0) {
-                if (nPopLen == LINK_TIMEOUT) {
-                        if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
-                                return 0;
-                        }
-                        LinkLogError("first pop from queue timeout:%d %"PRId64" %"PRId64"", nPopLen, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
-                }
-                return CURL_READFUNC_ABORT;
-        }
-        if (nPopLen == 0) {
-                if (LinkIsProcStatusQuit()) {
-                        return CURL_READFUNC_ABORT;
-                }
-                return 0;
-        }
-        
-        int nTmp = 0;
-        char *pBuf = (char *)buffer;
-        while (size * n - nPopLen > 0) {
-                nTmp = pUploader->pQueue_->PopWithNoOverwrite(pUploader->pQueue_, pBuf + nPopLen, size * n - nPopLen);
-                if (nTmp == 0)
-                        break;
-                if (nTmp < 0) {
-                        if (nTmp == LINK_TIMEOUT) {
-                                if (pUploader->nLastFrameTimestamp >= 0 &&  pUploader->nFirstFrameTimestamp >= 0) {
-                                        pUploader->isTimeoutWithData = 1;
-                                        goto RET;
-                                }
-                                LinkLogError("next pop from queue timeout:%d %"PRId64" %"PRId64"", nTmp, pUploader->nLastFrameTimestamp, pUploader->nFirstFrameTimestamp);
-                        }
-                        return CURL_READFUNC_ABORT;
-                }
-                nPopLen += nTmp;
-        }
-        LinkUploaderStatInfo info;
-        pUploader->pQueue_->GetStatInfo(rptr, &info);
-RET:
-        pUploader->getDataBytes += nPopLen;
-        return nPopLen;
-}
-
 static int streamUploadStart(LinkTsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;

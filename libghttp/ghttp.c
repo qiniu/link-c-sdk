@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "ghttp.h"
 #include "http_uri.h"
@@ -68,6 +69,9 @@ ghttp_request_new(void)
 
   /* create everything */
   l_return = malloc(sizeof(struct _ghttp_request));
+  if (l_return == NULL) {
+    return l_return;
+  }
   memset(l_return, 0, sizeof(struct _ghttp_request));
   l_return->uri = http_uri_new();
   l_return->proxy = http_uri_new();
@@ -368,7 +372,7 @@ ghttp_prepare(ghttp_request *a_request)
       a_request->conn->port = a_request->uri->port;
       a_request->conn->proxy_host = a_request->proxy->host;
       a_request->conn->proxy_port = a_request->proxy->port;
-      if (http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri) != 0)
+      if (a_request->secure_uri && http_trans_conn_set_ssl(a_request->conn, a_request->secure_uri) != 0)
           return HTTP_TRANS_ERR;
       
       /* close the socket if it looks open */
@@ -621,9 +625,9 @@ ghttp_get_error(ghttp_request *a_request)
         case http_trans_err_type_ssl:
             a_request->errstr = ERR_reason_error_string(a_request->conn->error);
             return a_request->errstr;
+#endif
 	default:
 	    break;
-#endif
     }
 
     return "Unknown Error.";

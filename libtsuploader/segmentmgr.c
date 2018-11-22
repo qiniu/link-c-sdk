@@ -1,13 +1,12 @@
 #include "segmentmgr.h"
 #include "resource.h"
 #include "queue.h"
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
-#include <curl/curl.h>
 #include "tsuploaderapi.h"
 #include "fixjson.h"
 #include "servertime.h"
 #include "b64/urlsafe_b64.h"
+#include <qupload.h>
+#include "httptools.h"
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
@@ -102,64 +101,51 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         
         char requetBody[256] = {0};
         snprintf(requetBody, sizeof(requetBody), "{\"key\":\"/move/%s/%s/force/false\"}", oldkeyB64, keyB64);
-        //printf("=======>move url:%s\n", pUrl);
-        CURL *curl;
-        curl_global_init(CURL_GLOBAL_ALL);
-        curl = curl_easy_init();
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeMoveToken);
-        curl_easy_setopt(curl, CURLOPT_URL, pUrl);
+        printf("=======>move url:%s\n", pUrl);
         
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, requetBody);
+        char httpResp[1024+256];
+        int nHttpRespBufLen = sizeof(httpResp);
+        int nRealRespLen = 0;
+        int ret = LinkSimpleHttpPost(pUrl, httpResp, nHttpRespBufLen, &nRealRespLen, requetBody, strlen(requetBody), NULL);
+        
+        if (ret != LINK_SUCCESS) {
+                if (ret == LINK_BUFFER_IS_SMALL) {
+                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRealRespLen);
+                }
+                return ret;
+        }
         
         pToken->pData = pBuf;
         pToken->nDataLen = nBufLen;
         pToken->pUrlPath = requetBody;
         pToken->nUrlPathLen = strlen(requetBody);
         pToken->nCurlRet = 0;
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, pToken);
-        //memset(pBuf, 0, nBufLen);
-        int ret =curl_easy_perform(curl);
-        if (ret != 0) {
-                curl_easy_cleanup(curl);
-                return ret;
+        
+        if (writeMoveToken(httpResp, nRealRespLen, 1, pToken) == 0) {
+                LinkLogError("maybe response format error:%s", httpResp);
+                return LINK_JSON_FORMAT;
         }
-        curl_easy_cleanup(curl);
-        return pToken->nCurlRet;
+        
+        return LINK_SUCCESS;
 }
 
 static int doMove(const char *pUrl, const char *pToken) {
-        CURL *curl;
-        curl_global_init(CURL_GLOBAL_ALL);
-        curl = curl_easy_init();
-        if (curl == NULL) {
-                return LINK_NO_MEMORY;
-        }
-        
         //printf("------->url:%s\n------->token:%s\n", pUrl, pToken);
         
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
-        if (headers == NULL) {
-                curl_easy_cleanup(curl);
-                return LINK_NO_MEMORY;
-        }
-        char authHeader[1024] = {0};
-        snprintf(authHeader, sizeof(authHeader), "Authorization: QBox %s", pToken);
-        headers = curl_slist_append(headers, authHeader);
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "POST");
-        curl_easy_setopt(curl, CURLOPT_URL, pUrl);
-
-        int ret =curl_easy_perform(curl);
+        int r = LINK_SUCCESS;
+        LinkPutret putret;
+        int ret = LinkMoveFile(pUrl, pToken, &putret);
         if (ret != 0) {
-                curl_slist_free_all(headers);
-                curl_easy_cleanup(curl);
-                return ret;
+                LinkLogError("http err:%s", putret.error);
+                r = LINK_GHTTP_FAIL;
         }
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
-        return 0;
+        if (putret.code > 0 && putret.code / 100 != 2) {
+                LinkLogError("request err:%d[%s] [%s]",putret.code, putret.reqid, putret.error);
+                LinkLogError("request resp:%s", putret.body);
+                r = LINK_GHTTP_FAIL;
+        }
+        LinkFreePutret(&putret);
+        return r;
 }
 
 static int checkShouldUpdate(Seg* pSeg) {
@@ -285,83 +271,27 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         
-        Qiniu_Client client;
-        Qiniu_Client_InitNoAuth(&client, 1024);
-        
-        Qiniu_Io_PutRet putRet;
-        Qiniu_Io_PutExtra putExtra;
-        Qiniu_Zero(putExtra);
-        
-#ifdef DISABLE_OPENSSL
-        switch(segmentMgr.handles[idx].uploadZone) {
-                case LINK_ZONE_HUABEI:
-                        Qiniu_Use_Zone_Huabei(Qiniu_False);
-                        break;
-                case LINK_ZONE_HUANAN:
-                        Qiniu_Use_Zone_Huanan(Qiniu_False);
-                        break;
-                case LINK_ZONE_BEIMEI:
-                        Qiniu_Use_Zone_Beimei(Qiniu_False);
-                        break;
-                case LINK_ZONE_DONGNANYA:
-                        Qiniu_Use_Zone_Dongnanya(Qiniu_False);
-                        break;
-                default:
-                        Qiniu_Use_Zone_Huadong(Qiniu_False);
-                        break;
-        }
-#else
-        switch(segmentMgr.handles[idx].uploadZone) {
-                case LINK_ZONE_HUABEI:
-                        Qiniu_Use_Zone_Huabei(Qiniu_True);
-                        break;
-                case LINK_ZONE_HUANAN:
-                        Qiniu_Use_Zone_Huanan(Qiniu_True);
-                        break;
-                case LINK_ZONE_BEIMEI:
-                        Qiniu_Use_Zone_Beimei(Qiniu_True);
-                        break;
-                case LINK_ZONE_DONGNANYA:
-                        Qiniu_Use_Zone_Dongnanya(Qiniu_True);
-                        break;
-                default:
-                        Qiniu_Use_Zone_Huadong(Qiniu_True);
-                        break;
-        }
-#endif
-        
-        Qiniu_Error error;
-        error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, "", 0, &putExtra);
+        const char *upHost = LinkGetUploadHost(0, segmentMgr.handles[idx].uploadZone);
 
         
-        if (error.code != 200) {
-                if (error.code == 401) {
-                        LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
-                } else if (error.code >= 500) {
-                        const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
-                        char errMsg[256];
-                        char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
-                        if (pMsg) {
-                                LinkLogError("upload segment :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
-                        }else {
-                                LinkLogError("upload segment :%s httpcode=%d errmsg=%s", key, error.code,
-                                             pFullErrMsg);
-                        }
+        LinkPutret putret;
+        ret = LinkUploadBuffer("", 0, upHost, uptoken, key, NULL, 0, NULL, &putret);
+       
+        if (ret != 0) {
+                LinkLogError("upload segment:%s http error:%d %s", key, ret, putret.error);
+        } else {//http error
+                if (putret.code / 100 == 2) {
+                        segmentMgr.handles[idx].segUploadOk = 1;
+                        uploadResult = LINK_UPLOAD_RESULT_OK;
+                        LinkLogDebug("upload segment: %s success", key);
                 } else {
-                        const char *pCurlErrMsg = curl_easy_strerror(error.code);
-                        if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+                        if (putret.body != NULL) {
+                                LinkLogError("upload segment:%s httpcode=%d reqid:%s errmsg=%s", key, putret.code, putret.reqid, putret.body);
                         } else {
-                                LinkLogError("upload segment :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+                                LinkLogError("upload segment:%s httpcode=%d reqid:%s errmsg={not receive response}", key, putret.reqid, putret.code);
                         }
                 }
-        } else {
-                segmentMgr.handles[idx].segUploadOk = 1;
-                uploadResult = LINK_UPLOAD_RESULT_OK;
-                LinkLogDebug("upload segment key:%s success", key);
         }
-        
-        Qiniu_Client_Cleanup(&client);
         
         if (segmentMgr.handles[idx].pUploadStatisticCb) {
                 segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_SEG, uploadResult);

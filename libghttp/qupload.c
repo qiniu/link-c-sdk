@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "ghttp.h"
+#include <errno.h>
 
 
 static int get_fix_random_str(char *buf, int bufLen, int len) {
@@ -131,7 +132,7 @@ static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_
  * @return 0 on success, -1 on failure
  * */
 static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
-	       	const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
+	       	const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret, int isTypeFile) {
 
     if (file_key == NULL || upload_token == NULL || filepathOrBufer == NULL) {
 	    return -1;
@@ -146,13 +147,18 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
     get_fix_random_str(form_boundary + form_prefix_len, sizeof(form_boundary) - form_prefix_len, 16);
     size_t form_boundary_len = strlen(form_boundary);
 
-
+    int form_buf_buf_len  = 0;
     //alloc body buffer
     struct stat st;
-    if (stat(filepathOrBufer, &st) != 0) {
-        return -2;
+    if (isTypeFile) {
+        if (stat(filepathOrBufer, &st) != 0) {
+            snprintf(put_ret->error, sizeof(put_ret->error), "%s", strerror(errno));
+            return -2;
+        }
+        form_buf_buf_len = st.st_size + 1024*5;
+    } else {
+        form_buf_buf_len = bufferLen + 1024*5;
     }
-    int form_buf_buf_len = st.st_size + 1024*5;
     char *form_data = (char *) malloc(form_buf_buf_len);
     char *form_data_p = form_data;
 
@@ -172,12 +178,12 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 
     if (nCustomMetaLen > 0) {
         form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "x-qn-meta-meta_key", customMeta, nCustomMetaLen,
-                                  mime_type, &form_data_len, 1);
+                                  NULL, &form_data_len, 0);
     }
 
-    if (bufferLen) {
+    if (!isTypeFile) {
         form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "file",  filepathOrBufer, bufferLen,
-                                  mime_type, &form_data_len, 1);
+                                  mime_type, &form_data_len, 0);
     } else {
         form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "file",  filepathOrBufer, -1,
                                   mime_type, &form_data_len, 1);
@@ -223,7 +229,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
     free(form_data);
 
     put_ret->code = ghttp_status_code(request);
-    if (put_ret->code / 200 == 2) {
+    if (put_ret->code / 100 == 2) {
 	return 0;
     }
 
@@ -241,12 +247,12 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 
 int LinkUploadBuffer(const char *buffer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
 	       	const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
-	return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen, mime_type, put_ret);
+	return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen, mime_type, put_ret, 0);
 }
 
 int LinkUploadFile(const char *local_path, const char * upHost, const char *upload_token, const char *file_key, const char *mime_type,
 		LinkPutret *put_ret) {
-	return linkUpload(local_path, 0 ,upHost, upload_token, file_key, NULL, 0,  mime_type, put_ret);
+	return linkUpload(local_path, 0 ,upHost, upload_token, file_key, NULL, 0,  mime_type, put_ret, 1);
 }
 
 void LinkFreePutret(LinkPutret *put_ret) {
@@ -254,4 +260,64 @@ void LinkFreePutret(LinkPutret *put_ret) {
 		free(put_ret->body);
 	}
 	put_ret->body = NULL;
+}
+
+int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_ret) {
+        
+        ghttp_status status;
+        memset(put_ret, 0, sizeof(LinkPutret));
+        ghttp_request * pRequest = ghttp_request_new();
+        if (pRequest == NULL) {
+                snprintf(put_ret->error, sizeof(put_ret->error), "ghttp_request_new return null");
+                return -1;
+        }
+        
+        ghttp_set_uri(pRequest, pMoveUrl);
+        
+        ghttp_set_type(pRequest, ghttp_type_post);
+        
+        char tokenBuf[512];
+        snprintf(tokenBuf, sizeof(tokenBuf), "Box %s", pMoveToken);
+        ghttp_set_header(pRequest, "Authorization", tokenBuf);
+        ghttp_set_header(pRequest, "Content-Type", "application/x-www-form-urlencoded");
+        
+        status = ghttp_prepare(pRequest);
+        if (status != 0) {
+                ghttp_clean(pRequest);
+                snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
+                return -2;
+        }
+        
+        status = ghttp_process(pRequest);
+        if (status == ghttp_error) {
+                if (ghttp_is_timeout(pRequest)) {
+                        snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
+                        ghttp_clean(pRequest);
+                        return -4;
+                } else {
+                        snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
+                        ghttp_clean(pRequest);
+                        return -5;
+                }
+                ghttp_clean(pRequest);
+                return -6;
+        }
+        
+        put_ret->code = ghttp_status_code(pRequest);
+        if (put_ret->code / 100 == 2) {
+                ghttp_clean(pRequest);
+                return 0;
+        }
+        
+        int resp_body_len = ghttp_get_body_len(pRequest);
+        char *resp_body = (char *)malloc(resp_body_len+1);
+        char *resp_body_end = qn_memconcat(resp_body, ghttp_get_body(pRequest), resp_body_len);
+        *resp_body_end = 0; //end it
+        
+        put_ret->body = resp_body;
+        //get reqid
+        strcpy(put_ret->reqid, ghttp_get_header(pRequest, "X-Reqid"));
+        
+        ghttp_clean(pRequest);
+        return 0;
 }
