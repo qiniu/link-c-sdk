@@ -1,4 +1,4 @@
-// Last Update:2018-11-14 15:14:10
+// Last Update:2018-11-20 16:27:45
 /**
  * @file socket_logging.c
  * @brief 
@@ -21,7 +21,7 @@
 #include "dbg.h"
 #include "main.h"
 
-#define BASIC() printf("[ %s %s() %d ] ", __FILE__, __FUNCTION__, __LINE__ )
+//#define BASIC() printf("[ %s %s() %d ] ", __FILE__, __FUNCTION__, __LINE__ )
 #define ARRSZ(arr) sizeof(arr)/sizeof(arr[0])
 
 
@@ -37,6 +37,7 @@ void CmdHnadleUpdateFrom( char *param );
 void CmdHnadleHelp( char *param );
 void CmdHnadleCache( char *param );
 void CmdHandleGetVersion( char *param );
+void* LogOverTcpTask( void *arg );
 
 int gsock = 0;
 static DemoCmd gCmds[] =
@@ -53,53 +54,6 @@ static DemoCmd gCmds[] =
 
 };
 
-int socket_init()
-{
-    struct sockaddr_in server;
-    int ret = 0;
-    static int first = 1;
-
-    if ( first ) {
-        gLogQueue = NewQueue();
-        if ( !gLogQueue ) {
-            printf("new queue error\n");
-            return -1;
-        }
-        first = 0;
-    }
-
-    if ( gsock != -1 ) {
-        close( gsock );
-    }
-
-    gsock = socket(AF_INET , SOCK_STREAM , 0);
-    if (gsock == -1) {
-        DBG_LOG("Could not create socket\b");
-        gStatus.connecting = 0;
-        return -1;
-    }
-
-    if ( !gIpc.config.serverIp ) {
-        return -1;
-    }
-
-    server.sin_addr.s_addr = inet_addr( gIpc.config.serverIp );
-    server.sin_family = AF_INET;
-    printf("log server : %s : %d\n", gIpc.config.serverIp, gIpc.config.serverPort );
-    server.sin_port = htons( gIpc.config.serverPort );
-
-    ret = connect(gsock , (struct sockaddr *)&server , sizeof(server));
-    if ( ret < 0) {
-        gStatus.connecting = 0;
-        return -1;
-    }
-
-    gStatus.connecting = 1;
-    gStatus.logStop = 0;
-    printf("connet to %s:%d sucdefully, gsock = %d\n", gIpc.config.serverIp, gIpc.config.serverPort, gsock  );
-    return 0;
-}
-
 void DbgSendFileName( char *logfile )
 {
     char message[256] = { 0 };
@@ -114,17 +68,17 @@ void DbgSendFileName( char *logfile )
 
     sprintf( message, "%s.log", logfile );
     printf("%s %s %d send file name %s\n", __FILE__, __FUNCTION__, __LINE__, message );
-    ret = send(gsock , message , strlen(message) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
+    ret = send( gsock , message , strlen(message) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
     if(  ret < 0 ) {
         printf("%s %s %d Send failed, ret = %d, %s\n", __FILE__, __FUNCTION__, __LINE__,  ret, strerror(errno) );
     }
 
 }
 
-int log_send( char *message )
+int SendLog( char *message )
 {
-    if ( gLogQueue && gStatus.connecting && !gStatus.logStop ) {
-        gLogQueue->enqueue( gLogQueue, message, strlen(message) );
+    if ( gLogger.logQueue && gStatus.connected && !gStatus.logStop ) {
+        gLogger.logQueue->enqueue( gLogger.logQueue, message, strlen(message) );
     }
 
     return 0;
@@ -207,58 +161,6 @@ int GetCurrentTime( char *now_time )
     return(0);
 }
 
-void *SocketLoggingTask( void *param )
-{
-    char log[1024] = { 0 };
-    int ret = 0;
-    int flags = 0;
-
-#ifdef __APPLE__
-    flags = SO_NOSIGPIPE;
-#else
-    flags = MSG_NOSIGNAL;
-#endif
-
-    for (;;) {
-        if ( !gStatus.logStop && ( gIpc.config.logOutput == OUTPUT_SOCKET) ) {
-            if ( gStatus.connecting ) {
-                if ( gLogQueue ) {
-                    memset( log, 0, sizeof(log) );
-                    gLogQueue->dequeue( gLogQueue, log, NULL );
-                } else {
-                    DBG_ERROR("error, gLogQueue is NULL\n");
-                    return NULL;
-                }
-                //printf("log = %s", log);
-                ret = send(gsock , log , strlen(log) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
-                if(  ret < 0 ) {
-                    DBG_ERROR("Send failed, ret = %d, %s\n", ret, strerror(errno) );
-                    gStatus.connecting = 0;
-                    shutdown( gsock, SHUT_RDWR );
-                    close( gsock );
-                    gsock = -1;
-                }
-            } else {
-                ret = socket_init();
-                if ( ret < 0 ) {
-                    sleep(5);
-                    gStatus.retry_count ++;
-                    DBG_ERROR("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
-                    continue;
-                }
-                DBG_LOG("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
-                gStatus.connecting = 1;
-                gStatus.retry_count = 0;
-                DbgSendFileName( gIpc.devId );
-                DBG_LOG("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
-            }
-        } else {
-            sleep( 3 );
-        }
-    }
-    return NULL;
-}
-
 void *SimpleSshTask( void *param )
 {
     ssize_t ret = 0;
@@ -266,28 +168,23 @@ void *SimpleSshTask( void *param )
     int i = 0;
 
     for (;;) {
-        if ( gStatus.connecting ) {
+        if ( gStatus.connected ) {
             memset( buffer, 0, sizeof(buffer) );
-            //printf("%s %s %d gsock = %d\n", __FILE__, __FUNCTION__, __LINE__, gsock );
             ret = recv( gsock, buffer, 1024, 0 );
             if ( ret < 0 ) {
                 if ( errno != 107 ) {
                     printf("recv error, errno = %d\n", errno );
                 }
                 sleep(5);
-                gStatus.connecting = 0;
                 printf("errno = %s\n", strerror(errno) );
                 continue;
             } else if ( ret == 0 ){
                 sleep(5);
-                gStatus.connecting = 0;
                 continue;
             }
             printf("buffer = %s", buffer );
             for ( i=0; i<ARRSZ(gCmds); i++ ) {
                 char *res = NULL;
-                //printf("buffer = %s\n", buffer );
-                //printf("gCmds[i].cmd = %s\n", gCmds[i].cmd );
                 res = strstr( buffer, gCmds[i].cmd );
                 if ( res ) {
                     gCmds[i].pCmdHandle( buffer );
@@ -299,18 +196,6 @@ void *SimpleSshTask( void *param )
             }
 
         } else {
-            ret = socket_init();
-            if ( ret < 0 ) {
-                gStatus.retry_count ++;
-                //printf("%s %s %d reconnect retry count %d\n", __FILE__, __FUNCTION__, __LINE__, gStatus.retry_count );
-                sleep(5);
-                continue;
-            }
-            DBG_LOG("%s %s %d reconnect to %s ok\n", __FILE__, __FUNCTION__, __LINE__,  gIpc.config.serverIp );
-            gStatus.connecting = 1;
-            gStatus.retry_count = 0;
-            DbgSendFileName( gIpc.devId );
-            DBG_LOG("%s %s %d queue size = %d\n", __FILE__, __FUNCTION__, __LINE__, gLogQueue->getSize( gLogQueue )) ;
             sleep( 3 );
         }
     }
@@ -324,7 +209,7 @@ void StartSocketDbgTask()
     if ( !log ) {
         DBG_LOG("%s %s %d start socket logging thread\n", __FILE__, __FUNCTION__, __LINE__);
         if ( gIpc.config.logOutput == OUTPUT_SOCKET)
-            pthread_create( &log, NULL, SocketLoggingTask, NULL );
+            pthread_create( &log, NULL, LogOverTcpTask, NULL );
     }
 }
 
@@ -504,5 +389,85 @@ void CmdHandleGetVersion( char *param )
     if(  ret < 0 ) {
         printf("Send failed, ret = %d, %s\n", ret, strerror(errno) );
     }
+}
+
+void* LogOverTcpTask( void *arg )
+{
+    struct sockaddr_in server;
+    char log[1024] = { 0 };
+    int ret = 0;
+    int flags = 0, retry = 0;
+
+#ifdef __APPLE__
+        flags = SO_NOSIGPIPE;
+#else
+        flags = MSG_NOSIGNAL;
+#endif
+
+    for (;;) {
+        if ( !gIpc.config.serverIp ) {
+            LOGE("check config of server ip error\n");        
+            return NULL;
+        }
+        if ( !gIpc.config.serverPort ) {
+            LOGE("check server port error\n");
+            return NULL;
+        }
+
+        if ( !gLogger.logQueue ) {
+            LOGE("check logQueue error\n");
+            return NULL;
+        }
+
+        gsock = socket( AF_INET , SOCK_STREAM , 0 );
+        if ( gsock == -1 ) {
+            LOGE("Could not create socket\b");
+            return NULL;
+        }
+
+        server.sin_addr.s_addr = inet_addr( gIpc.config.serverIp );
+        server.sin_family = AF_INET;
+        server.sin_port = htons( gIpc.config.serverPort );
+
+        ret = connect(gsock , (struct sockaddr *)&server , sizeof(server));
+        if ( ret < 0 ) {
+            LOGE("connect log server %s : %d error, retry\n", gIpc.config.serverIp, gIpc.config.serverPort );
+            close( gsock );
+            sleep( 3 );
+            continue;
+        }
+        LOGI("connect log server %s : %d success\n", gIpc.config.serverIp, gIpc.config.serverPort );
+        while( strlen(gIpc.devId) == 0 ) {
+            LOGI("log over tcp wait for ipc init finished to get dev id...\n");
+            usleep( 500 );
+        }
+        LOGI("get the dev id sucess, dev id is %s\n", gIpc.devId );
+        DbgSendFileName( gIpc.devId );
+        gStatus.connected = 1;
+
+        for (;;) {
+            if ( gLogger.logQueue ) {
+                memset( log, 0, sizeof(log) );
+                gLogger.logQueue->dequeue( gLogger.logQueue, log, NULL );
+            } else {
+                LOGE("error, gLogQueue is NULL\n");
+                return NULL;
+            }
+            ret = send(gsock , log , strlen(log) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
+            if(  ret < 0 ) {
+                LOGE("Send failed, ret = %d, %s\n", ret, strerror(errno) );
+                shutdown( gsock, SHUT_RDWR );
+                close( gsock );
+                retry = 0;
+                gStatus.connected = 0;
+                break;
+            }
+        }
+        sleep( 5 );
+        retry++;
+        LOGI("connect to log tcp server retry = %d\n", retry );
+    }
+
+    return NULL;
 }
 

@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "tsuploaderapi.h"
 #include "localkey.h"
@@ -29,22 +32,40 @@ App gIpc;
 
 int AlarmCallback( int alarm, void *data )
 {
+    static char lastPicName[256] = { 0 };
+
     if ( alarm == ALARM_MOTION_DETECT ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT\n");
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
-        LinkNotifyNomoreData( gIpc.stream[STREAM_MAIN].uploader );
+        if ( gIpc.stream[STREAM_MAIN].uploader )
+            LinkNotifyNomoreData( gIpc.stream[STREAM_MAIN].uploader );
         if ( gIpc.stream[STREAM_SUB].uploader ) {
             LinkNotifyNomoreData( gIpc.stream[STREAM_SUB].uploader );
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
-        //DBG_LOG( "data = %s\n", (char *)data );
         char *file = (char *) malloc(  strlen((char *)data)+1 );
+        //DBG_LOG( "data = %s\n", (char *)data );
+        /*
+         * sometimes the ipc will notify twice of one picture
+         * at this moment, demo will notify sdk twice
+         * inside LinkSendUploadPictureSingal will free the pointer pOpaque
+         * so it will cause double free
+         * here we will check the notify
+         * if the notify is same as the last
+         * ignore it
+         * */
+        if ( strncmp( (char *)data, lastPicName, strlen((char *)data) ) == 0 ) {
+            DBG_LOG("this is the bug of ipc, we will ignore this notify, pic name is : %s\n", data );
+            return 0;
+        }
 
         memset( file, 0, strlen((char *)data)+1 );
         memcpy( file, (char *)data, strlen((char *)data) );
+        memset( lastPicName, 0, sizeof(lastPicName) );
+        memcpy( lastPicName, (char *)data, sizeof(lastPicName) );
         DBG_LOG("gIpc.stream[STREAM_MAIN].pOpaque = %p, file : %s \n", gIpc.stream[STREAM_MAIN].pOpaque, file );
         LinkSendUploadPictureSingal( gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].pOpaque,
                                      file, strlen( (char *)data)+1, LinkPicUploadTypeFile );
@@ -63,7 +84,7 @@ static int CaptureDevInit( )
     DBG_LOG("start to init ipc...\n");
     gIpc.dev->init( gIpc.audioType, gIpc.config.multiChannel, VideoGetFrameCb, AudioGetFrameCb );
     gIpc.dev->getDevId( gIpc.devId );
-    DbgSendFileName( gIpc.devId );
+//    DbgSendFileName( gIpc.devId );
     gIpc.stream[STREAM_MAIN].videoCache = NewQueue();
     gIpc.stream[STREAM_MAIN].jpegQ = NewQueue();
     if ( gIpc.config.multiChannel ) {
@@ -153,7 +174,6 @@ int TsUploaderSdkInit()
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
     LinkUserUploadArg userUploadArg;
-    int mem = 0;
 
     memset(&userUploadArg, 0, sizeof(userUploadArg));
 
@@ -186,11 +206,7 @@ int TsUploaderSdkInit()
 
     printf("%s %s %d tokenUrl = %s\n", __FILE__, __FUNCTION__, __LINE__, gIpc.config.tokenUrl );
     if ( gIpc.config.tokenUrl )
-        strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
-    strncat( url, "/", 1 );
-    strncat( url, gIpc.devId, strlen(gIpc.devId) );
-    strncat( url, "a", 1 );
-    strncat( url, "?callback=false", strlen("?callback=false") );
+        sprintf( url, "%s/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
     DBG_LOG("url = %s\n", url );
 
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
@@ -252,11 +268,7 @@ int TsUploaderSdkInit()
     /* sub stream */
     if ( gIpc.config.multiChannel ) {
         memset( url, 0, sizeof(url) );
-        strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
-        strncat( url, "/", 1 );
-        strncat( url, gIpc.devId, strlen(gIpc.devId) );
-        strncat( url, "b", 1 );
-        strncat( url, "?callback=false", strlen("?callback=false") );
+        sprintf( url, "%s/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
         DBG_LOG("url = %s\n", url );
 
         if ( !gIpc.config.useLocalToken ) {
@@ -319,11 +331,7 @@ static void * UpadateToken() {
             DBG_ERROR("token url net set, please modify /tmp/oem/app/ipc.conf and add token url\n");
             return NULL;
         }
-        strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
-        strncat( url, "/", 1 );
-        strncat( url, gIpc.devId, strlen(gIpc.devId) );
-        strncat( url, "a", 1 );
-        strncat( url, "?callback=false", strlen("?callback=false") );
+        sprintf( url, "%s/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
         DBG_LOG("url = %s\n", url );
         memset(gIpc.stream[STREAM_MAIN].token, 0, sizeof(gIpc.stream[STREAM_MAIN].token));
         if ( !gIpc.config.useLocalToken ) {
@@ -345,11 +353,7 @@ static void * UpadateToken() {
 
         if ( gIpc.config.multiChannel ) {
             memset( url, 0, sizeof(url) );
-            strncat( url, gIpc.config.tokenUrl, strlen(gIpc.config.tokenUrl) );
-            strncat( url, "/", 1 );
-            strncat( url, gIpc.devId, strlen(gIpc.devId) );
-            strncat( url, "b", 1 );
-            strncat( url, "?callback=false", strlen("?callback=false") );
+            sprintf( url, "%s/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
             DBG_LOG("url = %s\n", url );
             memset( gIpc.stream[STREAM_SUB].token, 0, sizeof(gIpc.stream[STREAM_SUB].token));
             if ( !gIpc.config.useLocalToken ) {
@@ -504,13 +508,18 @@ int main()
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
+    DBG_LOG("gIpc.config.heartBeatInterval = %d\n", gIpc.config.heartBeatInterval);
     for (;; ) {
+        float cpu_usage = 0;
+
         sleep( gIpc.config.heartBeatInterval );
         DbgGetMemUsed( used );
-        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d \n memeory used : %s kB token_url : %s\n reanme_url : %s\n",
-                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used,
+        cpu_usage = DbgGetCpuUsage();
+        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f  token_url : %s\n reanme_url : %s\n",
+                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage,
                 gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
     }
+    sleep( 10 );
 
     CaptureDevDeinit();
     TsUploaderSdkDeInit();

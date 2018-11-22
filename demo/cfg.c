@@ -274,7 +274,7 @@ void InitConfig()
     gIpc.config.logVerbose = 1;
     gIpc.config.logPrintTime = 1;
     gIpc.config.timeStampPrintInterval = TIMESTAMP_REPORT_INTERVAL;
-    gIpc.config.heartBeatInterval = 50;
+    gIpc.config.heartBeatInterval = 5;
     gIpc.config.defaultLogFile = "/tmp/oem/tsupload.log";
     gIpc.config.tokenRetryCount = TOKEN_RETRY_COUNT;
     gIpc.config.defaultBucketName = "ipcamera";
