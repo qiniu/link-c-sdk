@@ -283,7 +283,7 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         
         status = ghttp_prepare(pRequest);
         if (status != 0) {
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
                 return -2;
         }
@@ -292,20 +292,20 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         if (status == ghttp_error) {
                 if (ghttp_is_timeout(pRequest)) {
                         snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
-                        ghttp_clean(pRequest);
+                        ghttp_request_destroy(pRequest);
                         return -4;
                 } else {
                         snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
-                        ghttp_clean(pRequest);
+                        ghttp_request_destroy(pRequest);
                         return -5;
                 }
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 return -6;
         }
         
         put_ret->code = ghttp_status_code(pRequest);
         if (put_ret->code / 100 == 2) {
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 return 0;
         }
         
@@ -318,6 +318,6 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         //get reqid
         strcpy(put_ret->reqid, ghttp_get_header(pRequest, "X-Reqid"));
         
-        ghttp_clean(pRequest);
+        ghttp_request_destroy(pRequest);
         return 0;
 }

@@ -78,7 +78,7 @@ int testpost(char *p) {
     return -1;
     buf = ghttp_get_body(request);//test
     sprintf(retbuf, "%s", buf);
-    ghttp_clean(request);
+    ghttp_request_destroy(request);
     return 0;
 }
 
@@ -106,12 +106,12 @@ int testget(char *p) {
 	} else {
 		printf("ghttp_process err:%d\n", status);
 	}
-    	ghttp_clean(request);
+    	ghttp_request_destroy(request);
     	return -1;
     }
     char *buf = ghttp_get_body(request);//test
     snprintf(retbuf, sizeof(retbuf), "%s", buf);
-    ghttp_clean(request);
+    ghttp_request_destroy(request);
     printf("ret:%s\n", retbuf);
     return 0;
 }
