@@ -10,6 +10,7 @@ if (WITH_OPENSSL)
                 --disable-debug
                 --enable-opensslextra
                 --prefix=${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/output/${HOST}
+                --host=${HOST}
             BUILD_COMMAND make
             BUILD_IN_SOURCE 1
             INSTALL_COMMAND make install
