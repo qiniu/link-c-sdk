@@ -251,7 +251,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         struct HttpToken *pToken = (struct HttpToken *)pUserData;
         
         int len = pToken->nDataLen;
-        int ret = GetJsonContentByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
+        int ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
         if (ret != LINK_SUCCESS) {
                 pToken->nHttpRet = ret;
                 return 0;
@@ -259,7 +259,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         
         char zone[10] = {0};
         len = sizeof(zone) - 1;
-        ret = GetJsonContentByKey((const char *)pTokenStr, "\"zone\"", zone, &len);
+        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"zone\"", zone, &len);
         if (ret == LINK_SUCCESS && pToken->pZone != NULL) {
                 if (strcmp(zone, "z1") == 0) {
                         *pToken->pZone = LINK_ZONE_HUABEI;

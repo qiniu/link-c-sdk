@@ -27,6 +27,7 @@ typedef struct {
         int isRestart;
         int segUploadOk;
         char ua[32];
+        char bucket[64];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         char *pMgrTokenRequestUrl;
@@ -65,7 +66,7 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
         struct MgrToken *pToken = (struct MgrToken *)pUserData;
        
         int nTokenLen = pToken->nDataLen;
-        int ret = GetJsonContentByKey(pTokenStr, "\"token\"", pToken->pData, &nTokenLen);
+        int ret = LinkGetJsonStringByKey(pTokenStr, "\"token\"", pToken->pData, &nTokenLen);
         if (ret != LINK_SUCCESS) {
                 pToken->nCurlRet = ret;
                 return 0;
@@ -206,9 +207,9 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 }
         }
         
-        char key[64] = {0};
+        char key[128] = {0};
         memset(key, 0, sizeof(key));
-        char oldKey[64] = {0};
+        char oldKey[128] = {0};
         memset(oldKey, 0, sizeof(oldKey));
         int isNewSeg = 1;
         if (segmentMgr.handles[idx].segUploadOk == 0) {
@@ -220,9 +221,9 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, segInfo.nEndOrInt);
                         return;
                 }
-                snprintf(oldKey, sizeof(oldKey), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua,
+                snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, segmentMgr.handles[idx].ua,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
-                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua,
+                snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, segmentMgr.handles[idx].ua,
                          segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
                 isNewSeg = 0;
         }
@@ -243,11 +244,11 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 
                 ret = doMove(mgrToken.pUrlPath, mgrToken.pToken);
                 if (ret != 0) {
-                        LinkLogError("move %s to %s fail", oldKey, key);
+                        LinkLogError("move seg: %s to %s fail", oldKey, key);
                 } else {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
-                        LinkLogDebug("move %s to %s success", oldKey, key);
+                        LinkLogDebug("move seg: %s to %s success", oldKey, key);
                 }
                 
                 if (segmentMgr.handles[idx].pUploadStatisticCb) {
@@ -269,6 +270,11 @@ static void upadateSegmentFile(SegInfo segInfo) {
         
         const char *upHost = LinkGetUploadHost(segmentMgr.handles[idx].useHttps, segmentMgr.handles[idx].uploadZone);
 
+        int nBLen = sizeof(segmentMgr.handles[idx].bucket);
+        ret = LinkGetBucketFromUptoken(uptoken, segmentMgr.handles[idx].bucket, &nBLen);
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("get bucket from token fail");
+        }
         
         LinkPutret putret;
         ret = LinkUploadBuffer("", 0, upHost, uptoken, key, NULL, 0, NULL, &putret);
@@ -306,6 +312,7 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].useHttps = 0;
+                segmentMgr.handles[seg].bucket[0] = 0;
                 segmentMgr.handles[seg].segUploadOk = 0;
                 segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
                 if (segmentMgr.handles[seg].pMgrTokenRequestUrl) {
