@@ -19,6 +19,7 @@ typedef struct _UploadArg {
         LinkUploadArgUpadater UploadSegmentIdUpadate;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
+        int useHttps;
 }LinkUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;

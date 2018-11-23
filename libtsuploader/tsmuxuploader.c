@@ -820,6 +820,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->uploadArg.pGetUploadParamCallbackArg = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        pFFTsMuxUploader->uploadArg.useHttps = _pUserUploadArg->useHttps;
         
         pFFTsMuxUploader->nUpdateSegmentInterval = 30;
         
@@ -934,6 +935,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         fullArg.uploadZone = _pUserUploadArg->uploadZone_;
+        fullArg.useHttps = _pUserUploadArg->useHttps;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {

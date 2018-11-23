@@ -84,7 +84,7 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
         return size * nmemb;
 }
 
-int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, struct MgrToken *pToken)
+int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, struct MgrToken *pToken, int isHttps)
 {
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
@@ -115,6 +115,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         pToken->pUrlPath = requetBody;
         pToken->nUrlPathLen = strlen(requetBody);
         pToken->nCurlRet = 0;
+        pToken->isHttps = isHttps;
         
         if (writeMoveToken(httpResp, nRealRespLen, 1, pToken) == 0) {
                 LinkLogError("maybe response format error:%s", httpResp);
@@ -234,7 +235,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 nUrlLen = sprintf(uptoken, "%s/%s", segmentMgr.handles[idx].pMgrTokenRequestUrl, segmentMgr.handles[idx].ua);
                 uptoken[nUrlLen] = 0;
                 mgrToken.isHttps = segmentMgr.handles[idx].useHttps;
-                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken);
+                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken, segmentMgr.handles[idx].useHttps);
                 if (ret != 0 || mgrToken.nCurlRet != 0) {
                         LinkLogError("getMoveToken fail:%d", ret, mgrToken.nCurlRet);
                         return;
@@ -266,7 +267,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         
-        const char *upHost = LinkGetUploadHost(0, segmentMgr.handles[idx].uploadZone);
+        const char *upHost = LinkGetUploadHost(segmentMgr.handles[idx].useHttps, segmentMgr.handles[idx].uploadZone);
 
         
         LinkPutret putret;

@@ -200,7 +200,7 @@ static void * uploadPicture(void *_pOpaque) {
                 return NULL;
         }
         
-        const char *upHost = LinkGetUploadHost(0, pSig->pPicUploader->picUpSettings_.uploadZone);
+        const char *upHost = LinkGetUploadHost(pSig->pPicUploader->picUpSettings_.useHttps, pSig->pPicUploader->picUpSettings_.uploadZone);
 
         LinkPutret putret;
 

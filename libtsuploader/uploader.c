@@ -237,7 +237,7 @@ static void * streamUpload(void *_pOpaque)
         param.nTypeBufLen = sizeof(suffix);
 
         
-        const char *upHost = LinkGetUploadHost(0, pUploader->uploadArg.uploadZone);
+        const char *upHost = LinkGetUploadHost(pUploader->uploadArg.useHttps, pUploader->uploadArg.uploadZone);
         
         char key[128] = {0};
         
