@@ -75,13 +75,8 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
         pToken->pToken[nTokenLen] = 0;
         
         int len = 0;
-        if (pToken->isHttps) {
-                len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
-                         "https://rs.qiniu.com%s", pToken->pUrlPath+8);
-        } else {
-                len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
-                         "http://rs.qiniu.com%s", pToken->pUrlPath+8);
-        }
+        len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
+                 "%s%s",LinkGetRsHost(pToken->isHttps), pToken->pUrlPath+8);
         pToken->pUrlPath = pToken->pData + nTokenLen + 1;
         pToken->nUrlPathLen = len-2;
         pToken->pUrlPath[len-2] = 0;
@@ -228,7 +223,6 @@ static void upadateSegmentFile(SegInfo segInfo) {
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
                 snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua,
                          segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
-                segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
                 isNewSeg = 0;
         }
         
@@ -251,6 +245,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         LinkLogError("move %s to %s fail", oldKey, key);
                 } else {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
+                        segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
                         LinkLogDebug("move %s to %s success", oldKey, key);
                 }
                 
