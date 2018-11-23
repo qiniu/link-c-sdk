@@ -10,30 +10,28 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
                 return LINK_NO_MEMORY;
         }
         if (ghttp_set_uri(pRequest, pUrl) == -1) {
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 return LINK_ARG_ERROR;
         }
         
         status = ghttp_prepare(pRequest);
         if (status != 0) {
-                ghttp_clean(pRequest);
                 LinkLogError("ghttp_prepare:%s", ghttp_get_error(pRequest));
+                ghttp_request_destroy(pRequest);
                 return LINK_GHTTP_FAIL;
         }
         
         status = ghttp_process(pRequest);
         if (status == ghttp_error) {
                 if (ghttp_is_timeout(pRequest)) {
-                        ghttp_clean(pRequest);
                         LinkLogError("ghttp_process timeout [%s]", ghttp_get_error(pRequest));
+                        ghttp_request_destroy(pRequest);
                         return LINK_TIMEOUT;
                 } else {
-                        ghttp_clean(pRequest);
                         LinkLogError("ghttp_process fail [%s]", ghttp_get_error(pRequest));
+                        ghttp_request_destroy(pRequest);
                         return LINK_GHTTP_FAIL;
                 }
-                ghttp_clean(pRequest);
-                return LINK_GHTTP_FAIL;
         }
         int nBodyLen = ghttp_get_body_len(pRequest);
         *pRespLen = nBodyLen;
@@ -41,7 +39,7 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
         
         int nCopyLen = nBodyLen > nBufLen - 1 ? nBufLen - 1 : nBodyLen;
         memcpy(pBuf, buf, nCopyLen);
-        ghttp_clean(pRequest);
+        ghttp_request_destroy(pRequest);
         pBuf[nCopyLen] = 0;
         
         if (nCopyLen <= nBufLen - 1)
@@ -61,7 +59,7 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
                 return LINK_NO_MEMORY;
         }
         if (ghttp_set_uri(pRequest, pUrl) == -1) {
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 return LINK_ARG_ERROR;
         }
         
@@ -77,7 +75,7 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
         
         status = ghttp_prepare(pRequest);
         if (status != 0) {
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 LinkLogError("ghttp_prepare:%s", ghttp_get_error(pRequest));
                 return LINK_GHTTP_FAIL;
         }
@@ -85,15 +83,15 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
         status = ghttp_process(pRequest);
         if (status == ghttp_error) {
                 if (ghttp_is_timeout(pRequest)) {
-                        ghttp_clean(pRequest);
+                        ghttp_request_destroy(pRequest);
                         LinkLogError("ghttp_process timeout [%s]", ghttp_get_error(pRequest));
                         return LINK_TIMEOUT;
                 } else {
-                        ghttp_clean(pRequest);
+                        ghttp_request_destroy(pRequest);
                         LinkLogError("ghttp_process fail [%s]", ghttp_get_error(pRequest));
                         return LINK_GHTTP_FAIL;
                 }
-                ghttp_clean(pRequest);
+                ghttp_request_destroy(pRequest);
                 return LINK_GHTTP_FAIL;
         }
         
@@ -103,7 +101,7 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
         
         int nCopyLen = nBodyLen > nBufLen - 1 ? nBufLen - 1 : nBodyLen;
         memcpy(pBuf, buf, nCopyLen);
-        ghttp_clean(pRequest);
+        ghttp_request_destroy(pRequest);
         pBuf[nCopyLen] = 0;
         
         if (nCopyLen <= nBufLen - 1)
