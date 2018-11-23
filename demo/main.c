@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
 
 #include "tsuploaderapi.h"
 #include "localkey.h"
@@ -24,6 +26,7 @@
 #include "stream.h"
 #include "picuploader.h"
 #include "httptools.h"
+#include "ota.h"
 
 /* global variable */
 App gIpc;
@@ -180,7 +183,7 @@ int TsUploaderSdkInit()
 
 
     DBG_LOG("start to init ts uploader sdk \n");
-    gIpc.version = "00.00.01";
+    gIpc.version = "v00.00.08";
     if ( gIpc.audioType == AUDIO_AAC ) {
         mediaArg.nAudioFormat = LINK_AUDIO_AAC;
         mediaArg.nChannels = 1;
@@ -475,6 +478,12 @@ int main()
 {
     char *logFile = NULL;
     char used[1024] = { 0 };
+    pid_t pid = 0;
+    char *keyFile = "/bin";
+    int msgid = 0;
+    int event = 0;
+    msg_t msg;
+    key_t key;
 
     InitConfig();
     UpdateConfig();
@@ -503,6 +512,18 @@ int main()
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
     DBG_LOG("gIpc.config.heartBeatInterval = %d\n", gIpc.config.heartBeatInterval);
+
+    if ( (pid = fork()) == 0 ) {
+        StartUpgradeProcess();
+    }
+
+    key = ftok( keyFile , '6' );
+    msgid = msgget( key, IPC_CREAT|O_WRONLY|0777 );
+    if ( msgid < 0 ) {
+        printf("msgid < 0 ");
+        return 0;
+    }
+
     for (;; ) {
         float cpu_usage = 0;
 
@@ -512,11 +533,17 @@ int main()
         DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f  token_url : %s\n reanme_url : %s\n",
                 gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage,
                 gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
+        msgrcv( msgid, &msg, sizeof(msg)-sizeof(msg.type), 2, IPC_NOWAIT );
+        printf("main process get event = %d\n", msg.event );
+        if ( msg.event == OTA_START_UPGRADE_EVENT ) {
+            printf("get the value OTA_START_UPGRADE_EVENT\n");
+            break;
+        }
     }
-    sleep( 10 );
 
     CaptureDevDeinit();
     TsUploaderSdkDeInit();
+    LOGI("main process exit\n");
 
     return 0;
 }

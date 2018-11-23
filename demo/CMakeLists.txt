@@ -35,6 +35,8 @@ add_executable(demo-tsupload
     stream.c
     stream.h
     sim_dev.c
+    ota.c
+    md5.c
 )
 
 if(APPLE)
