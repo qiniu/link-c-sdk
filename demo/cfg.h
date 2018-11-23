@@ -43,6 +43,7 @@ typedef struct {
     char *renameTokenUrl;
     char *h264_file;
     char *aac_file;
+    char *ota_url;
 } Config;
 
 struct cfg_struct;

@@ -293,6 +293,7 @@ void InitConfig()
     gIpc.config.sk = NULL;
     gIpc.config.serverIp = NULL;
     gIpc.config.renameTokenUrl = NULL;
+    gIpc.config.ota_url = NULL;
     if ( gIpc.config.useLocalToken ) {
         gIpc.config.tokenUploadInterval = 5;
     } else {
@@ -373,6 +374,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(tokenUrl), "TOKEN_GET_URL", 1 },
     { CFG_MEMBER(renameTokenUrl), "RENAME_TOKEN_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
+    { CFG_MEMBER(ota_url), "OTA_URL", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },
