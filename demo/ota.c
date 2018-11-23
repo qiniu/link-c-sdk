@@ -1,4 +1,4 @@
-// Last Update:2018-11-22 18:41:30
+// Last Update:2018-11-23 19:09:31
 /**
  * @file ota.c
  * @brief 
@@ -22,77 +22,45 @@
 #include "dbg.h"
 #include "main.h"
 #include "ota.h"
+#include "httptools.h"
 
-
-static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-
-  return written;
-}
+#define OTA_FILE_MAX_SIZE 3096*1024 // 3M
 
 int Download( const char *url, char *filename )
 {
-  CURL *curl_handle;
-  static char *pagefilename = NULL;
-  FILE *pagefile;
-  CURLcode ret = 0;
-  long retcode = 0;
+    char *buffer = ( char * ) malloc ( OTA_FILE_MAX_SIZE );// 3M
+    int len = 0, ret = 0;
+    FILE *fp = NULL;
+    
+    if ( !buffer ) {
+        LOGE("malloc buffer error\n");
+        return -1;
+    }
+    ret = LinkSimpleHttpGet( url, buffer, OTA_FILE_MAX_SIZE, &len ); 
+    if ( LINK_SUCCESS != ret ) {
+        LOGE("LinkSimpleHttpGet() error, ret = %d\n", ret );
+        return -1;
+    }
 
-  pagefilename = filename;
-  curl_global_init(CURL_GLOBAL_ALL);
+    if ( len <= 0 ) {
+        LOGE("check length error, len = %d\n", len );
+        return -1;
+    }
 
-  /* init the curl session */
-  curl_handle = curl_easy_init();
-  if ( !curl_handle ) {
-      LOGE("curl_easy_init error\n");
-      return -1;
-  }
+    LOGI("len = %d\n", len );
+    fp = fopen( filename, "w+" );
+    if ( !fp ) {
+        LOGE("open file %s error\n", filename );
+        return -1;
+    }
 
-  /* set URL to get here */
-  curl_easy_setopt(curl_handle, CURLOPT_URL, url );
+    fwrite( buffer, len, 1, fp );
+    fclose( fp );
+    free( buffer );
 
-  /* Switch on full protocol/debug output while testing */
-//  curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
-
-  /* disable progress meter, set to 0L to enable and disable debug output */
-  curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
-
-  /* send all data to this function  */
-  curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
-
-  /* open the file */
-  pagefile = fopen(pagefilename, "wb");
-  if (pagefile) {
-
-    /* write the page body to this file handle */
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, pagefile);
-
-    /* get it! */
-    ret = curl_easy_perform(curl_handle);
-
-    /* close the header file */
-    fclose(pagefile);
-  }
-
-  /* cleanup curl stuff */
-  curl_easy_cleanup(curl_handle);
-  LOGI("ret = %d\n", ret );
-  if ( ret != CURLE_OK ) {
-      LOGE("ret = %d\n", ret );
-      return -1;
-  }
-  ret = curl_easy_getinfo( curl_handle, CURLINFO_RESPONSE_CODE, &retcode );
-  if ( ret == CURLE_OK ) {
-      LOGI("retcode = %d\n", retcode );
-      if ( retcode == 404 ) {
-          LOGE("get the url return 404 error\n");
-          return -1;
-      }
-  }
-
-  return 0;
+    return 0;
 }
+
 
 int CheckUpdate( char *versionFile )
 {
@@ -169,13 +137,13 @@ int CheckMd5sum( char *versionFile, char *binFile )
     }
     if (cfg_load( cfg, versionFile ) < 0) {
         LOGE("Unable to load %s\n", versionFile );
-        return -1;
+        goto err;
     }
 
     remoteMd5 = cfg_get( cfg, md5_key );
     if ( !remoteMd5 ) {
         LOGE("get remoteMd5 error\n");
-        return -1;
+        goto err;
     }
 
     LOGI("the md5 of remote is %s\n", remoteMd5 );
@@ -189,7 +157,7 @@ int CheckMd5sum( char *versionFile, char *binFile )
     if (ferror (fp))
     {
         LOGE( "error reading `%s': %s\n", binFile, strerror (errno));
-        exit (1);
+        goto err;
     }
     md5_final (&ctx);
     fclose (fp);
@@ -201,10 +169,14 @@ int CheckMd5sum( char *versionFile, char *binFile )
 
     LOGI("str_md5 = %s\n", str_md5 );
     if ( memcmp( remoteMd5, str_md5, 32 ) == 0 ) {
+        free( cfg );
         return 1;
     }
 
     return 0;
+err:
+    free( cfg );
+    return -1;
 }
 
 int StartUpgradeProcess()

@@ -183,7 +183,7 @@ int TsUploaderSdkInit()
 
 
     DBG_LOG("start to init ts uploader sdk \n");
-    gIpc.version = "v00.00.08";
+    gIpc.version = "v00.00.09";
     if ( gIpc.audioType == AUDIO_AAC ) {
         mediaArg.nAudioFormat = LINK_AUDIO_AAC;
         mediaArg.nChannels = 1;
@@ -412,7 +412,7 @@ int WaitForNetworkOk()
     int nRespLen = 0;
     int i = 0;
         
-    printf("start to check network, url = %s ....\n", gIpc.config.url );
+    printf("start to check network, url = %s ....\n", url );
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
         int ret = LinkSimpleHttpGet(url, buf, sizeof(buf), &nRespLen);
         if (ret == LINK_SUCCESS || ret == LINK_BUFFER_IS_SMALL) {
