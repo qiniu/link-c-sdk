@@ -230,6 +230,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 
     put_ret->code = ghttp_status_code(request);
     if (put_ret->code / 100 == 2) {
+        ghttp_request_destroy(request);
 	return 0;
     }
 
