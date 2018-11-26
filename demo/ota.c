@@ -1,4 +1,4 @@
-// Last Update:2018-11-23 19:09:31
+// Last Update:2018-11-26 11:38:09
 /**
  * @file ota.c
  * @brief 
@@ -15,7 +15,6 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <fcntl.h>
-#include <curl/curl.h>
 #include <errno.h>
 #include "md5.h"
 #include "cfg.h"
@@ -87,24 +86,28 @@ int CheckUpdate( char *versionFile )
     }
     if (cfg_load( cfg, versionFile ) < 0) {
         LOGE("Unable to load %s\n", versionFile );
-        return -1;
+        goto err;
     }
 
     LOGI("start to parse the version number\n");
     version = cfg_get( cfg, version_key );
     if ( !version ) {
         LOGE("get version error\n");
-        return -1;
+        goto err;
     }
 
-    LOGI("the new version of remote is %s\n", version);
+    LOGI("the new version of remote is %s, current version is %s\n", version, gIpc.version );
     if ( strncmp( version, gIpc.version, strlen(version) ) == 0 ) {
+        cfg_free( cfg );
         return 0;
     }
 
     cfg_free( cfg );
 
     return 1;
+err:
+    cfg_free( cfg );
+    return -1;
 }
 
 void dump_buf( char *buf, int len, char *name )
@@ -150,6 +153,7 @@ int CheckMd5sum( char *versionFile, char *binFile )
     fp = fopen ( binFile, "rb");
     if (!fp) {
         LOGE( "can't open `%s': %s\n", binFile, strerror (errno));
+        goto err;
     }
     md5_init (&ctx);
     while ( (n = fread (buffer, 1, sizeof buffer, fp)))
@@ -167,12 +171,13 @@ int CheckMd5sum( char *versionFile, char *binFile )
         sprintf( str_md5 + strlen(str_md5), "%02x", ctx.buf[i] );
     }
 
-    LOGI("str_md5 = %s\n", str_md5 );
+    LOGI("str_md5 = %s\, remoteMd5 = %s\n", str_md5, remoteMd5 );
     if ( memcmp( remoteMd5, str_md5, 32 ) == 0 ) {
         free( cfg );
         return 1;
     }
 
+    free( cfg );
     return 0;
 err:
     free( cfg );
@@ -256,6 +261,8 @@ int StartUpgradeProcess()
     memset( cmdBuf, 0, sizeof(cmdBuf) );
     sprintf( cmdBuf, "chmod +x %s", target );
     system( cmdBuf );
+
+    msgctl( msgid, IPC_RMID, NULL );
 
     LOGI("the ota update success!!!!\n");
 
