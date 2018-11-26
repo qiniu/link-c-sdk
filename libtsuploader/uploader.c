@@ -337,11 +337,11 @@ static void getStatInfo(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *_pSta
         return;
 }
 
-void recordTimestamp(LinkTsUploader *_pTsUploader, int64_t _nTimestamp)
+void recordTimestamp(LinkTsUploader *_pTsUploader, int64_t _nTimestamp, int64_t nSysNanotime)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         if (pKodoUploader->nFirstFrameTimestamp == -1) {
-                pKodoUploader->nTsStartTimestamp = LinkGetCurrentNanosecond();
+                pKodoUploader->nTsStartTimestamp = nSysNanotime;
                 pKodoUploader->nFirstFrameTimestamp = _nTimestamp;
                 pKodoUploader->nLastFrameTimestamp = _nTimestamp;
         }

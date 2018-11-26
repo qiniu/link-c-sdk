@@ -33,7 +33,7 @@ typedef struct _LinkTsUploader{
         void (*NotifyDataPrapared)(IN LinkTsUploader *pTsUploader);
         int(*Push)(IN LinkTsUploader *pTsUploader, IN const char * pData, int nDataLen);
         void (*GetStatInfo)(IN LinkTsUploader *pTsUploader, IN LinkUploaderStatInfo *pStatInfo);
-        void (*RecordTimestamp)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp);
+        void (*RecordTimestamp)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp, IN int64_t nSysNanotime);
 }LinkTsUploader;
 
 typedef void (*LinkTsStartUploadCallback)(void *pOpaque, int64_t nTimestamp);
