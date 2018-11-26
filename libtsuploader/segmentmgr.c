@@ -215,7 +215,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         if(!isNewSeg) {
                 struct MgrToken mgrToken;
                 int nUrlLen = 0;
-                nUrlLen = sprintf(uptoken, "%s/%s", segmentMgr.handles[idx].pMgrTokenRequestUrl, segmentMgr.handles[idx].ua);
+                nUrlLen = sprintf(uptoken, "%s", segmentMgr.handles[idx].pMgrTokenRequestUrl, segmentMgr.handles[idx].ua);
                 uptoken[nUrlLen] = 0;
                 mgrToken.isHttps = segmentMgr.handles[idx].useHttps;
                 int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken, segmentMgr.handles[idx].useHttps);
