@@ -126,24 +126,6 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         return LINK_SUCCESS;
 }
 
-static int doMove(const char *pUrl, const char *pToken) {
-        //printf("------->url:%s\n------->token:%s\n", pUrl, pToken);
-        
-        int r = LINK_SUCCESS;
-        LinkPutret putret;
-        int ret = LinkMoveFile(pUrl, pToken, &putret);
-        if (ret != 0) {
-                LinkLogError("http err:%s", putret.error);
-                r = LINK_GHTTP_FAIL;
-        }
-        if (putret.code > 0 && putret.code / 100 != 2) {
-                LinkLogError("request err:%d[%s] [%s]",putret.code, putret.reqid, putret.error);
-                LinkLogError("request resp:%s", putret.body);
-                r = LINK_GHTTP_FAIL;
-        }
-        LinkFreePutret(&putret);
-        return r;
-}
 
 static int checkShouldUpdate(Seg* pSeg) {
         int64_t nNow = LinkGetCurrentNanosecond();
@@ -242,14 +224,26 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         return;
                 }
                 
-                ret = doMove(mgrToken.pUrlPath, mgrToken.pToken);
+                LinkPutret putret;
+                ret = LinkMoveFile(mgrToken.pUrlPath, mgrToken.pToken, &putret);
                 if (ret != 0) {
-                        LinkLogError("move seg: %s to %s fail", oldKey, key);
-                } else {
-                        uploadResult = LINK_UPLOAD_RESULT_OK;
-                        segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
-                        LinkLogDebug("move seg: %s to %s success", oldKey, key);
+                        LinkLogError("move seg: %s to %s errorcode=%d error:%s",oldKey, key, ret, putret.error);
+                } else {//http error
+                        if (putret.code / 100 == 2) {
+                                uploadResult = LINK_UPLOAD_RESULT_OK;
+                                segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
+                                LinkLogDebug("move seg: %s to %s success", oldKey, key);
+                        } else {
+                                if (putret.body != NULL) {
+                                        LinkLogError("move seg:%s to %s httpcode=%d reqid:%s errmsg=%s",
+                                                     oldKey, key, putret.code, putret.reqid, putret.body);
+                                } else {
+                                        LinkLogError("move seg:%s to %s httpcode=%d reqid:%s errmsg={not receive response}",
+                                                     oldKey, key, putret.reqid, putret.code);
+                                }
+                        }
                 }
+                LinkFreePutret(&putret);
                 
                 if (segmentMgr.handles[idx].pUploadStatisticCb) {
                         segmentMgr.handles[idx].pUploadStatisticCb(segmentMgr.handles[idx].pUploadStatArg, LINK_UPLOAD_MOVE_SEG, uploadResult);
@@ -280,7 +274,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         ret = LinkUploadBuffer("", 0, upHost, uptoken, key, NULL, 0, NULL, &putret);
        
         if (ret != 0) {
-                LinkLogError("upload segment:%s http error:%d %s", key, ret, putret.error);
+                LinkLogError("upload segment:%s errorcode=%d error:%s", key, ret, putret.error);
         } else {//http error
                 if (putret.code / 100 == 2) {
                         segmentMgr.handles[idx].segUploadOk = 1;
@@ -290,7 +284,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         if (putret.body != NULL) {
                                 LinkLogError("upload segment:%s httpcode=%d reqid:%s errmsg=%s", key, putret.code, putret.reqid, putret.body);
                         } else {
-                                LinkLogError("upload segment:%s httpcode=%d reqid:%s errmsg={not receive response}", key, putret.reqid, putret.code);
+                                LinkLogError("upload segment:%s httpcode=%d reqid:%s errmsg={not receive response}", key, putret.code,  putret.reqid);
                         }
                 }
         }

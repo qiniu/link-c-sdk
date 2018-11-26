@@ -102,7 +102,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
 
         int retCode = -1;
         if (ret != 0) { //http error
-                LinkLogError("upload.file :%s expsize:%d errorcode=%d errmsg={\"error\":\"%s\"}", key, datasize, ret, putret.error);
+                LinkLogError("upload.file :%s[%d] errorcode=%d errmsg=%s", key, datasize, ret, putret.error);
                 return LINK_GHTTP_FAIL;
         } else {
                 if (putret.code / 100 == 2) {
@@ -110,9 +110,11 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                         LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg=%s", key, datasize, putret.code, putret.body);
+                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg=%s",
+                                             key, datasize, putret.reqid, putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s expsize:%d httpcode=%d errmsg={not receive response}", key, datasize, putret.code);
+                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg={not receive response}",
+                                             key, datasize, putret.reqid, putret.code);
                         }
                 }
         }

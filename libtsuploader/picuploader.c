@@ -213,16 +213,18 @@ static void * uploadPicture(void *_pOpaque) {
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
         if (ret != 0) { //http error
-                LinkLogError("upload picture:%s http error:%d %s", key, ret, putret.error);
+                LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
         } else {
                 if (putret.code / 100 == 2) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         LinkLogDebug("upload picture: %s success", key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s", key, putret.code, putret.reqid, putret.body);
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
+                                             key, putret.code, putret.reqid, putret.body);
                         } else {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}", key, putret.reqid, putret.code);
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
+                                             key, putret.code, putret.reqid);
                         }
                 }
         }
