@@ -1,7 +1,9 @@
 #include "httptools.h"
 #include <ghttp.h>
-
-int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen) {
+static int linkSimpleHttpRequest(IN int isPost,
+                                 IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
+                                 IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType) {
+        
         
         ghttp_status status;
         
@@ -12,6 +14,17 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
         if (ghttp_set_uri(pRequest, pUrl) == -1) {
                 ghttp_request_destroy(pRequest);
                 return LINK_ARG_ERROR;
+        }
+        
+        if (isPost) {
+                ghttp_set_type(pRequest, ghttp_type_post);
+                if (pContentType == NULL) {
+                        ghttp_set_header(pRequest, http_hdr_Content_Type, "application/x-www-form-urlencoded");
+                } else {
+                        ghttp_set_header(pRequest, http_hdr_Content_Type, pContentType);
+                }
+                if (nReqBodyLen > 0 && pReqBody != NULL)
+                        ghttp_set_body(pRequest, pReqBody, nReqBodyLen);
         }
         
         status = ghttp_prepare(pRequest);
@@ -33,6 +46,14 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
                         return LINK_GHTTP_FAIL;
                 }
         }
+        
+        int httpCode = ghttp_status_code(pRequest);
+        if (httpCode / 100 != 2) {
+                ghttp_request_destroy(pRequest);
+                LinkLogError("%s error httpcode:%d", isPost ?  "LinkSimpleHttpPost" : "LinkSimpleHttpGet", httpCode);
+                return LINK_GHTTP_FAIL;
+        }
+        
         int nBodyLen = ghttp_get_body_len(pRequest);
         *pRespLen = nBodyLen;
         char *buf = ghttp_get_body(pRequest);//test
@@ -45,68 +66,18 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
         if (nCopyLen <= nBufLen - 1)
                 return LINK_SUCCESS;
         return LINK_BUFFER_IS_SMALL;
+}
+
+int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen) {
+        
+        return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL);
 }
 
 
 int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                        IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType) {
         
-        
-        ghttp_status status;
-        
-        ghttp_request * pRequest = ghttp_request_new();
-        if (pRequest == NULL) {
-                return LINK_NO_MEMORY;
-        }
-        if (ghttp_set_uri(pRequest, pUrl) == -1) {
-                ghttp_request_destroy(pRequest);
-                return LINK_ARG_ERROR;
-        }
-        
-        ghttp_set_type(pRequest, ghttp_type_post);
-        
-        if (pContentType == NULL) {
-                ghttp_set_header(pRequest, http_hdr_Content_Type, "application/x-www-form-urlencoded");
-        } else {
-                ghttp_set_header(pRequest, http_hdr_Content_Type, pContentType);
-        }
-        
-        ghttp_set_body(pRequest, pReqBody, nReqBodyLen);
-        
-        status = ghttp_prepare(pRequest);
-        if (status != 0) {
-                ghttp_request_destroy(pRequest);
-                LinkLogError("ghttp_prepare:%s", ghttp_get_error(pRequest));
-                return LINK_GHTTP_FAIL;
-        }
-        
-        status = ghttp_process(pRequest);
-        if (status == ghttp_error) {
-                if (ghttp_is_timeout(pRequest)) {
-                        ghttp_request_destroy(pRequest);
-                        LinkLogError("ghttp_process timeout [%s]", ghttp_get_error(pRequest));
-                        return LINK_TIMEOUT;
-                } else {
-                        ghttp_request_destroy(pRequest);
-                        LinkLogError("ghttp_process fail [%s]", ghttp_get_error(pRequest));
-                        return LINK_GHTTP_FAIL;
-                }
-                ghttp_request_destroy(pRequest);
-                return LINK_GHTTP_FAIL;
-        }
-        
-        int nBodyLen = ghttp_get_body_len(pRequest);
-        *pRespLen = nBodyLen;
-        char *buf = ghttp_get_body(pRequest);//test
-        
-        int nCopyLen = nBodyLen > nBufLen - 1 ? nBufLen - 1 : nBodyLen;
-        memcpy(pBuf, buf, nCopyLen);
-        ghttp_request_destroy(pRequest);
-        pBuf[nCopyLen] = 0;
-        
-        if (nCopyLen <= nBufLen - 1)
-                return LINK_SUCCESS;
-        return LINK_BUFFER_IS_SMALL;
+        return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType);
 }
 
 const char *LinkGetUploadHost(int nUseHttps, LinkUploadZone zone) {
