@@ -51,7 +51,7 @@ static int linkSimpleHttpRequest(IN int isPost,
         if (httpCode / 100 != 2) {
                 ghttp_request_destroy(pRequest);
                 LinkLogError("%s error httpcode:%d", isPost ?  "LinkSimpleHttpPost" : "LinkSimpleHttpGet", httpCode);
-                return LINK_GHTTP_FAIL;
+                return httpCode;
         }
         
         int nBodyLen = ghttp_get_body_len(pRequest);

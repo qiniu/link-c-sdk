@@ -415,7 +415,7 @@ int WaitForNetworkOk()
     printf("start to check network, url = %s ....\n", url );
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
         int ret = LinkSimpleHttpGet(url, buf, sizeof(buf), &nRespLen);
-        if (ret == LINK_SUCCESS || ret == LINK_BUFFER_IS_SMALL) {
+        if (ret == LINK_SUCCESS || ret == LINK_BUFFER_IS_SMALL || ret > 0) {
             return 0;
         } else {
             sleep(1);
