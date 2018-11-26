@@ -285,7 +285,7 @@ void InitConfig()
     gIpc.config.openCache = 1;
     gIpc.config.cacheSize = STREAM_CACHE_SIZE;
     gIpc.config.updateFrom = UPDATE_FROM_FILE;
-    gIpc.config.defaultUrl = "www.qiniu.com";
+    gIpc.config.defaultUrl = "http://www.qiniu.com";
     gIpc.config.tokenUrl = NULL;
     gIpc.config.simpleSshEnable = 1;
     gIpc.config.useLocalToken = 0;
