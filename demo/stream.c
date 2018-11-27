@@ -1,4 +1,4 @@
-// Last Update:2018-11-15 16:08:16
+// Last Update:2018-11-27 15:41:53
 /**
  * @file stream.c
  * @brief 
@@ -120,14 +120,13 @@ int VideoGetFrameCb( char *_pFrame,
                    int streamno )
 {
     static int first = 1;
-    static struct timeval start = { 0, 0 }, end = { 0, 0 };
-    int interval = 0;
+    /*static struct timeval start = { 0, 0 }, end = { 0, 0 };*/
 
     if ( _nIskey ) {
-        gettimeofday( &end, NULL );
-        interval = GetTimeDiffMs( &start, &end );
+        /*gettimeofday( &end, NULL );*/
+//        interval = GetTimeDiffMs( &start, &end );
     //    DBG_LOG("video key frame interval = %d\n", interval );
-        start = end;
+        /*start = end;*/
     }
 
     if ( first ) {

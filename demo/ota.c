@@ -1,4 +1,4 @@
-// Last Update:2018-11-26 11:38:09
+// Last Update:2018-11-27 15:43:26
 /**
  * @file ota.c
  * @brief 
@@ -166,12 +166,12 @@ int CheckMd5sum( char *versionFile, char *binFile )
     md5_final (&ctx);
     fclose (fp);
 
-    dump_buf( ctx.buf, 16, "ctx.buf" );
+    dump_buf( (char *)ctx.buf, 16, "ctx.buf" );
     for ( i=0; i<16; i++ ) {
         sprintf( str_md5 + strlen(str_md5), "%02x", ctx.buf[i] );
     }
 
-    LOGI("str_md5 = %s\, remoteMd5 = %s\n", str_md5, remoteMd5 );
+    LOGI("str_md5 = %s, remoteMd5 = %s\n", str_md5, remoteMd5 );
     if ( memcmp( remoteMd5, str_md5, 32 ) == 0 ) {
         free( cfg );
         return 1;
@@ -210,7 +210,7 @@ int StartUpgradeProcess()
         ret = CheckUpdate( versionFile );
         if ( ret <= 0 ) {
             LOGI("there is no new version in server\n");
-            sleep( 10 );
+            sleep( gIpc.config.ota_check_interval );
             continue;
         } 
 

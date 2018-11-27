@@ -294,6 +294,7 @@ void InitConfig()
     gIpc.config.serverIp = NULL;
     gIpc.config.renameTokenUrl = NULL;
     gIpc.config.ota_url = NULL;
+    gIpc.config.ota_check_interval = 30;
     if ( gIpc.config.useLocalToken ) {
         gIpc.config.tokenUploadInterval = 5;
     } else {
@@ -382,6 +383,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(useLocalToken), "USE_LOCAL_TOKEN", 0 },
     { CFG_MEMBER(serverPort), "SERVER_PORT", 0 },
     { CFG_MEMBER(simpleSshEnable), "SIMPLE_SSH", 0 },
+    { CFG_MEMBER(ota_check_interval), "OTA_CHECK_INTERVAL", 0 },
 };
 
 void CfgGetItem()
@@ -395,6 +397,12 @@ void CfgGetItem()
             CfgGetIntItem( cfg_items[i].item, (int *)cfg_items[i].save );
         }
     }
+}
+
+void DumpConfig()
+{
+    printf("log_output : %d\n", gIpc.config.logOutput );
+    printf("h264_file : %s\n", gIpc.config.h264_file );
 }
 
 void UpdateConfig()
@@ -439,5 +447,6 @@ void UpdateConfig()
     } else {
         gIpc.config.tokenUploadInterval = 3540;
     }
+    DumpConfig();
 }
 
