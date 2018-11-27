@@ -15,6 +15,13 @@ else()
     add_definitions(-DDISABLE_OPENSSL)
 endif()
 
+if (CMAKE_TOOLCHAIN_FILE)
+    set( DEV_FILE ipc_dev.c )
+    add_definitions(-DENABLE_IPC)
+else()
+    set( DEV_FILE sim_dev.c )
+endif()
+
 add_executable(demo-tsupload
     main.c
     main.h
@@ -34,9 +41,9 @@ add_executable(demo-tsupload
     dev_core.h
     stream.c
     stream.h
-    sim_dev.c
     ota.c
     md5.c
+    ${DEV_FILE}
 )
 
 if(APPLE)
@@ -50,9 +57,9 @@ if(APPLE)
 else()
     if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
-        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp m pthread )
+        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp m devsdk tools pthread )
         else()
-        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp wolfssl m pthread )
+        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp wolfssl m devsdk tools pthread )
         endif()
     else()
         if(DISABLE_OPENSSL)
