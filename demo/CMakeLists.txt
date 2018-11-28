@@ -35,8 +35,8 @@ add_executable(demo-tsupload
     mymalloc.h
     queue.c
     queue.h
-    socket_logging.c
-    socket_logging.h
+    log2tcp.c
+    log2tcp.h
     dev_core.c
     dev_core.h
     stream.c
