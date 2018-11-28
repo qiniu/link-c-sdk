@@ -46,7 +46,7 @@ int LinkInitUploader()
 
 int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg)
 {
-        if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
+        if (
             _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
             _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
                 LinkLogError("token or deviceid or argument is null");
@@ -80,7 +80,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 int LinkCreateAndStartAll(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
                           LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
 {
-        if (_pUserUploadArg->pToken_ == NULL || _pUserUploadArg->nTokenLen_ == 0 ||
+        if (
             _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
             _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
                 LinkLogError("token or deviceid or argument is null");
@@ -131,14 +131,6 @@ int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataL
         return ret;
 }
 
-int LinkUpdateToken(LinkTsMuxUploader *_pTsMuxUploader, const char * _pToken, int _nTokenLen)
-{
-        if (_pTsMuxUploader == NULL || _pToken == NULL || _nTokenLen == 0) {
-                return LINK_ARG_ERROR;
-        }
-        return _pTsMuxUploader->SetToken(_pTsMuxUploader, _pToken, _nTokenLen);
-}
-
 void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
 {
         if (_pTsMuxUploader == NULL || _nSize < 0) {
@@ -173,10 +165,6 @@ int LinkIsProcStatusQuit()
                 return 1;
         }
         return 0;
-}
-
-void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader, LinkUploadZone zone) {
-        LinkTsMuxUploaderSetUploadZone(pTsMuxUploader, zone);
 }
 
 void LinkUninitUploader()
@@ -243,6 +231,7 @@ void LinkSetDeleteAfterDays(int nDays)
 struct HttpToken {
         char * pData;
         int nDataLen;
+        int nDeadline;
         int nHttpRet; //use with curl not ghttp
         LinkUploadZone *pZone;
 };
@@ -254,6 +243,14 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         int ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
         if (ret != LINK_SUCCESS) {
                 pToken->nHttpRet = ret;
+                return 0;
+        }
+        pToken->nDataLen = len;
+        
+        int nDeleteAfterDays = 0;
+        ret = LinkGetPolicyFromUptoken(pToken->pData, &nDeleteAfterDays, &pToken->nDeadline);
+        if (ret != LINK_SUCCESS || pToken->nDeadline < 1543397800) {
+                pToken->nHttpRet = LINK_JSON_FORMAT;
                 return 0;
         }
         
@@ -276,7 +273,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, const char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, int *pDeadline, const char *pUrl)
 {
         
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
@@ -298,12 +295,16 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, const cha
         struct HttpToken token;
         token.pData = pBuf;
         token.nDataLen = nBufLen;
+        token.nDeadline = 0;
         token.nHttpRet = 0;
         token.pZone = pZone;
         
         if (writeData(httpResp, nRespLen,  1,  &token) == 0){
-                LinkLogError("maybe response format error:%s", httpResp);
+                LinkLogError("maybe response format error:%s[%d]", httpResp, token.nHttpRet);
                 return LINK_JSON_FORMAT;
+        }
+        if (pDeadline) {
+                *pDeadline = token.nDeadline;
         }
         
         return LINK_SUCCESS;

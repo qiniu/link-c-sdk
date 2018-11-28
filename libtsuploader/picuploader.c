@@ -5,6 +5,7 @@
 #include "fixjson.h"
 #include <qupload.h>
 #include "httptools.h"
+ #include <unistd.h>
 
 #define LINK_PIC_UPLOAD_MAX_FILENAME 256
 enum LinkPicUploadSignalType {
@@ -19,6 +20,7 @@ typedef struct {
         pthread_t workerId_;
         LinkCircleQueue *pSignalQueue_;
         int nQuit_;
+        int64_t nCount_;
         LinkPicUploadFullArg picUpSettings_;
 }PicUploader;
 
@@ -192,12 +194,30 @@ static void * uploadPicture(void *_pOpaque) {
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
         param.nTokenBufLen = sizeof(uptoken);
-        int ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
-                                                                      &param);
-        if (ret == LINK_BUFFER_IS_SMALL) {
-                LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
-                LinkPushFunction(pSig);
-                return NULL;
+        int ret = 0;
+        int isFirst = 0;
+        while(1) {
+                ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
+                                                                                    &param);
+                if (ret != LINK_SUCCESS) {
+                        if (ret == LINK_BUFFER_IS_SMALL) {
+                                LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
+                        } else {
+                                LinkLogError("not get uptoken yet:%s", key);
+                        }
+                        if (pSig->pPicUploader->nCount_ == 0) {
+                                isFirst = 1;
+                                pSig->pPicUploader->nCount_++;
+                                LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
+                                sleep(3);
+                        } else {
+                                LinkPushFunction(pSig);
+                                return NULL;
+                        }
+                } else {
+                        if (!isFirst)
+                                pSig->pPicUploader->nCount_++;
+                }
         }
         
         const char *upHost = LinkGetUploadHost(pSig->pPicUploader->picUpSettings_.useHttps, pSig->pPicUploader->picUpSettings_.uploadZone);

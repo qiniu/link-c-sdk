@@ -59,17 +59,16 @@ typedef enum _LinkUploadZone{
 }LinkUploadZone;
 
 typedef struct _LinkUserUploadArg{
-        char  *pToken_;
-        int   nTokenLen_;
         const char *pDeviceId_;
         int   nDeviceIdLen_;
         const char *pMgrTokenRequestUrl;
         int   nMgrTokenRequestUrlLen;
+        const char *pUPTokenRequestUrl;
+        int   nUpTokenRequestUrlLen;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;
         int   nUpdateIntervalSeconds;
         int   useHttps;
-        LinkUploadZone uploadZone_;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
 }LinkUserUploadArg;

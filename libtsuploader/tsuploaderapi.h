@@ -146,32 +146,6 @@ int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,
 void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
- * 设置上传区域
- *
- * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] zone 上传区域
- * @return NULL
- */
-void LinkSetuploadZone(IN LinkTsMuxUploader *pTsMuxUploader,
-                       IN LinkUploadZone zone
-                       );
-
-/**
- * 更新 token
- *
- * 如果用户使用时效 token, 需要通过此接口更新 token。
- *
- * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] pToken 上传token(包含上传策略)，正常情况下从用户业务服务器获取上传凭证
- * @param[in] nTokenLen 上传token的大小
- * @return LINK_SUCCESS 成功; 其它值 失败
- */
-int LinkUpdateToken(IN LinkTsMuxUploader *pTsMuxUploader,
-                    IN const char * pToken,
-                    IN int nTokenLen
-                    );
-
-/**
  * 设置上传实例的缓存 buffer
  *
  * buffer 最小值是 256KB, 此函数不是线程安全函数。
