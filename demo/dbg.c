@@ -1,4 +1,4 @@
-// Last Update:2018-11-21 12:28:12
+// Last Update:2018-11-27 16:49:54
 /**
  * @file dbg.c
  * @brief 
@@ -33,7 +33,6 @@ void SdkLogCallback(int nLogLevel, char *log )
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
 {
-
     memset( &gLogger, 0, sizeof(gLogger) );
 
     gLogger.output = output;
@@ -42,7 +41,7 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
     gLogger.logVerbose = logVerbose;
     gLogger.logQueue = NULL;
 
-    printf("output = %d\n", output );
+    LOGI("output = %d\n", output );
     switch( output ) {
     case OUTPUT_FILE:
         FileOpen( gLogger.logFile );
