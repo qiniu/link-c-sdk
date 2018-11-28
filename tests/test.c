@@ -73,6 +73,8 @@ typedef struct {
         LinkTsMuxUploader * pFirstUploader;
         LinkTsMuxUploader * pSecondUploader;
         int nSigQuitTimes;
+        
+        bool IsJustTestAuth;
 }CmdArg;
 
 typedef struct {
@@ -948,6 +950,7 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsWithPicUpload, "withpic", "with picture upload start");
         flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
         flag_bool(&cmdArg.IsJustTestSegment, "jseg", "just test segment manager");
+        flag_bool(&cmdArg.IsJustTestAuth, "jauth", "just test http(s) auth");
         flag_str(&cmdArg.pMgrToken, "mgrtoken", "where to get move token");
         
         
@@ -1016,6 +1019,8 @@ int main(int argc, const char** argv)
                 }
                 JustTestSegmentMgr(cmdArg.pTokenUrl, cmdArg.pMgrToken);
                 return 0;
+        } else if (cmdArg.IsJustTestAuth) {
+                //TODO test security sign
         }
 
         const char *pVFile = NULL;
