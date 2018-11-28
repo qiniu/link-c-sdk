@@ -1,4 +1,4 @@
-// Last Update:2018-11-27 16:49:54
+// Last Update:2018-11-28 15:35:53
 /**
  * @file dbg.c
  * @brief 
@@ -19,7 +19,7 @@
 #include <fcntl.h>
 
 #include "dbg.h"
-#include "socket_logging.h"
+#include "log2tcp.h"
 #include "log2file.h"
 #include "stream.h"
 #include "main.h"
