@@ -240,8 +240,12 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
     *resp_body_end = 0; //end it
 
     put_ret->body = resp_body;
+        
+    const char *reqid = ghttp_get_header(request, "X-Reqid");
     //get reqid
-    strcpy(put_ret->reqid, ghttp_get_header(request, "X-Reqid"));
+    if (reqid) {
+            strncpy(put_ret->reqid, reqid, sizeof(put_ret->reqid) - 1);
+    }
 
     return 0;
 }
@@ -316,8 +320,13 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         *resp_body_end = 0; //end it
         
         put_ret->body = resp_body;
+        
+        const char *reqid = ghttp_get_header(pRequest, "X-Reqid");
         //get reqid
-        strcpy(put_ret->reqid, ghttp_get_header(pRequest, "X-Reqid"));
+        if (reqid) {
+                strncpy(put_ret->reqid, reqid, sizeof(put_ret->reqid) - 1);
+        }
+        //get reqid
         
         ghttp_request_destroy(pRequest);
         return 0;
