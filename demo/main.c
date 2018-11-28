@@ -223,8 +223,10 @@ int _TsUploaderSdkInit( StreamChannel ch )
     memset( &arg, 0, sizeof(arg) );
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
-    arg.getPicCallback = GetPicCallback;
-    arg.getPictureFreeCallback = getPictureFreeCallback;
+    if ( ch == STREAM_MAIN ) {
+        arg.getPicCallback = GetPicCallback;
+        arg.getPictureFreeCallback = getPictureFreeCallback;
+    }
 
     if ( gIpc.audioType == AUDIO_AAC ) {
         mediaArg.nAudioFormat = LINK_AUDIO_AAC;
