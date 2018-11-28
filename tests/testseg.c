@@ -16,7 +16,8 @@ static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pPar
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         int ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
-        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, pUpToken);
+        int nDeadline;
+        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, &nDeadline, pUpToken);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;
