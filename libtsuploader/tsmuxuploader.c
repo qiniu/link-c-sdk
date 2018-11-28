@@ -1108,6 +1108,7 @@ static void *linkTokenThread(void * pOpaque) {
         int sleepTime = 1;
         while(!pFFTsMuxUploader->isQuit) {
                 char *pBuf = (char *)malloc(1024);
+                memset(pBuf, 0, 1024);
                 LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
                 int nDeadline = 0;
                 int ret = LinkGetUploadToken(pBuf, 1024, &upzone, &nDeadline, pFFTsMuxUploader->pUpTokenRequestUrl);

@@ -195,8 +195,8 @@ static void * uploadPicture(void *_pOpaque) {
         param.pTokenBuf = uptoken;
         param.nTokenBufLen = sizeof(uptoken);
         int ret = 0;
-        int isFirst = 0;
-        while(1) {
+        int isFirst = 0, tryCount = 2;
+        while(tryCount-- > 0) {
                 ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
                                                                                     &param);
                 if (ret != LINK_SUCCESS) {
@@ -217,6 +217,7 @@ static void * uploadPicture(void *_pOpaque) {
                 } else {
                         if (!isFirst)
                                 pSig->pPicUploader->nCount_++;
+                        break;
                 }
         }
         

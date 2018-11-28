@@ -303,6 +303,7 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, int *pDea
                 LinkLogError("maybe response format error:%s[%d]", httpResp, token.nHttpRet);
                 return LINK_JSON_FORMAT;
         }
+        token.pData[token.nDataLen] = 0;
         if (pDeadline) {
                 *pDeadline = token.nDeadline;
         }
