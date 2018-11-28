@@ -243,7 +243,7 @@ int StartUpgradeProcess()
 
     LOGI("notify main process to exit\n");
     key = ftok( keyFile ,'6');
-    msgid = msgget( key, O_RDONLY );
+    msgid = msgget( key, IPC_CREAT|0666 );
     if ( msgid < 0 ) {
         printf("msgid < 0 ");
         return 0;

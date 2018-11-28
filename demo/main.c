@@ -459,7 +459,7 @@ int main()
     }
 
     key = ftok( keyFile , '6' );
-    msgid = msgget( key, IPC_CREAT|O_WRONLY|0777 );
+    msgid = msgget( key, IPC_CREAT|0777 );
     if ( msgid < 0 ) {
         printf("msgid < 0 ");
         return 0;
