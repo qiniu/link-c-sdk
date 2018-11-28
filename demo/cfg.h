@@ -45,6 +45,7 @@ typedef struct {
     char *aac_file;
     char *ota_url;
     int ota_check_interval;
+    int ota_enable;
 } Config;
 
 struct cfg_struct;

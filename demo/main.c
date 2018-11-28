@@ -168,7 +168,7 @@ static int getPictureFreeCallback (char *pBuf, int nNameBufSize)
     return 0;
 }
 
-int GetToken( LinkTsMuxUploader *uploader, char *token, int len, LinkUploadZone *zone )
+int GetToken( StreamChannel ch, LinkTsMuxUploader *uploader, char *token, int len, LinkUploadZone *zone )
 {
     char url[1024] = { 0 }; 
     int i = 0, ret = 0;
@@ -179,8 +179,13 @@ int GetToken( LinkTsMuxUploader *uploader, char *token, int len, LinkUploadZone 
         return -1;
     }
 
-    if ( gIpc.config.tokenUrl )
-        sprintf( url, "%s/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
+    if ( gIpc.config.tokenUrl ) {
+        if ( ch == STREAM_MAIN ) {
+            sprintf( url, "%s/uas/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
+        } else {
+            sprintf( url, "%s/uas/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
+        }
+    }
     DBG_LOG("url = %s\n", url );
 
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
@@ -218,6 +223,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
     LinkUserUploadArg userUploadArg;
+    char url[512] = { 0 };
 
     memset( &mediaArg, 0, sizeof(mediaArg) );
     memset( &arg, 0, sizeof(arg) );
@@ -243,7 +249,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     } else {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "b" );
     }
-    if ( -1 == GetToken( NULL, gIpc.stream[ch].token, sizeof(gIpc.stream[ch].token ), &userUploadArg.uploadZone_ ) ) {
+    if ( -1 == GetToken( STREAM_MAIN, NULL, gIpc.stream[ch].token, sizeof(gIpc.stream[ch].token ), &userUploadArg.uploadZone_ ) ) {
         DBG_ERROR("get token error\n");
         return -1;
     }
@@ -253,13 +259,18 @@ int _TsUploaderSdkInit( StreamChannel ch )
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[ch].devId);
     userUploadArg.nUploaderBufferSize = 512;
     userUploadArg.pUploadStatisticCb = ReportUploadStatistic;
-    userUploadArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
     userUploadArg.useHttps = 0;
-    if ( gIpc.config.renameTokenUrl )
-        userUploadArg.pMgrTokenRequestUrl = gIpc.config.renameTokenUrl;
-    else
+    if ( gIpc.config.tokenUrl ) {
+        if ( ch == STREAM_MAIN ) {
+            sprintf( url, "%s/uas/%sa/token/api", gIpc.config.tokenUrl, gIpc.devId );
+        } else {
+            sprintf( url, "%s/uas/%sb/token/api", gIpc.config.tokenUrl, gIpc.devId );
+        }
+    } else
         userUploadArg.nMgrTokenRequestUrlLen = 0;
+    userUploadArg.pMgrTokenRequestUrl = url;
 
+    DBG_LOG("move seg url = %s\n", url );
     ret = LinkCreateAndStartAll( &gIpc.stream[ch].uploader, &mediaArg, &userUploadArg, &arg );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
@@ -276,7 +287,6 @@ int TsUploaderSdkInit()
     DBG_LOG("start to init ts uploader sdk \n");
     DBG_LOG("gIpc.devId= %s\n", gIpc.devId);
 
-    gIpc.version = "v00.00.02";
     LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
     ret = LinkInitUploader();
     if (ret != 0) {
@@ -302,7 +312,7 @@ static void * UpadateTokenTask() {
 
     for(;;) {
         memset(gIpc.stream[STREAM_MAIN].token, 0, sizeof(gIpc.stream[STREAM_MAIN].token));
-        ret = GetToken( gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].token,
+        ret = GetToken( STREAM_MAIN, gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].token,
                         sizeof(gIpc.stream[STREAM_MAIN].token), NULL );
         if ( ret < 0 ) {
             sleep( 3 );
@@ -311,7 +321,7 @@ static void * UpadateTokenTask() {
 
         if ( gIpc.config.multiChannel ) {
             memset( gIpc.stream[STREAM_SUB].token, 0, sizeof(gIpc.stream[STREAM_SUB].token));
-            ret = GetToken( gIpc.stream[STREAM_SUB].uploader, gIpc.stream[STREAM_SUB].token,
+            ret = GetToken( STREAM_SUB, gIpc.stream[STREAM_SUB].uploader, gIpc.stream[STREAM_SUB].token,
                             sizeof(gIpc.stream[STREAM_MAIN].token), NULL );
             if ( ret < 0 ) {
                 sleep( 3 );
@@ -420,11 +430,9 @@ int main()
 {
     char *logFile = NULL;
     char used[1024] = { 0 };
-    pid_t pid = 0;
-    char *keyFile = "/bin";
-    int msgid = 0;
-    msg_t msg;
-    key_t key;
+
+    gIpc.version = "v00.00.05";
+    gIpc.running = 1;
 
     InitConfig();
     UpdateConfig();
@@ -448,24 +456,15 @@ int main()
     TsUploaderSdkInit();
     StartTokenUpdateTask();
     CaptureDevStartStream();
+    if ( gIpc.config.ota_enable )
+        StartUpgradeTask();
 
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
     DBG_LOG("gIpc.config.heartBeatInterval = %d\n", gIpc.config.heartBeatInterval);
 
-    if ( (pid = fork()) == 0 ) {
-        StartUpgradeProcess();
-    }
-
-    key = ftok( keyFile , '6' );
-    msgid = msgget( key, IPC_CREAT|O_WRONLY|0777 );
-    if ( msgid < 0 ) {
-        printf("msgid < 0 ");
-        return 0;
-    }
-
-    for (;; ) {
+    while ( gIpc.running ) {
         float cpu_usage = 0;
 
         sleep( gIpc.config.heartBeatInterval );
@@ -474,15 +473,8 @@ int main()
         DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\ntoken_url : %s\nreanme_url : %s\n",
                 gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage,
                 gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
-        msgrcv( msgid, &msg, sizeof(msg)-sizeof(msg.type), 2, IPC_NOWAIT );
-        printf("main process get event = %d\n", msg.event );
-        if ( msg.event == OTA_START_UPGRADE_EVENT ) {
-            printf("get the value OTA_START_UPGRADE_EVENT\n");
-            break;
-        }
     }
 
-    msgctl( msgid, IPC_RMID, NULL );
     CaptureDevDeinit();
     TsUploaderSdkDeInit();
     LOGI("main process exit\n");
