@@ -19,7 +19,7 @@
 #include "log2file.h"
 #include "dbg.h"
 #include "cfg.h"
-#include "socket_logging.h"
+#include "log2tcp.h"
 #include "queue.h"
 #include "mymalloc.h"
 #include "dev_core.h"
@@ -191,7 +191,7 @@ int GetToken( StreamChannel ch, LinkTsMuxUploader *uploader, char *token, int le
     for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
         ret = LinkGetUploadToken( token, len, zone, url );
         if ( ret != 0 ) {
-            DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d\n", __LINE__, ret, i );
+            DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d, url = %s\n", __LINE__, ret, i, url  );
             sleep(2);
             continue;
         } else {
@@ -207,7 +207,7 @@ int GetToken( StreamChannel ch, LinkTsMuxUploader *uploader, char *token, int le
     if ( uploader ) {
         ret = LinkUpdateToken( uploader, token, strlen(token) );
         if (ret != 0) {
-            DBG_ERROR("UpdateToken error, ret = %d\n", ret );
+            DBG_ERROR("UpdateToken error, ret = %d, url = %s\n", ret, url );
             return -1;
         }
     } else {
@@ -431,7 +431,7 @@ int main()
     char *logFile = NULL;
     char used[1024] = { 0 };
 
-    gIpc.version = "v00.00.05";
+    gIpc.version = "v00.00.07";
     gIpc.running = 1;
 
     InitConfig();
@@ -456,8 +456,7 @@ int main()
     TsUploaderSdkInit();
     StartTokenUpdateTask();
     CaptureDevStartStream();
-    if ( gIpc.config.ota_enable )
-        StartUpgradeTask();
+    StartUpgradeTask();
 
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );

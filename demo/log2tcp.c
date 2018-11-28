@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include "tsuploaderapi.h"
-#include "socket_logging.h"
+#include "log2tcp.h"
 #include "queue.h"
 #include "dbg.h"
 #include "main.h"

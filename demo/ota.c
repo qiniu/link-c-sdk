@@ -1,4 +1,4 @@
-// Last Update:2018-11-28 12:08:35
+// Last Update:2018-11-28 15:00:57
 /**
  * @file ota.c
  * @brief 
@@ -195,9 +195,14 @@ void * UpgradeTask( void *arg )
 
 
     for (;;) {
+        if ( !gIpc.config.ota_enable ) {
+            DBG_LOG("ota function not enable\n");
+            sleep( gIpc.config.ota_check_interval );
+        }
+
         if ( !gIpc.config.ota_url ) {
             DBG_ERROR("OTA_URL not set, please modify /tmp/oem/app/ip.conf and add OTA_URL\n");
-            sleep( 5 );
+            sleep( gIpc.config.ota_check_interval );
             continue;
         }
 
