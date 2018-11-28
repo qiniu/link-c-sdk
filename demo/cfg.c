@@ -295,6 +295,7 @@ void InitConfig()
     gIpc.config.renameTokenUrl = NULL;
     gIpc.config.ota_url = NULL;
     gIpc.config.ota_check_interval = 30;
+    gIpc.config.ota_enable = 0;
     if ( gIpc.config.useLocalToken ) {
         gIpc.config.tokenUploadInterval = 5;
     } else {
@@ -384,6 +385,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(serverPort), "SERVER_PORT", 0 },
     { CFG_MEMBER(simpleSshEnable), "SIMPLE_SSH", 0 },
     { CFG_MEMBER(ota_check_interval), "OTA_CHECK_INTERVAL", 0 },
+    { CFG_MEMBER(ota_enable), "OTA_ENABLE", 0 },
 };
 
 void CfgGetItem()
@@ -403,6 +405,7 @@ void DumpConfig()
 {
     printf("log_output : %d\n", gIpc.config.logOutput );
     printf("h264_file : %s\n", gIpc.config.h264_file );
+    printf("ota_enable : %d\n", gIpc.config.ota_enable );
 }
 
 void UpdateConfig()
