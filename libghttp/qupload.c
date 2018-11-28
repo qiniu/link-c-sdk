@@ -119,6 +119,23 @@ static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_
     return dst_buffer_p;
 }
 
+static void getReqidAndResponse(ghttp_request * pRequest, LinkPutret *put_ret) {
+
+        int resp_body_len = ghttp_get_body_len(pRequest);
+        if (resp_body_len > 0) {
+                char *resp_body = (char *)malloc(resp_body_len+1);
+                char *resp_body_end = qn_memconcat(resp_body, ghttp_get_body(pRequest), resp_body_len);
+                *resp_body_end = 0; //end it
+                put_ret->body = resp_body;
+        }
+        
+        const char *reqid = ghttp_get_header(pRequest, "X-Reqid");
+        //get reqid
+        if (reqid) {
+                strncpy(put_ret->reqid, reqid, sizeof(put_ret->reqid) - 1);
+        }
+}
+
 /**
  * form upload file to qiniu storage
  *
@@ -234,18 +251,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 	return 0;
     }
 
-    int resp_body_len = ghttp_get_body_len(request);
-    char *resp_body = (char *)malloc(resp_body_len+1);
-    char *resp_body_end = qn_memconcat(resp_body, ghttp_get_body(request), resp_body_len);
-    *resp_body_end = 0; //end it
-
-    put_ret->body = resp_body;
-        
-    const char *reqid = ghttp_get_header(request, "X-Reqid");
-    //get reqid
-    if (reqid) {
-            strncpy(put_ret->reqid, reqid, sizeof(put_ret->reqid) - 1);
-    }
+    getReqidAndResponse(request, put_ret);
 
     return 0;
 }
@@ -314,19 +320,7 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
                 return 0;
         }
         
-        int resp_body_len = ghttp_get_body_len(pRequest);
-        char *resp_body = (char *)malloc(resp_body_len+1);
-        char *resp_body_end = qn_memconcat(resp_body, ghttp_get_body(pRequest), resp_body_len);
-        *resp_body_end = 0; //end it
-        
-        put_ret->body = resp_body;
-        
-        const char *reqid = ghttp_get_header(pRequest, "X-Reqid");
-        //get reqid
-        if (reqid) {
-                strncpy(put_ret->reqid, reqid, sizeof(put_ret->reqid) - 1);
-        }
-        //get reqid
+        getReqidAndResponse(pRequest, put_ret);
         
         ghttp_request_destroy(pRequest);
         return 0;
