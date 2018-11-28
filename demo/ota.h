@@ -17,7 +17,7 @@ typedef struct {
     int event;
 } msg_t;
 
-extern int StartUpgradeProcess();
+extern void StartUpgradeTask();
 
 
 #endif  /*OTA_H*/
