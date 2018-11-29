@@ -30,8 +30,8 @@ endif()
 message( "HOST is " ${HOST} )
 
 add_custom_target(all-clean
-        COMMAND echo "CLEAN CURL"
-        COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/curl && git clean -dxf
+        COMMAND echo "CLEAN WOLFSSL"
+        COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/wolfssl && git clean -dxf
     )
 
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wno-unused")
@@ -49,6 +49,7 @@ execute_process(
 add_definitions("-DCODE_VERSION=\"${GIT_CODE_VERSION}\"")
 
 add_subdirectory(third_party)
+add_subdirectory(libghttp)
 add_subdirectory(libtsuploader)
 add_subdirectory(tests)
 add_subdirectory(demo)

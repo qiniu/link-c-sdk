@@ -155,7 +155,8 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         return ret;
 }
 
-static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag, int _nIsKeyframe){
+static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag,
+                int _nIsKeyframe, int64_t nSysNanotime){
 #ifndef USE_OWN_TSMUX
         AVPacket pkt;
         av_init_packet(&pkt);
@@ -262,7 +263,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt);
 #endif
         if (ret == 0) {
-                pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp);
+                pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime);
         } else {
                 if (pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL)
                         LinkLogError("Error muxing packet:%d", ret);
@@ -277,7 +278,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         return ret;
 }
 
-static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int _nIsSegStart)
+static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int64_t nSysNanotime, int _nIsSegStart)
 {
         int ret;
         int shouldSwitch = 0;
@@ -306,12 +307,11 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
                         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
-                        int64_t nSystime = LinkGetCurrentNanosecond();
-                        int64_t nDiff = (nSystime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
+                        int64_t nDiff = (nSysNanotime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
                         if (nDiff < 1000) {
                                 LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
                         }
-                        pFFTsMuxUploader->nLastPicCallbackSystime = nSystime;
+                        pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         if (_nIsSegStart) {
                                 pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
@@ -337,12 +337,13 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         }
         int ret = 0;
 
+        int64_t nSysNanotime = LinkGetCurrentNanosecond();
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
-        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, _nIsSegStart);
+        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart);
         if (ret != 0) {
                 return ret;
         }
@@ -352,10 +353,12 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return 0;
         }
         if (pFFTsMuxUploader->nKeyFrameCount == 1 && nIsKeyFrame) {
-                linkCapturePictureCallback(_pTsMuxUploader, pFFTsMuxUploader->nLastPicCallbackSystime / 1000000);
+                if (pFFTsMuxUploader->nLastPicCallbackSystime <= 0)
+                        pFFTsMuxUploader->nLastPicCallbackSystime = LinkGetCurrentNanosecond();
+                linkCapturePictureCallback(_pTsMuxUploader, nSysNanotime / 1000000);
         }
         
-        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO, nIsKeyFrame);
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_VIDEO, nIsKeyFrame, nSysNanotime);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
@@ -376,7 +379,8 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return LINK_PAUSED;
         }
-        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, 0);
+        int64_t nSysNanotime = LinkGetCurrentNanosecond();
+        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0);
         if (ret != 0) {
                 return ret;
         }
@@ -385,7 +389,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 LinkLogDebug("no keyframe. drop audio frame");
                 return 0;
         }
-        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0);
+        ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0, nSysNanotime);
         if (ret == 0){
                 pFFTsMuxUploader->nFrameCount++;
         }
@@ -820,6 +824,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->uploadArg.pGetUploadParamCallbackArg = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        pFFTsMuxUploader->uploadArg.useHttps = _pUserUploadArg->useHttps;
         
         pFFTsMuxUploader->nUpdateSegmentInterval = 30;
         
@@ -934,6 +939,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         fullArg.uploadZone = _pUserUploadArg->uploadZone_;
+        fullArg.useHttps = _pUserUploadArg->useHttps;
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {

@@ -119,6 +119,7 @@ typedef struct _LinkMediaArg{
 #define LINK_MAX_SEG         -5103
 #define LINK_NOT_INITED      -5104
 #define LINK_PAUSED          -6000
+#define LINK_GHTTP_FAIL      -7000
 #define LINK_SUCCESS         0
 
 

@@ -33,6 +33,7 @@ typedef struct {
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         LinkUploadZone uploadZone;
+        int useHttps;
 }LinkPicUploadFullArg;
 
 int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadFullArg *pArg);

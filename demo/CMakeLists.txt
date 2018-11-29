@@ -5,16 +5,21 @@ project(demo)
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader/c-sdk/")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/include")
-link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/output/${HOST}/lib")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 
 if (WITH_OPENSSL)
     set(DISABLE_OPENSSL OFF)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl-3.15.3")
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
 else()
     set(DISABLE_OPENSSL ON)
     add_definitions(-DDISABLE_OPENSSL)
+endif()
+
+if (CMAKE_TOOLCHAIN_FILE)
+    set( DEV_FILE ipc_dev.c )
+    add_definitions(-DENABLE_IPC)
+else()
+    set( DEV_FILE sim_dev.c )
 endif()
 
 add_executable(demo-tsupload
@@ -30,37 +35,37 @@ add_executable(demo-tsupload
     mymalloc.h
     queue.c
     queue.h
-    socket_logging.c
-    socket_logging.h
+    log2tcp.c
+    log2tcp.h
     dev_core.c
     dev_core.h
     stream.c
     stream.h
-    sim_dev.c
     ota.c
     md5.c
+    ${DEV_FILE}
 )
 
 if(APPLE)
 	set(CMAKE_EXE_LINKER_FLAGS
     		"-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
 	if(DISABLE_OPENSSL)
-        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl bz2 lzma iconv)
+        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp bz2 lzma iconv)
         else()
-        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl crypto bz2 lzma iconv)
+        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp wolfssl bz2 lzma iconv)
         endif()
 else()
     if(CMAKE_TOOLCHAIN_FILE)
         if(DISABLE_OPENSSL)
-        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl m pthread )
+        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp m devsdk tools pthread )
         else()
-        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread )
+        	target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp wolfssl m devsdk tools pthread )
         endif()
     else()
         if(DISABLE_OPENSSL)
-        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl m pthread)
+        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp m pthread)
         else()
-        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} qiniu curl crypto m pthread)
+        	target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp wolfssl m pthread)
         endif()
     endif()
 endif()

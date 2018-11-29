@@ -1,11 +1,10 @@
 #include "picuploader.h"
 #include "resource.h"
 #include "queue.h"
-#include <qiniu/io.h>
-#include <qiniu/rs.h>
-#include <curl/curl.h>
 #include "tsuploaderapi.h"
 #include "fixjson.h"
+#include <qupload.h>
+#include "httptools.h"
 
 #define LINK_PIC_UPLOAD_MAX_FILENAME 256
 enum LinkPicUploadSignalType {
@@ -201,85 +200,37 @@ static void * uploadPicture(void *_pOpaque) {
                 return NULL;
         }
         
-        Qiniu_Client client;
-        Qiniu_Client_InitNoAuth(&client, 1024);
-        
-        Qiniu_Io_PutRet putRet;
-        Qiniu_Io_PutExtra putExtra;
-        Qiniu_Zero(putExtra);
+        const char *upHost = LinkGetUploadHost(pSig->pPicUploader->picUpSettings_.useHttps, pSig->pPicUploader->picUpSettings_.uploadZone);
 
-#ifdef DISABLE_OPENSSL
-        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
-                case LINK_ZONE_HUABEI:
-                        Qiniu_Use_Zone_Huabei(Qiniu_False);
-                        break;
-                case LINK_ZONE_HUANAN:
-                        Qiniu_Use_Zone_Huanan(Qiniu_False);
-                        break;
-                case LINK_ZONE_BEIMEI:
-                        Qiniu_Use_Zone_Beimei(Qiniu_False);
-                        break;
-                case LINK_ZONE_DONGNANYA:
-                        Qiniu_Use_Zone_Dongnanya(Qiniu_False);
-                        break;
-                default:
-                        Qiniu_Use_Zone_Huadong(Qiniu_False);
-                        break;
-        }
-#else
-        switch(pSig->pPicUploader->picUpSettings_.uploadZone) {
-                case LINK_ZONE_HUABEI:
-                        Qiniu_Use_Zone_Huabei(Qiniu_True);
-                        break;
-                case LINK_ZONE_HUANAN:
-                        Qiniu_Use_Zone_Huanan(Qiniu_True);
-                        break;
-                case LINK_ZONE_BEIMEI:
-                        Qiniu_Use_Zone_Beimei(Qiniu_True);
-                        break;
-                case LINK_ZONE_DONGNANYA:
-                        Qiniu_Use_Zone_Dongnanya(Qiniu_True);
-                        break;
-                default:
-                        Qiniu_Use_Zone_Huadong(Qiniu_True);
-                        break;
-        }
-#endif
+        LinkPutret putret;
 
-        Qiniu_Error error;
         if (pSig->upType_ == LinkPicUploadTypeFile) {
-                error = Qiniu_Io_PutFile(&client, &putRet, uptoken, key, (const char*)pSig->pData, &putExtra);
+                ret = LinkUploadFile((const char*)pSig->pData, upHost, uptoken, key, NULL, &putret);
         } else {
-                error = Qiniu_Io_PutBuffer(&client, &putRet, uptoken, key, (const char*)pSig->pData,
-                                               pSig->nDataLen, &putExtra);
+                ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, key, NULL, 0, NULL, &putret);
         }
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
-        if (error.code != 200) {
-                if (error.code == 401) {
-                        LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code, Qiniu_Buffer_CStr(&client.b));
-                } else if (error.code >= 500) {
-                        const char * pFullErrMsg = Qiniu_Buffer_CStr(&client.b);
-                        char errMsg[256];
-                        char *pMsg = GetErrorMsg(pFullErrMsg, errMsg, sizeof(errMsg));
-                        if (pMsg) {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pMsg);
-                        }else {
-                                LinkLogError("upload picture :%s httpcode=%d errmsg=%s", key, error.code,
-                                             pFullErrMsg);
-                        }
+        
+        if (ret != 0) { //http error
+                LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
+        } else {
+                if (putret.code / 100 == 2) {
+                        uploadResult = LINK_UPLOAD_RESULT_OK;
+                        LinkLogDebug("upload picture: %s success", key);
                 } else {
-                        const char *pCurlErrMsg = curl_easy_strerror(error.code);
-                        if (pCurlErrMsg != NULL) {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"%s\"}", key, error.code, pCurlErrMsg);
+                        if (putret.body != NULL) {
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
+                                             key, putret.code, putret.reqid, putret.body);
                         } else {
-                                LinkLogError("upload picture :%s errorcode=%d errmsg={\"error\":\"unknown error\"}", key, error.code);
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
+                                             key, putret.code, putret.reqid);
                         }
                 }
-        } else {
-                uploadResult = LINK_UPLOAD_RESULT_OK;
-                LinkLogDebug("upload picture key:%s success", key);
         }
+        
+        LinkFreePutret(&putret);
+        
         
         if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
                 pSig->pPicUploader->picUpSettings_.getPictureFreeCallback((char *)pSig->pData, pSig->nDataLen);
@@ -289,7 +240,6 @@ static void * uploadPicture(void *_pOpaque) {
                 pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
         
-        Qiniu_Client_Cleanup(&client);
         LinkPushFunction(pSig);
         
         return NULL;

@@ -2,15 +2,17 @@ cmake_minimum_required (VERSION 2.8)
 
 project(tsuploader)
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/curl/output/${HOST}/include")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/c-sdk")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libghttp")
+
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 
 if (WITH_OPENSSL)
     message("WITH_OPENSSL")
     set(DISABLE_OPENSSL OFF)
-    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/openssl-1.1.0h")
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/openssl-1.1.0h")
+    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}")
+    link_directories("${OPENSSL_ROOT_DIR}/lib")
+    include_directories("${OPENSSL_ROOT_DIR}/include")
+    include_directories("${OPENSSL_ROOT_DIR}/include/wolfssl")
 else()
     message("WITHOUT_OPENSSL")
     set(DISABLE_OPENSSL ON)
@@ -42,6 +44,8 @@ add_library(tsuploader STATIC
     tsmuxuploader.h
     tsuploaderapi.c
     tsuploaderapi.h
+    httptools.h
+    httptools.c
     tsmux.h
     tsmux.c
     mpegts.c
@@ -53,6 +57,8 @@ add_library(tsuploader STATIC
     localkey.h
     segmentmgr.c
     segmentmgr.h
+    b64/b64.c
+    b64/b64.h
+    b64/urlsafe_b64.c
+    b64/urlsafe_b64.h
 )
-
-add_subdirectory(c-sdk)

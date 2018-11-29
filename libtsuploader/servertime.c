@@ -1,9 +1,9 @@
 #include <fcntl.h>
 #include <unistd.h>
-#include <curl/curl.h>
 #include <string.h>
 #include "base.h"
 #include <time.h>
+#include "httptools.h"
 
 #define USE_CLOCK 1
 
@@ -49,10 +49,6 @@ struct ServerTime{
 
 static size_t writeTime(void *pTimeStr, size_t size,  size_t nmemb,  void *pUserData) {
         struct ServerTime *pTime = (struct ServerTime *)pUserData;
-        if (pTime->nDataLen < size * nmemb) {
-                pTime->nCurlRet = -11;
-                return 0;
-        }
         
         char *pTokenStart = strstr(pTimeStr, "\"timestamp\"");
         if (pTokenStart == NULL) {
@@ -74,30 +70,29 @@ static size_t writeTime(void *pTimeStr, size_t size,  size_t nmemb,  void *pUser
 }
 
 static int getTimeFromServer(int64_t *pStime) {
-        CURL *curl;
-        curl_global_init(CURL_GLOBAL_ALL);
-        curl = curl_easy_init();
-        if (curl == NULL) {
-                return LINK_NO_MEMORY;
+        
+        char respBuf[128];
+        int nRespBufLen = sizeof(respBuf);
+        int nRealRespLen = 0;
+        int ret = LinkSimpleHttpGet("http://39.107.247.14:8086/timestamp", respBuf, nRespBufLen, &nRealRespLen);
+        if (ret != LINK_SUCCESS){
+                return ret;
         }
-        
-        curl_easy_setopt(curl, CURLOPT_URL, "http://39.107.247.14:8086/timestamp");
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeTime);
-        
-        char timeStr[128] = {0};
+       
+        char timeStr[16] = {0};
         struct ServerTime stime;
         stime.pData = timeStr;
         stime.nDataLen = sizeof(timeStr);
         stime.nCurlRet = 0;
         
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &stime);
-        int ret =curl_easy_perform(curl);
-        
-        curl_easy_cleanup(curl);
-        if(ret == 0) {
-                *pStime = (int64_t)atoll(stime.pData);
+        if ( writeTime(respBuf, nRealRespLen, 1, &stime) == 0) {
+                LinkLogError("may response format:%s", respBuf);
+                return LINK_JSON_FORMAT;
         }
-        return ret;
+        
+        *pStime = (int64_t)atoll(stime.pData);
+
+        return LINK_SUCCESS;
 }
 
 int64_t LinkGetCurrentNanosecond()

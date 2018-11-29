@@ -23,7 +23,6 @@ void *mymalloc( size_t size, char *function, int line )
 
 void myfree( void *ptr, char *function, int line )
 {
-    char buffer[1024] = {0};
     DBG_LOG( "+++ free, %s() ---> %d, down = %d, ptr = %p, diff = %d \n", function, line, __sync_fetch_and_sub(&down,1), ptr, up+down );
 
     free( ptr );

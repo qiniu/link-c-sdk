@@ -56,6 +56,7 @@ typedef struct {
     unsigned char detectMoving;
     char *version;
     Stream stream[STREAM_MAX];
+    int running;
 } App;
 
 extern App gIpc;
