@@ -63,7 +63,7 @@ typedef struct _LinkUserUploadArg{
         int   nDeviceIdLen_;
         const char *pMgrTokenRequestUrl;
         int   nMgrTokenRequestUrlLen;
-        const char *pUPTokenRequestUrl;
+        const char *pUpTokenRequestUrl;
         int   nUpTokenRequestUrlLen;
         int   nUploaderBufferSize;
         int   nNewSegmentInterval;

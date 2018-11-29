@@ -802,7 +802,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->uploadArg.useHttps = _pUserUploadArg->useHttps;
         pFFTsMuxUploader->pUpTokenRequestUrl = (char *)(pFFTsMuxUploader) + sizeof(FFTsMuxUploader);
         if (pFFTsMuxUploader->pUpTokenRequestUrl) {
-                memcpy(pFFTsMuxUploader->pUpTokenRequestUrl, _pUserUploadArg->pUPTokenRequestUrl, _pUserUploadArg->nUpTokenRequestUrlLen);
+                memcpy(pFFTsMuxUploader->pUpTokenRequestUrl, _pUserUploadArg->pUpTokenRequestUrl, _pUserUploadArg->nUpTokenRequestUrlLen);
                 pFFTsMuxUploader->pUpTokenRequestUrl[_pUserUploadArg->nUpTokenRequestUrlLen] = 0;
         }
         
