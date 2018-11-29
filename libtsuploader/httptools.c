@@ -41,7 +41,7 @@ static int linkSimpleHttpRequest(IN int isPost,
                         ghttp_request_destroy(pRequest);
                         return LINK_TIMEOUT;
                 } else {
-                        LinkLogError("ghttp_process fail [%s]", ghttp_get_error(pRequest));
+                        LinkLogError("ghttp_process fail [%s] resp[%s]", ghttp_get_error(pRequest), ghttp_get_body(pRequest));
                         ghttp_request_destroy(pRequest);
                         return LINK_GHTTP_FAIL;
                 }
@@ -49,11 +49,13 @@ static int linkSimpleHttpRequest(IN int isPost,
         
         int httpCode = ghttp_status_code(pRequest);
         if (httpCode / 100 != 2) {
+                LinkLogError("%s error httpcode:%d [%s]", isPost ?  "LinkSimpleHttpPost" : "LinkSimpleHttpGet",
+                             httpCode, ghttp_get_body(pRequest));
                 ghttp_request_destroy(pRequest);
-                LinkLogError("%s error httpcode:%d", isPost ?  "LinkSimpleHttpPost" : "LinkSimpleHttpGet", httpCode);
                 return httpCode;
         }
-        
+
+
         int nBodyLen = ghttp_get_body_len(pRequest);
         *pRespLen = nBodyLen;
         char *buf = ghttp_get_body(pRequest);//test
