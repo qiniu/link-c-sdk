@@ -64,10 +64,10 @@ int LinkCreateAndStartAll(OUT LinkTsMuxUploader **pTsMuxUploader,
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader,
-                                void *pOpaque,
+                                const char *pFilename,
+                                int nFilenameLen,
                                 const char *pBuf,
-                                int nBuflen,
-                                enum LinkPicUploadType type
+                                int nBuflen
                                 );
 
 /**

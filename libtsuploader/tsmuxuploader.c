@@ -405,10 +405,12 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         return ret;
 }
 
-int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *_pTsMuxUploader, void *_pOpaque, const char *_pBuf, int _nBuflen, enum LinkPicUploadType _type) {
+int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
+                                int nFilenameLen, const char *_pBuf, int _nBuflen) {
+        
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         assert(pFFTsMuxUploader->pPicUploader != NULL);
-        return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, _pOpaque, _pBuf, _nBuflen, _type);
+        return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, pFilename, nFilenameLen, _pBuf, _nBuflen);
 }
 
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
@@ -924,7 +926,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
         fullArg.pGetPicCallbackOpaque = _pPicArg->pGetPicCallbackOpaque;
-        fullArg.getPictureFreeCallback = _pPicArg->getPictureFreeCallback;
         fullArg.getUploadParamCallback = getUploadParamCallback;
         fullArg.pGetUploadParamCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;

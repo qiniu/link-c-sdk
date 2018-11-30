@@ -27,23 +27,17 @@ typedef struct {
 typedef struct {
         LinkAsyncInterface asyncWait_;
         enum LinkPicUploadSignalType signalType_;
-        enum LinkPicUploadType upType_;
-        const char *pData;
+        char *pData;
         int nDataLen;
         int64_t nTimestamp; //file name need
         pthread_t uploadPicThread;
-        char deviceId[64];
+        char deviceId[33];
         PicUploader *pPicUploader;
+        char *pFileName;
 }LinkPicUploadSignal;
 
 
 static void * uploadPicture(void *_pOpaque);
-
-static int pushUploadSignal(PicUploader *pPicUploader, LinkPicUploadSignal *pSig) {
-        pSig->pPicUploader = pPicUploader;
-        pSig->signalType_ = LinkPicUploadSignalUpload;
-        return pPicUploader->pSignalQueue_->Push(pPicUploader->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
-}
 
 int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
         LinkPicUploadSignal sig;
@@ -59,16 +53,26 @@ int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, con
         return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
 }
 
-int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, void *pOpaque, const char *pBuf, int nBuflen, enum LinkPicUploadType type) {
+int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const char *pFileName, int nFileNameLen, const char *pBuf, int nBuflen) {
+        
         PicUploader *pPicUp = (PicUploader *)pPicUploader;
-        LinkPicUploadSignal* pSig = (LinkPicUploadSignal*)pOpaque;
-        pSig->pPicUploader = pPicUp;
-        pSig->signalType_ = LinkPicUploadSignalUpload;
-        pSig->pData = pBuf;
-        pSig->nDataLen = nBuflen;
-        pSig->upType_ = type;
-        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)pSig, sizeof(LinkPicUploadSignal));
-        free(pSig);
+        
+        LinkPicUploadSignal sig;
+        memset(&sig, 0, sizeof(LinkPicUploadSignal));
+        
+        sig.pPicUploader = pPicUp;
+        sig.signalType_ = LinkPicUploadSignalUpload;
+        sig.nDataLen = nBuflen;
+        sig.pFileName = (char *)malloc(nFileNameLen + 1 + nBuflen);
+        if (sig.pFileName == NULL) {
+                return LINK_NO_MEMORY;
+        }
+        memcpy(sig.pFileName, pFileName, nFileNameLen);
+        sig.pFileName[nFileNameLen] = 0;
+        sig.pData = sig.pFileName + nFileNameLen + 1;
+        memcpy(sig.pData, pBuf, nBuflen);
+        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+
         return ret;
 }
 
@@ -113,16 +117,13 @@ static void * listenPicUpload(void *_pOpaque)
                                         break;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
-                                                void *pSigBackup = NULL;
-                                                pSigBackup = malloc(sizeof(sig));
-                                                memcpy(pSigBackup, &sig, sizeof(sig));
-                                                enum LinkGetPictureSyncMode syncMode = pPicUploader->picUpSettings_.getPicCallback(
+                                                char key[160] = {0};
+                                                memset(key, 0, sizeof(key));
+                                                snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", sig.deviceId, sig.nTimestamp);
+                                                pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
-                                                                                            pSigBackup, &sig.pData, &sig.nDataLen, &sig.upType_);
-                                                if (syncMode == LinkGetPictureModeSync) {
-                                                        free(pSigBackup);
-                                                        pushUploadSignal(pPicUploader, &sig);
-                                                }
+                                                                                            key, strlen(key));
+                                               
                                         }
                                         break;
                         }
@@ -176,6 +177,9 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
 static int waitUploadThread(void * _pOpaque) {
         LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
         pthread_join(pSig->uploadPicThread, NULL);
+        if (pSig->pFileName) {
+                free(pSig->pFileName);
+        }
         free(pSig);
         return 0;
 }
@@ -187,7 +191,25 @@ static void * uploadPicture(void *_pOpaque) {
         // frame/ua/ts_start_timestamp/fragment_start_timestamp.jpeg
         char key[160] = {0};
         memset(key, 0, sizeof(key));
-        snprintf(key, sizeof(key), "frame/%s/%"PRId64"/0.jpg", pSig->deviceId, pSig->nTimestamp);
+        if (pSig->pFileName != NULL) {
+                char *n = strrchr(pSig->pFileName, '/');
+                
+                char *r = pSig->pFileName;
+                if (n != NULL) {
+                        r = ++n;
+                } else {
+                        n = pSig->pFileName;
+                }
+                while(*r != 0) {
+                        if (*r == '_') {
+                                *r = '/';
+                        }
+                        r++;
+                }
+                snprintf(key, sizeof(key), "%s", n);
+        } else {
+                snprintf(key, sizeof(key), "frame/%s/%"PRId64"/0.jpg", pSig->deviceId, pSig->nTimestamp);
+        }
         
         char uptoken[1024] = {0};
         LinkUploadParam param;
@@ -225,11 +247,7 @@ static void * uploadPicture(void *_pOpaque) {
 
         LinkPutret putret;
 
-        if (pSig->upType_ == LinkPicUploadTypeFile) {
-                ret = LinkUploadFile((const char*)pSig->pData, upHost, uptoken, key, NULL, &putret);
-        } else {
-                ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, key, NULL, 0, NULL, &putret);
-        }
+        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, key, NULL, 0, NULL, &putret);
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
@@ -252,10 +270,6 @@ static void * uploadPicture(void *_pOpaque) {
         
         LinkFreePutret(&putret);
         
-        
-        if (pSig->pPicUploader->picUpSettings_.getPictureFreeCallback) {
-                pSig->pPicUploader->picUpSettings_.getPictureFreeCallback((char *)pSig->pData, pSig->nDataLen);
-        }
         
         if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
                 pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);

@@ -4,28 +4,36 @@
 #include <unistd.h>
 #include "picuploader.h"
 
-static void *gSvaeWhenAsync; //may race risk. but for test is enough
-enum LinkGetPictureSyncMode gSyncMode = LinkGetPictureModeSync;
+static char *gpFilename; //may race risk. but for test is enough
+static int gnPfilenameLen = 0;
+extern char *gpPictureBuf;
+extern int gnPictureBufLen;
+static int asyncType = 1;
+static PictureUploader *pPicUploader = NULL;
 
-static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-#ifdef __APPLE__
-        const char *file = "../../../tests/material/3c.jpg";
-#else
-        const char *file = "../../tests/material/3c.jpg";
-#endif
-        int n = strlen(file)+1;
-        char * pFile = (char *)malloc(n);
-        memcpy(pFile, file, n);
-        *pBuf = pFile;
-        *pType = LinkPicUploadTypeFile;
-        gSvaeWhenAsync = pSvaeWhenAsync;
-        return gSyncMode;
-}
-
-static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
-        fprintf(stderr, "free data\n");
-        free(pBuf);
-        return 0;
+static void getPicCallback (void *pOpaque,  const char *pFileName, int nFilenameLen) {
+        if (gpFilename == NULL) {
+                gnPfilenameLen = nFilenameLen * 2;
+                gpFilename = (char *)malloc(gnPfilenameLen);
+                memcpy(gpFilename, pFileName, nFilenameLen);
+                gpFilename[nFilenameLen] = 0;
+        } else {
+                if (gnPfilenameLen < nFilenameLen) {
+                        free(gpFilename);
+                }
+                gnPfilenameLen = nFilenameLen * 2;
+                gpFilename = (char *)malloc(gnPfilenameLen);
+                memcpy(gpFilename, pFileName, nFilenameLen);
+                gpFilename[nFilenameLen] = 0;
+        }
+        printf("in testpic getPicCallback:%s\n", gpFilename);
+        if (!asyncType) {
+                if(gpPictureBuf != NULL && pPicUploader != NULL)
+                        LinkSendUploadPictureToPictureUploader(pPicUploader, pFileName, nFilenameLen, gpPictureBuf, gnPfilenameLen);
+                else
+                        fprintf(stderr, "gpPictureBuf is NULL\n");
+        }
+        return;
 }
 
 static char gtestToken[1024] = {0};
@@ -38,6 +46,7 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 }
 
 void justTestSyncUploadPicture(const char *pTokenUrl) {
+        asyncType = 0;
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int nDeadline = 0;
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, &nDeadline, pTokenUrl);
@@ -49,11 +58,10 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
         LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
         arg.getUploadParamCallback = getUploadParamCallback;
-        arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetUploadParamCallbackOpaque = NULL;
         arg.uploadZone = upzone;
-        PictureUploader *pPicUploader;
+        
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);
         
@@ -68,7 +76,6 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
 }
 
 void justTestAsyncUploadPicture(const char *pTokenUrl) {
-        gSyncMode = LinkGetPictureModeAsync;
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int nDeadline;
         int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, &nDeadline, pTokenUrl);
@@ -80,11 +87,10 @@ void justTestAsyncUploadPicture(const char *pTokenUrl) {
         LinkPicUploadFullArg arg;
         arg.getPicCallback = getPicCallback;
         arg.getUploadParamCallback = getUploadParamCallback;
-        arg.getPictureFreeCallback = getPictureFreeCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetUploadParamCallbackOpaque = NULL;
         arg.uploadZone = upzone;
-        PictureUploader *pPicUploader;
+        
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);
         
@@ -100,7 +106,10 @@ void justTestAsyncUploadPicture(const char *pTokenUrl) {
                 char * pFile = (char *)malloc(n);
                 memcpy(pFile, file, n);
                 fprintf(stderr, "send upload signal\n");
-                LinkSendUploadPictureToPictureUploader(pPicUploader, gSvaeWhenAsync, pFile, n, LinkPicUploadTypeFile);
+                if (gpPictureBuf != NULL)
+                        LinkSendUploadPictureToPictureUploader(pPicUploader, gpFilename, strlen(gpFilename), gpPictureBuf, gnPfilenameLen);
+                else
+                        fprintf(stderr, "gpPictureBuf is NULL\n");
                 
                 sleep(4);
                 ts += 4990;

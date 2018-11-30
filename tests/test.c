@@ -17,6 +17,9 @@
 #define MATERIAL_PATH "../../tests/material/"
 #endif
 
+char *gpPictureBuf = NULL;
+int gnPictureBufLen = 0;
+
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl);
 void justTestSyncUploadPicture(const char *pTokenUrl);
 void justTestAsyncUploadPicture(const char *pTokenUrl);
@@ -672,37 +675,18 @@ typedef struct {
         void * pData;
 }GetPicSaver;
 
-static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = MATERIAL_PATH"3c.jpg";
-        
-        int n = strlen(file);
-        char * pFile = (char *)malloc(n+1);
-        *pBufSize = n;
-        memcpy(pFile, file, n);
-        *pBuf = pFile;
-        *pType = LinkPicUploadTypeFile;
-        pFile[n] = 0;
-        
+static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameLen) {
         GetPicSaver * saver = (GetPicSaver*)pOpaque;
-        if (cmdArg.IsPicUploadSyncMode) {
-                return LinkGetPictureModeSync;
-        }
-        
-        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, pSvaeWhenAsync, pFile, n, LinkPicUploadTypeFile);
-        return LinkGetPictureModeAsync;
-}
-
-static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
-        fprintf(stderr, "free data\n");
-        free(pBuf);
-        return 0;
+        char filename[128] = {0};
+        sprintf(filename, "/tmp/abc/%s", pFileName);
+        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        return ;
 }
 
 static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
         int ret = 0;
         LinkPicUploadArg picArg;
         picArg.getPicCallback = getPicCallback;
-        picArg.getPictureFreeCallback = getPictureFreeCallback;
         picArg.pGetPicCallbackOpaque = NULL;
         
 
@@ -953,6 +937,15 @@ int main(int argc, const char** argv)
 
         checkCmdArg(argv[0]);
         
+        const char *file = MATERIAL_PATH"3c.jpg";
+        if (gpPictureBuf == NULL) {
+                int ret = readFileToBuf(file, &gpPictureBuf, &gnPictureBufLen);
+                if (ret != 0) {
+                        printf("map data to buffer fail:%s", file);
+                        return -22;
+                }
+        }
+        
         LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         //LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
         if (cmdArg.IsJustTestSyncUploadPicture) {
@@ -1055,7 +1048,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSegIntval;
         avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback;
         avuploader.userUploadArg.pUploadStatArg = (void *)10;
-        avuploader.userUploadArg.pUPTokenRequestUrl = cmdArg.pTokenUrl;
+        avuploader.userUploadArg.pUpTokenRequestUrl = cmdArg.pTokenUrl;
         avuploader.userUploadArg.nUpTokenRequestUrlLen = strlen(cmdArg.pTokenUrl);
         
         avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
