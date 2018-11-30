@@ -162,8 +162,13 @@ static void * streamUpload(void *_pOpaque)
         ret = pUploader->uploadArg.getUploadParamCallback(pUploader->uploadArg.pGetUploadParamCallbackArg,
                                                           &param);
         if (ret != LINK_SUCCESS) {
-                LinkLogError("ts up getUploadParamCallback fail:%d", ret);
-                goto END;
+                if (ret == LINK_BUFFER_IS_SMALL) {
+                        LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
+                        goto END;
+                } else {
+                        LinkLogError("not get uptoken yet:%s", key);
+                        goto END;
+                }
         }
         
         int64_t tsStartTime = pUploader->nTsStartTimestamp;

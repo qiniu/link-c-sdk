@@ -1,7 +1,7 @@
 #ifndef __TS_LOCAL_TEST__
 #define __TS_LOCAL_TEST__
 
-int LinkGetUploadToken(OUT char *pBuf, IN int nBufLen, OUT LinkUploadZone *pZone, IN const char *pUrl);
+int LinkGetUploadToken(OUT char *pBuf, IN int nBufLen, OUT LinkUploadZone *pZone, OUT int *pDeadline, IN const char *pUrl);
 void LinkSetAk(IN char *pAk);
 void LinkSetSk(IN char *pSk);
 void LinkSetBucketName(IN char *_pName);

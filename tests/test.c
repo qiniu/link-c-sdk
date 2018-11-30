@@ -17,6 +17,9 @@
 #define MATERIAL_PATH "../../tests/material/"
 #endif
 
+char *gpPictureBuf = NULL;
+int gnPictureBufLen = 0;
+
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl);
 void justTestSyncUploadPicture(const char *pTokenUrl);
 void justTestAsyncUploadPicture(const char *pTokenUrl);
@@ -43,7 +46,6 @@ typedef struct {
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pTokenUrl;
-        const char *pToken;
 #ifndef DISABLE_OPENSSL
         const char *pAk;
         const char *pSk;
@@ -51,8 +53,6 @@ typedef struct {
 #endif
         const char *pUa1;
         const char *pUa2;
-        const char *pZone;
-        LinkUploadZone zone;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
@@ -101,7 +101,6 @@ typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, 
 
 FILE *outTs;
 int gTotalLen = 0;
-char gtestToken[1024] = {0};
 
 // start aac
 static int aacfreq[13] = {96000, 88200,64000,48000,44100,32000,24000, 22050 , 16000 ,12000,11025,8000,7350};
@@ -640,28 +639,6 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         return ret;
 }
 
-static void * updateToken(void * opaque) {
-        int ret = 0;
-        while(1) {
-                sleep(cmdArg.nUptokenInterval);
-                memset(gtestToken, 0, sizeof(gtestToken));
-                ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), NULL, cmdArg.pTokenUrl);
-                if (ret != 0) {
-                        printf("update token file<<<<<<<<<<<<<\n");
-                        return NULL;
-                }
-                printf("1token:%s\n", gtestToken);
-		assert(strlen(gtestToken) < 1024);
-                AVuploader *pAvuploader = (AVuploader *)opaque;
-                ret = LinkUpdateToken(pAvuploader->pTsMuxUploader, gtestToken, strlen(gtestToken));
-                if (ret != 0) {
-                        printf("update token file<<<<<<<<<<<<<\n");
-                        return NULL;
-                }
-        }
-        return NULL;
-}
-
 void signalHander(int s){
         
         if (SIGINT == s) {
@@ -698,37 +675,18 @@ typedef struct {
         void * pData;
 }GetPicSaver;
 
-static enum LinkGetPictureSyncMode getPicCallback (void *pOpaque, void *pSvaeWhenAsync, OUT const char **pBuf, OUT int *pBufSize, OUT enum LinkPicUploadType *pType) {
-        const char *file = MATERIAL_PATH"3c.jpg";
-        
-        int n = strlen(file);
-        char * pFile = (char *)malloc(n+1);
-        *pBufSize = n;
-        memcpy(pFile, file, n);
-        *pBuf = pFile;
-        *pType = LinkPicUploadTypeFile;
-        pFile[n] = 0;
-        
+static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameLen) {
         GetPicSaver * saver = (GetPicSaver*)pOpaque;
-        if (cmdArg.IsPicUploadSyncMode) {
-                return LinkGetPictureModeSync;
-        }
-        
-        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, pSvaeWhenAsync, pFile, n, LinkPicUploadTypeFile);
-        return LinkGetPictureModeAsync;
-}
-
-static int getPictureFreeCallback (char *pBuf, int nNameBufSize) {
-        fprintf(stderr, "free data\n");
-        free(pBuf);
-        return 0;
+        char filename[128] = {0};
+        sprintf(filename, "/tmp/abc/%s", pFileName);
+        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        return ;
 }
 
 static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
         int ret = 0;
         LinkPicUploadArg picArg;
         picArg.getPicCallback = getPicCallback;
-        picArg.getPictureFreeCallback = getPictureFreeCallback;
         picArg.pGetPicCallbackOpaque = NULL;
         
 
@@ -800,41 +758,19 @@ static void checkCmdArg(const char * name)
                         cmdArg.pUa1 = "ipc99a";
                 }
         }
-        if (cmdArg.pZone) {
-                if (strcmp(cmdArg.pZone, "huabei") == 0) {
-                        cmdArg.zone = LINK_ZONE_HUABEI;
-                } else if(strcmp(cmdArg.pZone, "huanan") == 0) {
-                        cmdArg.zone = LINK_ZONE_HUANAN;
-                } else if(strcmp(cmdArg.pZone, "beimei") == 0) {
-                        cmdArg.zone = LINK_ZONE_BEIMEI;
-                } else if(strcmp(cmdArg.pZone, "dongnanya") == 0) {
-                        cmdArg.zone = LINK_ZONE_DONGNANYA;
-                }
-        }
         
-        if (cmdArg.pToken != NULL) {
-                if (strlen(cmdArg.pToken) > sizeof(gtestToken) - 1) {
-                        LinkLogError("token too long");
-                        exit(6);
-                }
 #ifndef DISABLE_OPENSSL
-                if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
-                        LinkLogError("could not specify ak/s/bucket and token simultaneously");
-                        exit(7);
-                }
+        if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
+                LinkLogError("could not specify ak/s/bucket and token simultaneously");
+                exit(7);
+        }
 #endif
-        } else {
-                if (cmdArg.pTokenUrl == NULL) {
-                        LinkLogError("must specify tokenurl");
-                        exit(8);
-                }
+
+        if (cmdArg.pTokenUrl == NULL) {
+                LinkLogError("must specify tokenurl");
+                exit(8);
         }
-        if (cmdArg.IsFileLoop) {
-                if (cmdArg.pTokenUrl == NULL) {
-                        LinkLogError("must specify tokenurl in loop mode");
-                        exit(8);
-                }
-        }
+
 #ifndef DISABLE_OPENSSL
         if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
                 if (!(cmdArg.pAk && cmdArg.pSk && cmdArg.pBucket)) {
@@ -843,6 +779,7 @@ static void checkCmdArg(const char * name)
                 }
         }
 #endif
+
         return;
 }
 
@@ -896,7 +833,6 @@ static void * second_file_test(void * opaque) {
         AVuploader avuploader = *pAuploader;
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
-        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
         if (cmdArg.pMgrToken != NULL)
                 avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
@@ -971,10 +907,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
-        flag_str(&cmdArg.pToken, "token", "upload token");
         flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc99a");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
-        flag_str(&cmdArg.pZone, "zone", "upload zone(huadong huabei huanan beimei dongnanya). default huadong");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.InvalidToken, "invalidtoken", "use invalid token");
@@ -1000,9 +934,17 @@ int main(int argc, const char** argv)
         printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
         printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
-        printf("cmdArg.zone=%s %d\n", cmdArg.pZone, cmdArg.zone);
 
         checkCmdArg(argv[0]);
+        
+        const char *file = MATERIAL_PATH"3c.jpg";
+        if (gpPictureBuf == NULL) {
+                int ret = readFileToBuf(file, &gpPictureBuf, &gnPictureBufLen);
+                if (ret != 0) {
+                        printf("map data to buffer fail:%s", file);
+                        return -22;
+                }
+        }
         
         LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         //LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
@@ -1074,30 +1016,6 @@ int main(int argc, const char** argv)
 #endif
         
         AVuploader avuploader;
-        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
-        if (!cmdArg.InvalidToken) {
-                if (cmdArg.pToken == NULL) {
-                        ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, cmdArg.pTokenUrl);
-                        if (ret != 0)
-                                return ret;
-                } else {
-                        strcpy(gtestToken, cmdArg.pToken);
-                }
-                printf("2token:%s\n", gtestToken);
-
-                pthread_t updateTokenThread;
-                pthread_attr_t attr;
-                pthread_attr_init (&attr);
-                pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_DETACHED);
-                ret = pthread_create(&updateTokenThread, &attr, updateToken, (void*)&avuploader);
-                if (ret != 0) {
-                        printf("create update token thread fail\n");
-                        return ret;
-                }
-                pthread_attr_destroy (&attr);
-	} else {
-		strcpy(gtestToken, "invalid_token");
-        }
         
         memset(&avuploader, 0, sizeof(avuploader));
         avuploader.avArg.nChannels = 1;
@@ -1124,20 +1042,15 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-        avuploader.userUploadArg.pToken_ = gtestToken;
-        avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSegIntval;
         avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback;
         avuploader.userUploadArg.pUploadStatArg = (void *)10;
-        if (cmdArg.zone != LINK_ZONE_UNKNOWN) {
-                avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
-        } else if (upzone != LINK_ZONE_UNKNOWN) {
-                LinkLogDebug("set upload zone to:%d", upzone);
-                avuploader.userUploadArg.uploadZone_ = upzone;
-        }
+        avuploader.userUploadArg.pUpTokenRequestUrl = cmdArg.pTokenUrl;
+        avuploader.userUploadArg.nUpTokenRequestUrlLen = strlen(cmdArg.pTokenUrl);
+        
         avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
         if (cmdArg.pMgrToken != NULL)
                 avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
@@ -1163,7 +1076,7 @@ int main(int argc, const char** argv)
                         printf("create update token thread fail\n");
                         return ret;
                 }
-                printf("two file upload\n");
+                printf("two file upload: threadid:%x\n", secondUploadThread);
                 do_start_file_test(&avuploader);
 #ifdef TEST_WITH_FFMPEG
 	} else if (cmdArg.IsTwoUpload) {

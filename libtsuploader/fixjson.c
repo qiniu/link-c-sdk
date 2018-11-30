@@ -155,3 +155,20 @@ int LinkGetDeleteAfterDaysFromUptoken(char * pToken, int *pDeleteAfterDays) {
         *pDeleteAfterDays = ret;
         return LINK_SUCCESS;
 }
+
+int LinkGetPolicyFromUptoken(char * pToken, int *pDeleteAfterDays, int *pDeadline) {
+        char * pJson = NULL;
+        int ret = getTokenPlainPolicy(pToken, &pJson);
+        if (ret != LINK_SUCCESS) {
+                return ret;
+        }
+        
+        ret = LinkGetJsonIntByKey(pJson, "\"deleteAfterDays\"");
+        *pDeleteAfterDays = ret;
+        
+        ret = LinkGetJsonIntByKey(pJson, "\"deadline\"");
+        *pDeadline = ret;
+
+        free(pJson);
+        return LINK_SUCCESS;
+}
