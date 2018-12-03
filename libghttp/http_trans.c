@@ -94,7 +94,6 @@ static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
 int
 http_trans_connect(http_trans_conn *a_conn)
 {
-  int err_ret;
   int dnserr = 0;
 
   if ((a_conn == NULL) || (a_conn->host == NULL))
@@ -153,6 +152,8 @@ http_trans_connect(http_trans_conn *a_conn)
   /* initialize the SSL data structures */
   if (a_conn->use_ssl) 
     {
+        int err_ret;
+
       if(a_conn->ssl_conn) 
         {
           SSL_free(a_conn->ssl_conn);
