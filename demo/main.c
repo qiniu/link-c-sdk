@@ -31,6 +31,71 @@
 /* global variable */
 App gIpc;
 
+int GetFileSize( char *_pFileName)
+{
+    FILE *fp = fopen( _pFileName, "r"); 
+    int size = 0;
+    
+    if( !fp ) {
+        DBG_ERROR("fopen file %s error\n", _pFileName );
+        return -1;
+    }
+
+    fseek(fp, 0L, SEEK_END ); 
+    size = ftell(fp); 
+    fclose(fp);
+
+    return size;
+}
+
+int LoadFile( char *_pFileName, int size, void *_pBuf )
+{
+    FILE *fp = fopen( _pFileName, "r"); 
+    size_t ret = 0;
+
+    if( !fp ) {
+        DBG_ERROR("fopen file %s error\n", _pFileName );
+        return -1;
+    }
+
+    ret = fread( _pBuf, size, 1, fp );
+    if ( ret != 1 ) {
+        DBG_ERROR("fread error\n");
+        fclose( fp );
+        return -1;
+    }
+    fclose( fp );
+
+    return 0;
+}
+
+int RemoveFile( char *_pFileName )
+{
+    int ret = 0;
+    char okfile[512] = { 0 };
+
+    if ( access( _pFileName, R_OK ) == 0  ) {
+        ret = remove( _pFileName );
+        if ( ret != 0 ) {
+            DBG_ERROR("remove file %s error, ret = %d\n", _pFileName, ret );
+        }
+    } else {
+        DBG_ERROR("file %s not exist \n", _pFileName );
+    }
+
+    sprintf( okfile, "%s.ok", _pFileName );
+    if ( access( okfile, R_OK ) == 0  ) {
+        ret = remove( okfile );
+        if ( ret != 0 ) {
+            DBG_ERROR("remove file %s error, ret = %d\n", okfile, ret );
+        }
+    } else {
+        DBG_ERROR("file %s not exist \n", okfile );
+    }
+
+    return 0;
+}
+
 int AlarmCallback( int alarm, void *data )
 {
     static char lastPicName[256] = { 0 };
@@ -48,6 +113,9 @@ int AlarmCallback( int alarm, void *data )
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         char *file = (char *) malloc(  strlen((char *)data)+1 );
+        void *pBuf = NULL;
+        int size = 0, ret = 0;
+
         //DBG_LOG( "data = %s\n", (char *)data );
         /*
          * sometimes the ipc will notify twice of one picture
@@ -62,14 +130,33 @@ int AlarmCallback( int alarm, void *data )
             DBG_LOG("this is the bug of ipc, we will ignore this notify, pic name is : %s\n", data );
             return 0;
         }
+        
+        size = GetFileSize( (char*)data );
+        if ( size < 0 ) {
+            DBG_ERROR("GetFileSize error\n");
+            return 0;
+        }
+        pBuf = malloc( size ); 
+        if ( !pBuf ) {
+            DBG_LOG("malloc error\n");
+            return 0;
+        }
 
+        ret = LoadFile( (char *)data, size, pBuf );
+        if ( ret < 0 ) {
+            DBG_ERROR("LoadFile error\n");
+            return 0;
+        }
         memset( file, 0, strlen((char *)data)+1 );
         memcpy( file, (char *)data, strlen((char *)data) );
         memset( lastPicName, 0, sizeof(lastPicName) );
         memcpy( lastPicName, (char *)data, sizeof(lastPicName) );
-        DBG_LOG("gIpc.stream[STREAM_MAIN].pOpaque = %p, file : %s \n", gIpc.stream[STREAM_MAIN].pOpaque, file );
-        LinkSendUploadPictureSingal( gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].pOpaque,
-                                     file, strlen( (char *)data)+1, LinkPicUploadTypeFile );
+        DBG_LOG("notify jpeg file : %s \n", file );
+
+        LinkSendUploadPictureSingal( gIpc.stream[STREAM_MAIN].uploader, (char *)data,
+                                strlen((char *)data), pBuf, size ); 
+        RemoveFile( (char*)data );
+        free( pBuf );
     } else {
         /* do nothing */
     }
@@ -115,106 +202,19 @@ static int CaptureDevDeinit()
     return 0;
 }
 
-static enum LinkGetPictureSyncMode GetPicCallback ( void *pOpaque, void *pSvaeWhenAsync, 
-                                                   OUT const char **pBuf, OUT int *pBufSize,
-                                                   OUT enum LinkPicUploadType *pType) 
+static void GetPicCallback (void *pOpaque,  const char *pFileName, int nFilenameLen )
 {
-    static unsigned int count = 0;
-    char file[128] = { 0 };
     char *path = "/tmp";
     static struct timeval start = { 0, 0 }, end = { 0, 0 };
     int interval = 0;
 
     gettimeofday( &end, NULL );
     interval = GetTimeDiffMs( &start, &end );
+    DBG_LOG("capture jpeg %s interval %d\n", pFileName, interval );
 
-    sprintf( file, "capture%d.jpeg", count++ );
-    *pType = LinkPicUploadTypeFile;
-    gIpc.stream[STREAM_MAIN].pOpaque = pSvaeWhenAsync;
-    DBG_LOG("pSvaeWhenAsync = %p, file : %s interval = %d \n", pSvaeWhenAsync, file, interval  );
-    gIpc.dev->captureJpeg( 0, 0, path, file );
+    gIpc.dev->captureJpeg( 0, 0, path, (char *)pFileName );
 
     start = end;
-
-    return LinkGetPictureModeAsync;
-}
-
-static int getPictureFreeCallback (char *pBuf, int nNameBufSize) 
-{
-    int ret = 0;
-    char okfile[512] = { 0 };
-
-    //DBG_LOG("pBuf = %s\n", pBuf );
-    //DBG_LOG("pBuf address = %p\n", pBuf );
-    if ( access( pBuf, R_OK ) == 0  ) {
-        ret = remove( pBuf );
-        if ( ret != 0 ) {
-            DBG_ERROR("remove file %s error, ret = %d\n", pBuf, ret );
-        }
-    } else {
-        DBG_ERROR("file %s not exist \n", pBuf );
-    }
-
-    sprintf( okfile, "%s.ok", pBuf );
-    if ( access( okfile, R_OK ) == 0  ) {
-        ret = remove( okfile );
-        if ( ret != 0 ) {
-            DBG_ERROR("remove file %s error, ret = %d\n", okfile, ret );
-        }
-    } else {
-        DBG_ERROR("file %s not exist \n", okfile );
-    }
-    free( pBuf );
-    return 0;
-}
-
-int GetToken( StreamChannel ch, LinkTsMuxUploader *uploader, char *token, int len, LinkUploadZone *zone )
-{
-    char url[1024] = { 0 }; 
-    int i = 0, ret = 0;
-    
-
-    if ( !gIpc.config.tokenUrl ) {
-        DBG_ERROR("token url not set, please modify /tmp/oem/app/ipc.conf and add token url\n");
-        return -1;
-    }
-
-    if ( gIpc.config.tokenUrl ) {
-        if ( ch == STREAM_MAIN ) {
-            sprintf( url, "%s/uas/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
-        } else {
-            sprintf( url, "%s/uas/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
-        }
-    }
-    DBG_LOG("url = %s\n", url );
-
-    for ( i=0; i<gIpc.config.tokenRetryCount; i++ ) {
-        ret = LinkGetUploadToken( token, len, zone, url );
-        if ( ret != 0 ) {
-            DBG_ERROR("%d GetUploadToken error, ret = %d, retry = %d, url = %s\n", __LINE__, ret, i, url  );
-            sleep(2);
-            continue;
-        } else {
-            break;
-        }
-    }
-
-    if ( i == gIpc.config.tokenRetryCount ) {
-        DBG_LOG( "GetUploadToken error, ret = %d\n", ret );
-        return -1;
-    }
-
-    if ( uploader ) {
-        ret = LinkUpdateToken( uploader, token, strlen(token) );
-        if (ret != 0) {
-            DBG_ERROR("UpdateToken error, ret = %d, url = %s\n", ret, url );
-            return -1;
-        }
-    } else {
-        DBG_ERROR("update token error, uploader is NULL\n");
-    }
-
-    return 0;
 }
 
 int _TsUploaderSdkInit( StreamChannel ch )
@@ -231,7 +231,6 @@ int _TsUploaderSdkInit( StreamChannel ch )
 
     if ( ch == STREAM_MAIN ) {
         arg.getPicCallback = GetPicCallback;
-        arg.getPictureFreeCallback = getPictureFreeCallback;
     }
 
     if ( gIpc.audioType == AUDIO_AAC ) {
@@ -249,12 +248,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     } else {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "b" );
     }
-    if ( -1 == GetToken( STREAM_MAIN, NULL, gIpc.stream[ch].token, sizeof(gIpc.stream[ch].token ), &userUploadArg.uploadZone_ ) ) {
-        DBG_ERROR("get token error\n");
-        return -1;
-    }
-    userUploadArg.pToken_ = gIpc.stream[ch].token;
-    userUploadArg.nTokenLen_ = strlen(gIpc.stream[ch].token);
+    
     userUploadArg.pDeviceId_ = gIpc.stream[ch].devId;
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[ch].devId);
     userUploadArg.nUploaderBufferSize = 512;
@@ -269,8 +263,19 @@ int _TsUploaderSdkInit( StreamChannel ch )
     } else
         userUploadArg.nMgrTokenRequestUrlLen = 0;
     userUploadArg.pMgrTokenRequestUrl = url;
-
     DBG_LOG("move seg url = %s\n", url );
+    memset( url, 0, sizeof(url) );
+    if ( gIpc.config.tokenUrl ) {
+        if ( ch == STREAM_MAIN ) {
+            sprintf( url, "%s/uas/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
+        } else {
+            sprintf( url, "%s/uas/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
+        }
+    } else
+        userUploadArg.nUpTokenRequestUrlLen;
+    userUploadArg.pUpTokenRequestUrl = url;
+    userUploadArg.nUpTokenRequestUrlLen = strlen( url );
+
     ret = LinkCreateAndStartAll( &gIpc.stream[ch].uploader, &mediaArg, &userUploadArg, &arg );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
@@ -304,50 +309,6 @@ int TsUploaderSdkInit()
 
     DBG_LOG("[ %s ] link ts uploader sdk init ok\n", gIpc.devId );
     printf("[ %s ] link ts uploader sdk init ok\n", gIpc.devId );
-    return 0;
-}
-
-static void * UpadateTokenTask() {
-    int ret = 0;
-
-    for(;;) {
-        memset(gIpc.stream[STREAM_MAIN].token, 0, sizeof(gIpc.stream[STREAM_MAIN].token));
-        ret = GetToken( STREAM_MAIN, gIpc.stream[STREAM_MAIN].uploader, gIpc.stream[STREAM_MAIN].token,
-                        sizeof(gIpc.stream[STREAM_MAIN].token), NULL );
-        if ( ret < 0 ) {
-            sleep( 3 );
-            continue;
-        }
-
-        if ( gIpc.config.multiChannel ) {
-            memset( gIpc.stream[STREAM_SUB].token, 0, sizeof(gIpc.stream[STREAM_SUB].token));
-            ret = GetToken( STREAM_SUB, gIpc.stream[STREAM_SUB].uploader, gIpc.stream[STREAM_SUB].token,
-                            sizeof(gIpc.stream[STREAM_MAIN].token), NULL );
-            if ( ret < 0 ) {
-                sleep( 3 );
-                continue;
-            }
-        }
-        sleep( gIpc.config.tokenUploadInterval );// 59 minutes
-    }
-    return NULL;
-}
-
-int StartTokenUpdateTask()
-{
-    pthread_t updateTokenThread;
-    pthread_attr_t attr;
-    int ret = 0;
-
-    pthread_attr_init ( &attr );
-    pthread_attr_setdetachstate ( &attr, PTHREAD_CREATE_DETACHED );
-    ret = pthread_create( &updateTokenThread, &attr, UpadateTokenTask, NULL );
-    if (ret != 0 ) {
-        DBG_ERROR("create update token thread fail\n");
-        return ret;
-    }
-    pthread_attr_destroy (&attr);
-
     return 0;
 }
 
@@ -454,7 +415,6 @@ int main()
     StartSimpleSshTask();
     StartSocketDbgTask();
     TsUploaderSdkInit();
-    StartTokenUpdateTask();
     CaptureDevStartStream();
     StartUpgradeTask();
 
