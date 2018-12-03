@@ -59,6 +59,7 @@ add_library(tsuploader STATIC
     localkey.h
     segmentmgr.c
     segmentmgr.h
+    security.c
     b64/b64.c
     b64/b64.h
     b64/urlsafe_b64.c
