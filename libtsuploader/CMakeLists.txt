@@ -36,6 +36,8 @@ add_library(tsuploader STATIC
     adts.c
     queue.c
     queue.h
+    kmp.h
+    kmp.c
     log.h
     log.c
     servertime.h
