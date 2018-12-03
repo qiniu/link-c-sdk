@@ -13,7 +13,7 @@
 
 static int volatile nProcStatus = 0;
 
-int LinkInitUploader()
+int LinkInit()
 {
         if (nProcStatus) {
                 return LINK_SUCCESS;
@@ -77,7 +77,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
         return LINK_SUCCESS;
 }
 
-int LinkCreateAndStartAll(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
+int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
                           LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
 {
         if (
@@ -154,7 +154,7 @@ void LinkUpdateNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nInte
         _pTsMuxUploader->SetUpdateSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
 }
 
-void LinkDestroyAVUploader(LinkTsMuxUploader **pTsMuxUploader)
+void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
         LinkDestroyTsMuxUploader(pTsMuxUploader);
 }
@@ -167,7 +167,7 @@ int LinkIsProcStatusQuit()
         return 0;
 }
 
-void LinkUninitUploader()
+void LinkCleanup()
 {
         if (nProcStatus != 1)
                 return;

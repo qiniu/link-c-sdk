@@ -353,7 +353,7 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                                 if (cmdArg.IsWithPicUpload) {
                                                                         fprintf(stderr, "----->stop push(motion stop)");
                                                                         AVuploader *pAvuploader = (AVuploader*)opaque;
-                                                                        LinkNotifyNomoreData(pAvuploader->pTsMuxUploader);
+                                                                        LinkFlushUploader(pAvuploader->pTsMuxUploader);
                                                                 }
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
@@ -674,7 +674,7 @@ static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameL
         GetPicSaver * saver = (GetPicSaver*)pOpaque;
         char filename[128] = {0};
         sprintf(filename, "/tmp/abc/%s", pFileName);
-        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        LinkPushPicture((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
         return ;
 }
 
@@ -696,7 +696,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
-                ret = LinkCreateAndStartAll(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
+                ret = LinkNewUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
                 saver->pData = *_pTsMuxUploader;
         }
         return ret;
@@ -788,7 +788,7 @@ static void * second_test(void * opaque) {
         
         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 #endif
@@ -827,7 +827,7 @@ static void * second_file_test(void * opaque) {
         
         do_start_file_test(&avuploader);
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 
@@ -1002,7 +1002,7 @@ int main(int argc, const char** argv)
                 }
         }
          
-        ret = LinkInitUploader();
+        ret = LinkInit();
         if (ret != 0) {
                 fprintf(stderr, "InitUploader err:%d\n", ret);
                 return ret;
@@ -1068,11 +1068,11 @@ int main(int argc, const char** argv)
         }
         
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);
         }
-        LinkUninitUploader();
+        LinkCleanup();
         LinkLogInfo("should total:%d\n", avuploader.nByteCount);
 
         return 0;
