@@ -65,7 +65,7 @@ typedef struct _FFTsMuxUploader{
         
         char deviceId_[33];
         Token token_;
-        LinkUploadArg uploadArg;
+        LinkTsUploadArg uploadArg;
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
@@ -525,7 +525,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
                 LinkLogDebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
                          statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
-                LinkDestroyUploader(&pTsMuxCtx->pTsUploader_);
+                LinkDestroyTsUploader(&pTsMuxCtx->pTsUploader_);
 #ifdef USE_OWN_TSMUX
                 LinkDestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
 #else
@@ -629,7 +629,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
         }
 }
 
-static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkUploadArg *_pUploadArg,
+static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
                            int nQBufSize, enum CircleQueuePolicy queueType)
 #ifdef USE_OWN_TSMUX
 {
@@ -658,7 +658,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         
         ret = LinkNewTsMuxerContext(&avArg, &pTsMuxCtx->pFmtCtx_);
         if (ret != 0) {
-                LinkDestroyUploader(&pTsMuxCtx->pTsUploader_);
+                LinkDestroyTsUploader(&pTsMuxCtx->pTsUploader_);
                 free(pTsMuxCtx);
                 return ret;
         }
@@ -811,7 +811,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
 static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
-        LinkUploadArg *_pUploadArg = (LinkUploadArg *)pArg;
+        LinkTsUploadArg *_pUploadArg = (LinkTsUploadArg *)pArg;
 
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
         
@@ -1153,7 +1153,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        //LinkUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
+        //LinkTsUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return LINK_SUCCESS;

@@ -34,7 +34,7 @@ typedef struct _KodoUploader{
         pthread_t workerId_;
         int isThreadStarted_;
         
-        LinkUploadArg uploadArg;
+        LinkTsUploadArg uploadArg;
         
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
@@ -362,7 +362,7 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
         return pKodoUploader->state;
 }
 
-int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {
@@ -410,13 +410,13 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkUploadArg *_pArg, 
         return LINK_SUCCESS;
 }
 
-void LinkUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque) {
+void LinkTsUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
         pKodoUploader->tsStartUploadCallback = cb;
         pKodoUploader->pTsStartUploadCallbackArg = pOpaque;
 }
 
-void LinkDestroyUploader(LinkTsUploader ** _pUploader)
+void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
         
