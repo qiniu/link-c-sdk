@@ -1,4 +1,4 @@
-#include "localkey.h"
+#include "security.h"
 #include <openssl/hmac.h>
 
 /*hmac-sha1 output is 160bit(20 byte)*/

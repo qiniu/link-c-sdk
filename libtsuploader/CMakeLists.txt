@@ -56,9 +56,9 @@ add_library(tsuploader STATIC
     fixjson.c
     picuploader.h
     picuploader.c
-    localkey.h
     segmentmgr.c
     segmentmgr.h
+    security.h
     security.c
     b64/b64.c
     b64/b64.h
