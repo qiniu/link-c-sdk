@@ -46,11 +46,6 @@ typedef struct {
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pTokenUrl;
-#ifndef DISABLE_OPENSSL
-        const char *pAk;
-        const char *pSk;
-        const char *pBucket;
-#endif
         const char *pUa1;
         const char *pUa2;
         bool IsFileLoop;
@@ -759,26 +754,10 @@ static void checkCmdArg(const char * name)
                 }
         }
         
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
-                LinkLogError("could not specify ak/s/bucket and token simultaneously");
-                exit(7);
-        }
-#endif
-
         if (cmdArg.pTokenUrl == NULL) {
                 LinkLogError("must specify tokenurl");
                 exit(8);
         }
-
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
-                if (!(cmdArg.pAk && cmdArg.pSk && cmdArg.pBucket)) {
-                        LinkLogError("must specify all ak/sk/bucket option");
-                        exit(9);
-                }
-        }
-#endif
 
         return;
 }
@@ -893,11 +872,6 @@ int main(int argc, const char** argv)
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
 #endif
-#ifndef DISABLE_OPENSSL
-        flag_str(&cmdArg.pAk, "ak", "access key. could not specify bosh ak and token");
-        flag_str(&cmdArg.pSk, "sk", "secret key. could not specify bosh sk and token");
-        flag_str(&cmdArg.pBucket, "bucket", "bucket name. could not specify bosh bucket and token");
-#endif
         flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload. must set ua1 nad ua2");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
@@ -1006,14 +980,6 @@ int main(int argc, const char** argv)
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);
         
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.IsLocalToken) {
-                LinkSetAk(cmdArg.pAk);
-                LinkSetSk(cmdArg.pSk);
-                //计算token需要，所以需要先设置
-                LinkSetBucketName(cmdArg.pBucket);
-        }
-#endif
         
         AVuploader avuploader;
         
