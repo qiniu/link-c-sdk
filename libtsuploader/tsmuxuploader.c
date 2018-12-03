@@ -10,6 +10,7 @@
 #endif
 #include "servertime.h"
 #include "segmentmgr.h"
+#include "kmp.h"
 
 #ifdef USE_OWN_TSMUX
 #include "tsmux.h"
@@ -75,6 +76,9 @@ typedef struct _FFTsMuxUploader{
         
         char *pUpTokenRequestUrl;
         pthread_t tokenThread;
+        
+        char *pVideoMeta;
+        int nVideoMetaLen;
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -281,7 +285,85 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         return ret;
 }
 
-static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int64_t nSysNanotime, int _nIsSegStart)
+static inline int getNaluType(LinkVideoFormat format, unsigned char v) {
+        if (format == LINK_VIDEO_H264) {
+                return v & 0x1F;
+        } else {
+                return ((v & 0x7E) >> 1);
+        }
+}
+
+static inline int isTypeSPS(LinkVideoFormat format, int v) {
+        if (format == LINK_VIDEO_H264) {
+                return v == 8;
+        } else {
+                return v == 33;
+        }
+}
+
+static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int *pIsSameAsBefore) {
+
+        LinkKMP kmp;
+        unsigned char d[3] = {0x00, 0x00, 0x01};
+        const unsigned char * pData = (const unsigned char *)_pData;
+        LinkInitKmp(&kmp, (const unsigned char *)d, 3);
+        int pos = 0;
+        if (pFFTsMuxUploader->avArg.nVideoFormat != LINK_VIDEO_H264 &&
+            pFFTsMuxUploader->avArg.nVideoFormat != LINK_VIDEO_H265) {
+                return -2;
+        }
+        *pIsSameAsBefore = 0;
+        const unsigned char *pSpsStart = NULL;
+        do{
+                pos = LinkFindPatternIndex(&kmp, pData, _nDataLen);
+                if (pos < 0){
+                        return -1;
+                }
+                pData+=pos+3;
+                int type = getNaluType(pFFTsMuxUploader->avArg.nVideoFormat, pData[0]);
+                if (isTypeSPS(pFFTsMuxUploader->avArg.nVideoFormat, type)) { //sps
+                        pSpsStart = pData;
+                        continue;
+                }
+                if (pSpsStart) {
+                        int nMetaLen = pData - pSpsStart - 3;
+                        if (*(pData-4) == 00)
+                                nMetaLen--;
+                        if(pFFTsMuxUploader->pVideoMeta == NULL) { //save metadata
+                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen);
+                                if (pFFTsMuxUploader->pVideoMeta == NULL)
+                                        return LINK_NO_MEMORY;
+                                pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
+                                memcpy(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen);
+                                return 0;
+                        } else { //compare metadata
+                                if (pFFTsMuxUploader->nVideoMetaLen != nMetaLen ||
+                                    memcmp(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen) != 0) {
+                                        
+                                        *pIsSameAsBefore = 1;
+                                        
+                                        if (pFFTsMuxUploader->nVideoMetaLen != nMetaLen) {
+                                                free(pFFTsMuxUploader->pVideoMeta);
+                                                pFFTsMuxUploader->pVideoMeta = NULL;
+                                                
+                                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen);
+                                                if (pFFTsMuxUploader->pVideoMeta == NULL)
+                                                        return LINK_NO_MEMORY;
+                                                pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
+                                        }
+                                        memcpy(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen);
+                                        return 0;
+                                }
+                        }
+                        break;
+                }
+        }while(1);
+                
+        return -2;
+}
+
+static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int64_t nSysNanotime, int _nIsSegStart,
+                       const char * _pData, int _nDataLen)
 {
         int ret;
         int shouldSwitch = 0;
@@ -298,8 +380,22 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                 pFFTsMuxUploader->ffMuxSatte = ustate;
                 shouldSwitch = 1;
         }
+        int isVideoKeyframe = 0;
+        int isSameAsBefore = 0;
+        if (_isVideo && nIsKeyFrame) {
+                isVideoKeyframe = 1;
+                //TODO video metadata
+                ret = getVideoSpsAndCompare(pFFTsMuxUploader, _pData, _nDataLen, &isSameAsBefore);
+                if (ret != LINK_SUCCESS) {
+                        return ret;
+                }
+                if (isSameAsBefore) {
+                        LinkLogInfo("video change sps");
+                        shouldSwitch = 1;
+                }
+        }
         // if start new uploader, start from keyframe
-        if ((_isVideo && nIsKeyFrame) || shouldSwitch) {
+        if (isVideoKeyframe || shouldSwitch) {
                 if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > 4980 && pFFTsMuxUploader->nKeyFrameCount > 0)
                    //at least 1 keyframe and aoubt last 5 second
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
@@ -323,7 +419,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                                 return ret;
                         }
                 }
-                if (_isVideo && nIsKeyFrame) {
+                if (isVideoKeyframe) {
                         pFFTsMuxUploader->nKeyFrameCount++;
                 }
         }
@@ -346,7 +442,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
-        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart);
+        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart, _pData, _nDataLen);
         if (ret != 0) {
                 return ret;
         }
@@ -383,7 +479,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return LINK_PAUSED;
         }
         int64_t nSysNanotime = LinkGetCurrentNanosecond();
-        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0);
+        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0, NULL, 0);
         if (ret != 0) {
                 return ret;
         }
@@ -449,6 +545,9 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                 if (pFFTsMuxUploader) {
                         pthread_cancel(pFFTsMuxUploader->tokenThread);
                         pthread_join(pFFTsMuxUploader->tokenThread, NULL);
+                        if (pFFTsMuxUploader->pVideoMeta) {
+                                free(pFFTsMuxUploader->pVideoMeta);
+                        }
                         LinkReleaseSegmentHandle(&pFFTsMuxUploader->segmentHandle);
                         LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
                         if (pFFTsMuxUploader->pAACBuf) {

@@ -178,56 +178,6 @@ void LinkUninitUploader()
         return;
 }
 
-//---------test
-static char gAk[65] = {0};
-static char gSk[65] = {0};
-static char gBucket[128] = {0};
-static char gCallbackUrl[256] = {0};
-static int nDeleteAfterDays = -1;
-void LinkSetBucketName(char *_pName)
-{
-        int nLen = strlen(_pName);
-        assert(nLen < sizeof(gBucket));
-        strcpy(gBucket, _pName);
-        gBucket[nLen] = 0;
-        
-        return;
-}
-
-void LinkSetAk(char *_pAk)
-{
-        int nLen = strlen(_pAk);
-        assert(nLen < sizeof(gAk));
-        strcpy(gAk, _pAk);
-        gAk[nLen] = 0;
-        
-        return;
-}
-
-void LinkSetSk(char *_pSk)
-{
-        int nLen = strlen(_pSk);
-        assert(nLen < sizeof(gSk));
-        strcpy(gSk, _pSk);
-        gSk[nLen] = 0;
-        
-        return;
-}
-
-void LinkSetCallbackUrl(char *pUrl)
-{
-        int nLen = strlen(pUrl);
-        assert(nLen < sizeof(gCallbackUrl));
-        strcpy(gCallbackUrl, pUrl);
-        gCallbackUrl[nLen] = 0;
-        return;
-}
-
-void LinkSetDeleteAfterDays(int nDays)
-{
-        nDeleteAfterDays = nDays;
-}
-
 struct HttpToken {
         char * pData;
         int nDataLen;

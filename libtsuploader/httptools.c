@@ -2,10 +2,13 @@
 #include <ghttp.h>
 static int linkSimpleHttpRequest(IN int isPost,
                                  IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
-                                 IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType) {
+                                 IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType,
+                                 IN const char *pToken, IN int nTokenLen) {
         
         
         ghttp_status status;
+        char tokenbuf[40+40+18+2+1+1+10]; //40 for sha1, 40 for ak, 18 for QiniuLinkingDevice, 2for space, 1for :, 1for null terminator
+                                          //10 for backup
         
         ghttp_request * pRequest = ghttp_request_new();
         if (pRequest == NULL) {
@@ -25,6 +28,14 @@ static int linkSimpleHttpRequest(IN int isPost,
                 }
                 if (nReqBodyLen > 0 && pReqBody != NULL)
                         ghttp_set_body(pRequest, pReqBody, nReqBodyLen);
+        }
+        if (pToken) {
+                const char * prefix = " QiniuLinkingDevice ";
+                memcpy(tokenbuf, prefix, strlen(prefix));
+                memcpy(tokenbuf+strlen(prefix), pToken, nTokenLen);
+                tokenbuf[strlen(prefix) + nTokenLen] = 0;
+                
+                ghttp_set_header(pRequest, "Authorization", tokenbuf);
         }
         
         status = ghttp_prepare(pRequest);
@@ -72,14 +83,14 @@ static int linkSimpleHttpRequest(IN int isPost,
 
 int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen) {
         
-        return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL);
+        return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL, NULL, 0);
 }
 
 
 int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                        IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType) {
         
-        return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType);
+        return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType, NULL, 0);
 }
 
 const char *LinkGetUploadHost(int nUseHttps, LinkUploadZone zone) {
@@ -118,4 +129,12 @@ const char *LinkGetRsHost(int nUseHttps) {
         } else {
                 return "http://rs.qiniu.com";
         }
+}
+
+
+//https://developer.qiniu.com/kodo/manual/1201/access-token
+int LinkGetUserConfig(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
+                              IN const char *pToken, IN int nTokenLen) {
+        
+        return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL, pToken, nTokenLen);
 }

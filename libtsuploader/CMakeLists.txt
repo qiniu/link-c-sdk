@@ -36,6 +36,8 @@ add_library(tsuploader STATIC
     adts.c
     queue.c
     queue.h
+    kmp.h
+    kmp.c
     log.h
     log.c
     servertime.h
@@ -54,9 +56,10 @@ add_library(tsuploader STATIC
     fixjson.c
     picuploader.h
     picuploader.c
-    localkey.h
     segmentmgr.c
     segmentmgr.h
+    security.h
+    security.c
     b64/b64.c
     b64/b64.h
     b64/urlsafe_b64.c
