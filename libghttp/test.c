@@ -143,7 +143,7 @@ void testupbuf(char * file, char * token) {
         if (read_num != file_len) {
             fclose(fp);
 	    printf("read less than expect\n");
-            return NULL;
+            //return NULL;
         }
         fclose(fp);
 
