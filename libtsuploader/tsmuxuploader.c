@@ -462,7 +462,6 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                //LinkNotifyNomoreData;
                 if (pFFTsMuxUploader->pTsMuxCtx)
                         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
@@ -493,7 +492,6 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                //LinkNotifyNomoreData;
                 if (pFFTsMuxUploader->pTsMuxCtx)
                         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
@@ -501,7 +499,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         return ret;
 }
 
-int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
+int LinkPushPicture(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
                                 int nFilenameLen, const char *_pBuf, int _nBuflen) {
         
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
@@ -641,7 +639,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
-        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, 188, nQBufSize / 188);
+        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, 188, nQBufSize / 188);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -679,7 +677,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
         int nBufsize = getBufferSize();
-        int ret = LinkNewUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
+        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -1172,7 +1170,7 @@ static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, Lin
         return LINK_SUCCESS;
 }
 
-void LinkNotifyNomoreData(IN LinkTsMuxUploader *_pTsMuxUploader) {
+void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
         if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
                 return;

@@ -7,7 +7,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include "tsuploaderapi.h"
-#include "localkey.h"
+#include "security.h"
 #include "adts.h"
 #include "flag.h"
 
@@ -46,11 +46,6 @@ typedef struct {
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pTokenUrl;
-#ifndef DISABLE_OPENSSL
-        const char *pAk;
-        const char *pSk;
-        const char *pBucket;
-#endif
         const char *pUa1;
         const char *pUa2;
         bool IsFileLoop;
@@ -358,7 +353,7 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                                 if (cmdArg.IsWithPicUpload) {
                                                                         fprintf(stderr, "----->stop push(motion stop)");
                                                                         AVuploader *pAvuploader = (AVuploader*)opaque;
-                                                                        LinkNotifyNomoreData(pAvuploader->pTsMuxUploader);
+                                                                        LinkFlushUploader(pAvuploader->pTsMuxUploader);
                                                                 }
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
@@ -679,7 +674,7 @@ static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameL
         GetPicSaver * saver = (GetPicSaver*)pOpaque;
         char filename[128] = {0};
         sprintf(filename, "/tmp/abc/%s", pFileName);
-        LinkSendUploadPictureSingal((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        LinkPushPicture((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
         return ;
 }
 
@@ -701,7 +696,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
                 picArg.pGetPicCallbackOpaque = saver;
-                ret = LinkCreateAndStartAll(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
+                ret = LinkNewUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
                 saver->pData = *_pTsMuxUploader;
         }
         return ret;
@@ -759,26 +754,10 @@ static void checkCmdArg(const char * name)
                 }
         }
         
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
-                LinkLogError("could not specify ak/s/bucket and token simultaneously");
-                exit(7);
-        }
-#endif
-
         if (cmdArg.pTokenUrl == NULL) {
                 LinkLogError("must specify tokenurl");
                 exit(8);
         }
-
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.pAk || cmdArg.pSk || cmdArg.pBucket) {
-                if (!(cmdArg.pAk && cmdArg.pSk && cmdArg.pBucket)) {
-                        LinkLogError("must specify all ak/sk/bucket option");
-                        exit(9);
-                }
-        }
-#endif
 
         return;
 }
@@ -809,7 +788,7 @@ static void * second_test(void * opaque) {
         
         start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 #endif
@@ -848,7 +827,7 @@ static void * second_file_test(void * opaque) {
         
         do_start_file_test(&avuploader);
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         return NULL;
 }
 
@@ -892,11 +871,6 @@ int main(int argc, const char** argv)
         
 #ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
-#endif
-#ifndef DISABLE_OPENSSL
-        flag_str(&cmdArg.pAk, "ak", "access key. could not specify bosh ak and token");
-        flag_str(&cmdArg.pSk, "sk", "secret key. could not specify bosh sk and token");
-        flag_str(&cmdArg.pBucket, "bucket", "bucket name. could not specify bosh bucket and token");
 #endif
         flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload. must set ua1 nad ua2");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
@@ -1006,14 +980,6 @@ int main(int argc, const char** argv)
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);
         
-#ifndef DISABLE_OPENSSL
-        if (cmdArg.IsLocalToken) {
-                LinkSetAk(cmdArg.pAk);
-                LinkSetSk(cmdArg.pSk);
-                //计算token需要，所以需要先设置
-                LinkSetBucketName(cmdArg.pBucket);
-        }
-#endif
         
         AVuploader avuploader;
         
@@ -1036,7 +1002,7 @@ int main(int argc, const char** argv)
                 }
         }
          
-        ret = LinkInitUploader();
+        ret = LinkInit();
         if (ret != 0) {
                 fprintf(stderr, "InitUploader err:%d\n", ret);
                 return ret;
@@ -1102,11 +1068,11 @@ int main(int argc, const char** argv)
         }
         
         sleep(1);
-        LinkDestroyAVUploader(&avuploader.pTsMuxUploader);
+        LinkFreeUploader(&avuploader.pTsMuxUploader);
         if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);
         }
-        LinkUninitUploader();
+        LinkCleanup();
         LinkLogInfo("should total:%d\n", avuploader.nByteCount);
 
         return 0;

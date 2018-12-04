@@ -362,7 +362,7 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
         return pKodoUploader->state;
 }
 
-int LinkNewUploader(LinkTsUploader ** _pUploader, const LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {

@@ -19,7 +19,7 @@
  *
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkInitUploader();
+int LinkInit();
 
 /**
  * 创建并且启动一个切片上传实例
@@ -47,7 +47,7 @@ int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
  * @param[in]  pPicArg 图片上传参数
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkCreateAndStartAll(OUT LinkTsMuxUploader **pTsMuxUploader,
+int LinkNewUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
                           IN LinkMediaArg *pAvArg,
                           IN LinkUserUploadArg *pUserUploadArg,
                           IN LinkPicUploadArg *pPicArg
@@ -63,7 +63,7 @@ int LinkCreateAndStartAll(OUT LinkTsMuxUploader **pTsMuxUploader,
  * @param[in] type 上传类型，文件上传 或者 缓存上传
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkSendUploadPictureSingal(IN LinkTsMuxUploader *pTsMuxUploader,
+int LinkPushPicture(IN LinkTsMuxUploader *pTsMuxUploader,
                                 const char *pFilename,
                                 int nFilenameLen,
                                 const char *pBuf,
@@ -91,7 +91,7 @@ void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in] pTsMuxUploader 切片上传实例
  * @return NULL
  */
-void LinkNotifyNomoreData(IN LinkTsMuxUploader *pTsMuxUploader);
+void LinkFlushUploader(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
  * 暂停上传
@@ -221,7 +221,7 @@ int LinkPushAudio(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in,out] pTsMuxUploader 切片上传实例
  * @return NULL
  */
-void LinkDestroyAVUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
+void LinkFreeUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
 
 /**
  * 销毁释放 sdk 资源。
@@ -230,7 +230,7 @@ void LinkDestroyAVUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
  *
  * @return NULL
  */
-void LinkUninitUploader();
+void LinkCleanup();
 
 
 #endif

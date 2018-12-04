@@ -14,7 +14,7 @@
 #include <sys/msg.h>
 
 #include "tsuploaderapi.h"
-#include "localkey.h"
+#include "security.h"
 #include "main.h"
 #include "log2file.h"
 #include "dbg.h"
@@ -107,9 +107,9 @@ int AlarmCallback( int alarm, void *data )
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader )
-            LinkNotifyNomoreData( gIpc.stream[STREAM_MAIN].uploader );
+            LinkFlushUploader( gIpc.stream[STREAM_MAIN].uploader );
         if ( gIpc.stream[STREAM_SUB].uploader ) {
-            LinkNotifyNomoreData( gIpc.stream[STREAM_SUB].uploader );
+            LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         char *file = (char *) malloc(  strlen((char *)data)+1 );
@@ -120,7 +120,7 @@ int AlarmCallback( int alarm, void *data )
         /*
          * sometimes the ipc will notify twice of one picture
          * at this moment, demo will notify sdk twice
-         * inside LinkSendUploadPictureSingal will free the pointer pOpaque
+         * inside LinkPushPicture will free the pointer pOpaque
          * so it will cause double free
          * here we will check the notify
          * if the notify is same as the last
@@ -153,7 +153,7 @@ int AlarmCallback( int alarm, void *data )
         memcpy( lastPicName, (char *)data, sizeof(lastPicName) );
         DBG_LOG("notify jpeg file : %s \n", file );
 
-        LinkSendUploadPictureSingal( gIpc.stream[STREAM_MAIN].uploader, (char *)data,
+        LinkPushPicture( gIpc.stream[STREAM_MAIN].uploader, (char *)data,
                                 strlen((char *)data), pBuf, size ); 
         RemoveFile( (char*)data );
         free( pBuf );
@@ -276,7 +276,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     userUploadArg.pUpTokenRequestUrl = url;
     userUploadArg.nUpTokenRequestUrlLen = strlen( url );
 
-    ret = LinkCreateAndStartAll( &gIpc.stream[ch].uploader, &mediaArg, &userUploadArg, &arg );
+    ret = LinkNewUploader( &gIpc.stream[ch].uploader, &mediaArg, &userUploadArg, &arg );
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
@@ -293,7 +293,7 @@ int TsUploaderSdkInit()
     DBG_LOG("gIpc.devId= %s\n", gIpc.devId);
 
     LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
-    ret = LinkInitUploader();
+    ret = LinkInit();
     if (ret != 0) {
         DBG_LOG("InitUploader error, ret = %d\n", ret );
         return ret;
@@ -369,9 +369,9 @@ int CaptureDevStartStream()
 
 int TsUploaderSdkDeInit()
 {
-    LinkDestroyAVUploader(&gIpc.stream[STREAM_MAIN].uploader);
-    LinkDestroyAVUploader(&gIpc.stream[STREAM_SUB].uploader);
-    LinkUninitUploader();
+    LinkFreeUploader(&gIpc.stream[STREAM_MAIN].uploader);
+    LinkFreeUploader(&gIpc.stream[STREAM_SUB].uploader);
+    LinkCleanup();
 
     return 0;
 }

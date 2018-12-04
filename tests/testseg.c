@@ -3,7 +3,7 @@
 #include "servertime.h"
 #include <string.h>
 #include <time.h>
-#include "localkey.h"
+#include "security.h"
 #include <unistd.h>
 
 static char segStoreToken[1024];
