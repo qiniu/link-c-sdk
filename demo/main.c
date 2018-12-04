@@ -222,7 +222,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     int ret = 0;
     LinkMediaArg mediaArg;
     LinkPicUploadArg arg;
-    LinkUserUploadArg userUploadArg;
+    LinkUploadArg userUploadArg;
     char url[512] = { 0 };
 
     memset( &mediaArg, 0, sizeof(mediaArg) );

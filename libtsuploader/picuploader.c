@@ -212,10 +212,13 @@ static void * uploadPicture(void *_pOpaque) {
         }
         
         char uptoken[1024] = {0};
+        char upHost[192] = {0};
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
         param.nTokenBufLen = sizeof(uptoken);
+        param.pUpHost = upHost;
+        param.nUpHostLen = sizeof(upHost);
         int ret = 0;
         int isFirst = 0, tryCount = 2;
         while(tryCount-- > 0) {
@@ -242,8 +245,6 @@ static void * uploadPicture(void *_pOpaque) {
                         break;
                 }
         }
-        
-        const char *upHost = LinkGetUploadHost(pSig->pPicUploader->picUpSettings_.useHttps, pSig->pPicUploader->picUpSettings_.uploadZone);
 
         LinkPutret putret;
 

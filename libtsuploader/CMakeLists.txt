@@ -64,4 +64,6 @@ add_library(tsuploader STATIC
     b64/b64.h
     b64/urlsafe_b64.c
     b64/urlsafe_b64.h
+    cJSON/cJSON.h
+    cJSON/cJSON.c
 )

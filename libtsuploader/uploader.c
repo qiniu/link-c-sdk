@@ -130,7 +130,8 @@ static void * streamUpload(void *_pOpaque)
 {
         KodoUploader * pUploader = (KodoUploader *)_pOpaque;
         
-        char uptoken[1280] = {0};
+        char uptoken[1024] = {0};
+        char upHost[192] = {0};
         char suffix[16] = {0};
         int ret = 0;
         
@@ -140,9 +141,8 @@ static void * streamUpload(void *_pOpaque)
         param.nTokenBufLen = sizeof(uptoken);
         param.pTypeBuf = suffix;
         param.nTypeBufLen = sizeof(suffix);
-
-        
-        const char *upHost = LinkGetUploadHost(pUploader->uploadArg.useHttps, pUploader->uploadArg.uploadZone);
+        param.pUpHost = upHost;
+        param.nUpHostLen = sizeof(upHost);
         
         char key[128] = {0};
         

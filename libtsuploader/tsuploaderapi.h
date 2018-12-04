@@ -48,9 +48,7 @@ int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkNewUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
-                          IN LinkMediaArg *pAvArg,
-                          IN LinkUserUploadArg *pUserUploadArg,
-                          IN LinkPicUploadArg *pPicArg
+                          IN LinkUploadArg *pUserUploadArg
                           );
 
 /**
