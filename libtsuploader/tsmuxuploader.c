@@ -352,10 +352,9 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
                                                 pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
                                         }
                                         memcpy(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen);
-                                        return 0;
                                 }
+                                return 0;
                         }
-                        break;
                 }
         }while(1);
                 
@@ -444,6 +443,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         }
         ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart, _pData, _nDataLen);
         if (ret != 0) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return ret;
         }
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
