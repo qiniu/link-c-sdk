@@ -32,6 +32,8 @@ typedef struct {
         IN int nTokenBufLen;
         IN char *pTypeBuf;
         IN int nTypeBufLen;
+        IN char *pUpHost;
+        IN int nUpHostLen;
 }LinkUploadParam;
 
 typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
@@ -58,21 +60,6 @@ typedef enum _LinkUploadZone{
         LINK_ZONE_DONGNANYA = 5,
 }LinkUploadZone;
 
-typedef struct _LinkUserUploadArg{
-        const char *pDeviceId_;
-        int   nDeviceIdLen_;
-        const char *pMgrTokenRequestUrl;
-        int   nMgrTokenRequestUrlLen;
-        const char *pUpTokenRequestUrl;
-        int   nUpTokenRequestUrlLen;
-        int   nUploaderBufferSize;
-        int   nNewSegmentInterval;
-        int   nUpdateIntervalSeconds;
-        int   useHttps;
-        UploadStatisticCallback pUploadStatisticCb;
-        void *pUploadStatArg;
-}LinkUserUploadArg;
-
 typedef enum {
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2
@@ -98,6 +85,49 @@ typedef struct _LinkMediaArg{
         LinkVideoFormat nVideoFormat;
 } LinkMediaArg;
 
+
+typedef struct _LinkUserUploadArg{
+        const char *pDeviceId_;
+        int   nDeviceIdLen_;
+        const char * pApp;
+        size_t nAppLen;
+        const char * pConfigRequestUrl;
+        size_t nConfigRequestUrlLen;
+        const char *pDeviceAk;
+        size_t nDeviceAkLen;
+        const char *pDeviceSk;
+        size_t nDeviceSkLen;
+        
+        UploadStatisticCallback pUploadStatisticCb;
+        void *pUploadStatArg;
+}LinkUserUploadArg;
+
+
+/** @brief 上传参数 */
+typedef struct _LinkUploadArg {
+        LinkAudioFormat nAudioFormat;           /**< 音频格式 */
+        size_t nChannels;                       /**< 音频通道数 */
+        size_t nSampleRate;                     /**< 音频通道数 */
+        LinkVideoFormat nVideoFormat;           /**< 视频格式 */
+        const char * pDeviceId_;               /**< 设备名 */
+        size_t nDeviceIdLen_;                  /**< 设备名长度 */
+        const char * pApp;                      /**< 命名空间 */
+        size_t nAppLen;                         /**< 命名空间长度 */
+        const char * pConfigRequestUrl;         /**< 获取业务配置的请求地址 */
+        size_t nConfigRequestUrlLen;            /**< 业务配置的请求地址长度 */
+        const char *pDeviceAk;                  /**< 设备 APP KEY */
+        size_t nDeviceAkLen;                    /**< 设备 APP KEY 长度 */
+        const char *pDeviceSk;                  /**< 设备 SECRET KEY */
+        size_t nDeviceSkLen;                    /**< 设备 SECRET KEY 长度 */
+        void(*getPictureCallback)(void *pUserData, const char *pFilename, int nFilenameLen);
+        void *pGetPictureCallbackUserData;
+        /**< 图片上传回调函数 */
+        void * reserved1;                       /**< 预留1 */
+        void * reserved2;                       /**< 预留2 */
+}LinkUploadArg;
+
+
+
 #define LINK_STREAM_UPLOAD 1
 
 #define LINK_NO_MEMORY       -1000
@@ -113,6 +143,7 @@ typedef struct _LinkMediaArg{
 #define LINK_HTTP_TIME       -2300
 #define LINK_OPEN_TS_ERR     -2400
 #define LINK_WRITE_TS_ERR    -2401
+#define LINK_WOLFSSL_ERR     -2500
 #define LINK_Q_OVERWRIT      -5001
 #define LINK_Q_WRONGSTATE    -5002
 #define LINK_MAX_SEG         -5103
@@ -123,6 +154,10 @@ typedef struct _LinkMediaArg{
 
 
 int LinkIsProcStatusQuit();
+#if 0
+#define strlen mystrlen
+#define strcpy mystrcpy
+#endif
 
 #define LINK_DEFINE_HANDLE(object) typedef struct object##_T* object;
 

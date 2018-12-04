@@ -92,7 +92,6 @@ int testget(char *p) {
     ghttp_request *request = NULL;
     ghttp_status status;
     char retbuf[1024];
-    int len;
 
     request = ghttp_request_new();
     if (ghttp_set_uri(request, uri) == -1)

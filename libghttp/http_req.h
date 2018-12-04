@@ -63,7 +63,7 @@ typedef struct http_req_tag {
   char          *host;
   char          *full_uri;
   char          *resource;
-  char          *body;
+  const char    *body;
   int            body_len;
   http_hdr_list *headers;
   http_req_state state;

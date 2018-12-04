@@ -46,8 +46,11 @@ typedef struct {
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pTokenUrl;
+        const char *pConfigUrl;
         const char *pUa1;
         const char *pUa2;
+        const char *pAk;
+        const char *pSk;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
@@ -73,8 +76,7 @@ typedef struct {
 }CmdArg;
 
 typedef struct {
-        LinkUserUploadArg userUploadArg;
-        LinkMediaArg avArg;
+        LinkUploadArg userUploadArg;
         LinkTsMuxUploader *pTsMuxUploader;
         int64_t firstTimeStamp ;
         int segStartCount;
@@ -631,6 +633,9 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 
                 ret = LinkPushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
         }
+        if (ret == LINK_NOT_INITED) {
+                return LINK_SUCCESS;
+        }
         return ret;
 }
 
@@ -678,25 +683,25 @@ static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameL
         return ;
 }
 
-static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg) {
+static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg) {
         int ret = 0;
-        LinkPicUploadArg picArg;
-        picArg.getPicCallback = getPicCallback;
-        picArg.pGetPicCallbackOpaque = NULL;
         
+        _pUserUploadArg->getPictureCallback = getPicCallback;
+        _pUserUploadArg->pGetPictureCallbackUserData = NULL;
 
-        
+        LinkMediaArg avArg;
+        avArg.nAudioFormat = _pUserUploadArg->nAudioFormat;
+        avArg.nChannels = _pUserUploadArg->nChannels;
+        avArg.nSamplerate = _pUserUploadArg->nSampleRate;
+        avArg.nVideoFormat = _pUserUploadArg->nVideoFormat;
         if (!cmdArg.IsWithPicUpload)
-                ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg);
+                //TODO not work now, with no pic and seg
+                ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, &avArg, _pUserUploadArg);
         else {
-                if (cmdArg.pMgrToken == NULL) {
-                        LinkLogError("mgrtoken is NULL");
-                        exit(8);
-                }
                 GetPicSaver * saver = malloc(sizeof(GetPicSaver));
                 memset(saver, 0, sizeof(GetPicSaver));
-                picArg.pGetPicCallbackOpaque = saver;
-                ret = LinkNewUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, &picArg);
+                _pUserUploadArg->pGetPictureCallbackUserData = saver;
+                ret = LinkNewUploader(_pTsMuxUploader, _pUserUploadArg);
                 saver->pData = *_pTsMuxUploader;
         }
         return ret;
@@ -754,9 +759,23 @@ static void checkCmdArg(const char * name)
                 }
         }
         
-        if (cmdArg.pTokenUrl == NULL) {
-                LinkLogError("must specify tokenurl");
-                exit(8);
+        if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture || cmdArg.IsJustTestSegment) {
+                if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture){
+                        if (cmdArg.pTokenUrl == NULL) {
+                                LinkLogError("jtestpic muset spcecify tokenurl");
+                                exit(7);
+                        }
+                } else {
+                        if (cmdArg.pTokenUrl == NULL || cmdArg.pMgrToken == NULL) {
+                                LinkLogError("jtestseg muset spcecify tokenurl and mgrtoken");
+                                exit(7);
+                        }
+                }
+        } else {
+                if (cmdArg.pConfigUrl == NULL || cmdArg.pSk == NULL || cmdArg.pAk == NULL) {
+                        LinkLogError("must specify confurl ak and sk");
+                        exit(8);
+                }
         }
 
         return;
@@ -812,13 +831,9 @@ static void * second_file_test(void * opaque) {
         AVuploader avuploader = *pAuploader;
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
-        avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
-        if (cmdArg.pMgrToken != NULL)
-                avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
-        avuploader.userUploadArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
-        avuploader.userUploadArg.useHttps = 0;
+       
 
-        int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return NULL;
@@ -881,8 +896,11 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
+        flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
         flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc99a");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
+        flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
+        flag_str(&cmdArg.pSk, "sk", "device secret token(not kodo sk)");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.InvalidToken, "invalidtoken", "use invalid token");
@@ -906,6 +924,7 @@ int main(int argc, const char** argv)
         printf("cmdArg.pAFilePath=%s\n", cmdArg.pAFilePath);
         printf("cmdArg.pVFilePath=%s\n", cmdArg.pVFilePath);
         printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
+        printf("cmdArg.pConfigUrl=%s\n", cmdArg.pConfigUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
         printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
 
@@ -984,21 +1003,21 @@ int main(int argc, const char** argv)
         AVuploader avuploader;
         
         memset(&avuploader, 0, sizeof(avuploader));
-        avuploader.avArg.nChannels = 1;
+        avuploader.userUploadArg.nChannels = 1;
         if (!cmdArg.IsNoAudio) {
                 if(cmdArg.IsTestAAC) {
-                        avuploader.avArg.nAudioFormat = LINK_AUDIO_AAC;
-                        avuploader.avArg.nSamplerate = 16000;
+                        avuploader.userUploadArg.nAudioFormat = LINK_AUDIO_AAC;
+                        avuploader.userUploadArg.nSampleRate = 16000;
                 } else {
-                        avuploader.avArg.nAudioFormat = LINK_AUDIO_PCMU;
-                        avuploader.avArg.nSamplerate = 8000;
+                        avuploader.userUploadArg.nAudioFormat = LINK_AUDIO_PCMU;
+                        avuploader.userUploadArg.nSampleRate = 8000;
                 }
         }
         if (!cmdArg.IsNoVideo) {
                 if(cmdArg.IsTestH265) {
-                        avuploader.avArg.nVideoFormat = LINK_VIDEO_H265;
+                        avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H265;
                 } else {
-                        avuploader.avArg.nVideoFormat = LINK_VIDEO_H264;
+                        avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H264;
                 }
         }
          
@@ -1010,20 +1029,16 @@ int main(int argc, const char** argv)
         
         avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
-        avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
-        avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSegIntval;
-        avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback;
-        avuploader.userUploadArg.pUploadStatArg = (void *)10;
-        avuploader.userUploadArg.pUpTokenRequestUrl = cmdArg.pTokenUrl;
-        avuploader.userUploadArg.nUpTokenRequestUrlLen = strlen(cmdArg.pTokenUrl);
+        //avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback; //TODO
+        //avuploader.userUploadArg.pUploadStatArg = (void *)10;
+        avuploader.userUploadArg.pConfigRequestUrl = cmdArg.pConfigUrl;
+        avuploader.userUploadArg.nConfigRequestUrlLen = strlen(cmdArg.pConfigUrl);
+        avuploader.userUploadArg.pDeviceAk = cmdArg.pAk;
+        avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pAk);
+        avuploader.userUploadArg.pDeviceSk = cmdArg.pSk;
+        avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pSk);
         
-        avuploader.userUploadArg.pMgrTokenRequestUrl = cmdArg.pMgrToken;
-        if (cmdArg.pMgrToken != NULL)
-                avuploader.userUploadArg.nMgrTokenRequestUrlLen = strlen(cmdArg.pMgrToken);
-        avuploader.userUploadArg.nUpdateIntervalSeconds = cmdArg.nNewSegIntval;
-        avuploader.userUploadArg.useHttps = 0;
-        
-        ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
+        ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
                 return ret;

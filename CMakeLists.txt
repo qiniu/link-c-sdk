@@ -37,7 +37,7 @@ add_custom_target(all-clean
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wno-unused")
 if (WITH_DEBUG)
     message("WITH_DEBUG")
-    add_definitions("-Wall -g")
+    add_definitions("-Wall -g -fstack-protector")
 endif()
 
 execute_process(

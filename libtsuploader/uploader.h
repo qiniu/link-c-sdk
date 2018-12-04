@@ -6,9 +6,9 @@
 #include "queue.h"
 #include "base.h"
 
-typedef void (*LinkUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow, int64_t nEnd);
+typedef void (*LinkTsUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t nNow, int64_t nEnd);
 
-typedef struct _UploadArg {
+typedef struct _LinkTsUploadArg {
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         LinkUploadZone uploadZone;
@@ -16,11 +16,11 @@ typedef struct _UploadArg {
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
         int64_t nLastUploadTsTime_;
-        LinkUploadArgUpadater UploadSegmentIdUpadate;
+        LinkTsUploadArgUpadater UploadSegmentIdUpadate;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int useHttps;
-}LinkUploadArg;
+}LinkTsUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;
 typedef int (*StreamUploadStart)(LinkTsUploader* pUploader);
@@ -38,9 +38,9 @@ typedef struct _LinkTsUploader{
 
 typedef void (*LinkTsStartUploadCallback)(void *pOpaque, int64_t nTimestamp);
 
-int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkUploadArg *pArg, IN enum CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);
-void LinkUploaderSetTsStartUploadCallback(IN LinkTsUploader * _pUploader, IN LinkTsStartUploadCallback cb, IN void *pOpaque);
-void LinkDestroyUploader(IN OUT LinkTsUploader ** _pUploader);
+int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg *pArg, IN enum CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);
+void LinkTsUploaderSetTsStartUploadCallback(IN LinkTsUploader * _pUploader, IN LinkTsStartUploadCallback cb, IN void *pOpaque);
+void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
 
 #endif

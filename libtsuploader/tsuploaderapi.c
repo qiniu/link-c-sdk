@@ -59,12 +59,6 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
                 LinkLogError("NewTsMuxUploader fail");
                 return ret;
         }
-        if (_pUserUploadArg->nUploaderBufferSize != 0) {
-                pTsMuxUploader->SetUploaderBufferSize(pTsMuxUploader, _pUserUploadArg->nUploaderBufferSize);
-        }
-        if (_pUserUploadArg->nNewSegmentInterval != 0) {
-                pTsMuxUploader->SetUpdateSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
-        }
         
         ret = LinkTsMuxUploaderStart(pTsMuxUploader);
         if (ret != 0){
@@ -76,28 +70,44 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 
         return LINK_SUCCESS;
 }
-
-int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg,
-                          LinkUserUploadArg *_pUserUploadArg, IN LinkPicUploadArg *_pPicArg)
+// LinkMediaArg *_pAvArg, IN LinkPicUploadArg *_pPicArg
+int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
-        if (
-            _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
-            _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
+        if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0
+            || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
+            _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
                 LinkLogError("token or deviceid or argument is null");
                 return LINK_ARG_ERROR;
         }
         
+        LinkMediaArg avArg;
+        avArg.nAudioFormat = _pUserUploadArg->nAudioFormat;
+        avArg.nChannels = _pUserUploadArg->nChannels;
+        avArg.nSamplerate = _pUserUploadArg->nSampleRate;
+        avArg.nVideoFormat = _pUserUploadArg->nVideoFormat;
+        
+        LinkPicUploadArg picArg;
+        picArg.getPicCallback = _pUserUploadArg->getPictureCallback;
+        picArg.pGetPicCallbackOpaque = _pUserUploadArg->pGetPictureCallbackUserData;
+        
+        LinkUserUploadArg userUploadArg;
+        memset(&userUploadArg, 0, sizeof(userUploadArg));
+        userUploadArg.nAppLen = _pUserUploadArg->nAppLen;
+        userUploadArg.pApp = _pUserUploadArg->pApp;
+        userUploadArg.pDeviceId_ = _pUserUploadArg->pDeviceId_;
+        userUploadArg.nDeviceIdLen_ = _pUserUploadArg->nDeviceIdLen_;
+        userUploadArg.pConfigRequestUrl = _pUserUploadArg->pConfigRequestUrl;
+        userUploadArg.nConfigRequestUrlLen = _pUserUploadArg->nConfigRequestUrlLen;
+        userUploadArg.pDeviceAk = _pUserUploadArg->pDeviceAk;
+        userUploadArg.nDeviceAkLen = _pUserUploadArg->nDeviceAkLen;
+        userUploadArg.pDeviceSk = _pUserUploadArg->pDeviceSk;
+        userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
+        
         LinkTsMuxUploader *pTsMuxUploader;
-        int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, _pAvArg, _pUserUploadArg, _pPicArg);
+        int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);
         if (ret != 0) {
                 LinkLogError("LinkNewTsMuxUploaderWillPicAndSeg fail");
                 return ret;
-        }
-        if (_pUserUploadArg->nUploaderBufferSize != 0) {
-                pTsMuxUploader->SetUploaderBufferSize(pTsMuxUploader, _pUserUploadArg->nUploaderBufferSize);
-        }
-        if (_pUserUploadArg->nNewSegmentInterval != 0) {
-                pTsMuxUploader->SetUpdateSegmentInterval(pTsMuxUploader, _pUserUploadArg->nNewSegmentInterval);
         }
         
         ret = LinkTsMuxUploaderStart(pTsMuxUploader);

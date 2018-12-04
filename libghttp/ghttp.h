@@ -101,7 +101,7 @@ void ghttp_set_timeout(ghttp_request *a_request, int nTimeoutInSecond);
 void ghttp_set_global_cert_file_path(const char *file, const char *path);
 
 int
-ghttp_set_uri(ghttp_request *a_request, char *a_uri);
+ghttp_set_uri(ghttp_request *a_request, const char *a_uri);
 
 /* Set a proxy for a request
  * This will return -1 if the uri is invalid
@@ -123,7 +123,7 @@ ghttp_set_type(ghttp_request *a_request, ghttp_type a_type);
  */
 
 int
-ghttp_set_body(ghttp_request *a_request, char *a_body, int a_len);
+ghttp_set_body(ghttp_request *a_request, const char *a_body, int a_len);
 
 /* Set whether or not you want to use sync or async mode.
  */

@@ -40,7 +40,7 @@ void
 http_uri_destroy(http_uri *a_uri);
 
 int
-http_uri_parse(char *a_uri,
+http_uri_parse(const char *a_uri,
 	       http_uri *a_request);
 
 #endif

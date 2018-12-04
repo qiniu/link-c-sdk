@@ -180,7 +180,7 @@ ghttp_uri_validate(char *a_uri)
 }
 
 int
-ghttp_set_uri(ghttp_request *a_request, char *a_uri)
+ghttp_set_uri(ghttp_request *a_request, const char *a_uri)
 {
   int l_rv = 0;
   http_uri *l_new_uri = NULL;
@@ -311,7 +311,7 @@ ghttp_set_type(ghttp_request *a_request, ghttp_type a_type)
 }
 
 int
-ghttp_set_body(ghttp_request *a_request, char *a_body, int a_len)
+ghttp_set_body(ghttp_request *a_request, const char *a_body, int a_len)
 {
   /* check to make sure the request is there */
   if (!a_request)
