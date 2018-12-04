@@ -53,7 +53,6 @@ typedef struct _KodoUploader{
         int nMetaInfoLen;
 }KodoUploader;
 
-static struct timespec tmResolution;
 
 
 
@@ -133,7 +132,7 @@ static void * streamUpload(void *_pOpaque)
         
         char uptoken[1280] = {0};
         char suffix[16] = {0};
-        int ret = 0, freeClient = 1;
+        int ret = 0;
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
@@ -202,7 +201,6 @@ static void * streamUpload(void *_pOpaque)
         if (qtype == TSQ_APPEND) {
                 int r, l;
                 char *bufData;
-                freeClient = 0;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts

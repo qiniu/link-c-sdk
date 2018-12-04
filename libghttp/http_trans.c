@@ -342,7 +342,7 @@ http_trans_get_host_error(int a_herror)
 
 int
 http_trans_append_data_to_buf(http_trans_conn *a_conn,
-			      char *a_data,
+			      const char *a_data,
 			      int   a_data_len)
 {
   if (http_trans_buf_free(a_conn) < a_data_len)

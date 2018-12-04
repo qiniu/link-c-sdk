@@ -33,7 +33,7 @@ typedef enum uri_parse_state_tag
     
 
 int
-http_uri_parse(char *a_string,
+http_uri_parse(const char *a_string,
 	       http_uri *a_uri)
 {
   /* Everyone chant... "we love state machines..." */

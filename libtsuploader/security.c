@@ -12,9 +12,10 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int pInputLen,
         HMAC_Init_ex(&ctx, pKey, nKeyLen, engine, NULL);
         HMAC_Update(&ctx, (unsigned char*)pInput, pInputLen);
         
-        HMAC_Final(&ctx, pOutput, pOutputLen);
-        HMAC_CTX_cleanup(&ctx);
-        
+        unsigned int nOutLen = 0;
+        HMAC_Final(&ctx, (unsigned char*)pOutput, &nOutLen);
+        HMAC_cleanup(&ctx);
+        *pOutputLen = (int)nOutLen;
         return 0;
 }
 
