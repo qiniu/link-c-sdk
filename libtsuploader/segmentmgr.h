@@ -11,8 +11,6 @@ typedef struct {
         int nDeviceIdLen;
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
-        const char *pMgrTokenRequestUrl;
-        int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int useHttps;

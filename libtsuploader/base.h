@@ -34,6 +34,8 @@ typedef struct {
         IN int nTypeBufLen;
         IN char *pUpHost;
         IN int nUpHostLen;
+        IN char* pSegUrl;
+        IN int nSegUrlLen;
 }LinkUploadParam;
 
 typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);

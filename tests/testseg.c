@@ -7,10 +7,14 @@
 #include <unistd.h>
 
 static char segStoreToken[1024];
+static char *gpMgrTokenRequestUrl;
+static int gnMgrTokenRequestUrlLen;
 static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam) {
         LinkLogDebug("in segGetTokenCallback");
         memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
+        memcpy(pParam->pSegUrl, gpMgrTokenRequestUrl, gnMgrTokenRequestUrlLen);
         return strlen(segStoreToken);
+        
 }
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
@@ -36,8 +40,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         arg.pGetUploadParamCallbackArg = NULL;
         arg.pDeviceId = "abc";
         arg.nDeviceIdLen = 3;
-        arg.pMgrTokenRequestUrl = (char *)pMgrUrl;
-        arg.nMgrTokenRequestUrlLen = strlen(arg.pMgrTokenRequestUrl);
+        gpMgrTokenRequestUrl = (char *)pMgrUrl;
+        gnMgrTokenRequestUrlLen = strlen(pMgrUrl);
         arg.useHttps = 0;
         arg.pUploadStatisticCb = NULL;
         arg.pUploadStatArg = NULL;

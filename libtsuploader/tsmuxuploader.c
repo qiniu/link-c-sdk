@@ -1073,23 +1073,42 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
         }
-        if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
-                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_BUFFER_IS_SMALL;
-        }
-        int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
-        if (pParam->nUpHostLen - 1 < nUpHostLen) {
-                LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
-        pParam->pUpHost[nUpHostLen] = 0;
         
-        memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
-        pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
-        pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+        if (pParam->pTokenBuf != NULL) {
+                if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
+                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+                pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
+                pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+        }
+        
+        
+        if (pParam->pUpHost != NULL) {
+                int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
+                if (pParam->nUpHostLen - 1 < nUpHostLen) {
+                        LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                pParam->nUpHostLen = nUpHostLen;
+                pParam->pUpHost[nUpHostLen] = 0;
+        }
+        
+        if (pParam->pSegUrl != NULL) {
+                int nSegLen = strlen(pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl);
+                if (pParam->nSegUrlLen - 1 < nSegLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pSegUrl, pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                pParam->nSegUrlLen = nSegLen;
+                pParam->pSegUrl[nSegLen] = 0;
+        }
         
         if (pParam->pTypeBuf != NULL && pParam->nTypeBufLen != 0) {
                 int nTypeLen = strlen(pFFTsMuxUploader->tsType);
@@ -1100,11 +1119,12 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 } else {
                         pParam->nTypeBufLen = 0;
                 }
+                if (pFFTsMuxUploader->isTypeOneshot) {
+                        pFFTsMuxUploader->isTypeOneshot = 0;
+                        memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+                }
         }
-        if (pFFTsMuxUploader->isTypeOneshot) {
-                pFFTsMuxUploader->isTypeOneshot = 0;
-                memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
-        }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
         return LINK_SUCCESS;
@@ -1450,7 +1470,7 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
         LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int ret = LinkGetUploadToken(pBuf, 1024, &upzone, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
         if (ret != LINK_SUCCESS) {
-                LinkLogError("LinkGetUploadToken fail:%d", ret);
+                LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }
         linkTsMuxUploaderSetUploadZone(pFFTsMuxUploader, upzone);
@@ -1504,6 +1524,7 @@ static void *linkTokenThread(void * pOpaque) {
                                 }
                                 sleep(nNextTryTokenTime);
                                 nNextTryTokenTime *= 2;
+                                continue;
                         }
                         nNextTryTokenTime = 1;
                         shouldUpdateToken = 0;
@@ -1514,10 +1535,10 @@ static void *linkTokenThread(void * pOpaque) {
                 int stime = 0;
                 if (rcSleepTime > tokenSleepTime) {
                         shouldUpdateToken = 1;
-                        stime = tokenSleepTime - now;
+                        stime = tokenSleepTime - now - 10;
                 } else {
                         shouldUpdateRemoteCofig = 1;
-                        stime = rcSleepTime - now;
+                        stime = rcSleepTime - now - 10;
                 }
                 if (stime > 0) {
                         sleep(stime);

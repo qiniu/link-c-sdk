@@ -30,8 +30,6 @@ typedef struct {
         char bucket[64];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
-        char *pMgrTokenRequestUrl;
-        int nMgrTokenRequestUrlLen;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int useHttps;
@@ -59,7 +57,7 @@ struct MgrToken {
         int nTokenLen;
         char *pUrlPath;
         int nUrlPathLen;
-        int isHttps;
+        const char * pSegUrl;
 };
 
 static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
@@ -77,7 +75,7 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
         
         int len = 0;
         len = snprintf(pToken->pData+nTokenLen + 1, pToken->nDataLen - nTokenLen - 1,
-                 "%s%s",LinkGetRsHost(pToken->isHttps), pToken->pUrlPath+8);
+                 "%s%s", pToken->pSegUrl, pToken->pUrlPath+8);
         pToken->pUrlPath = pToken->pData + nTokenLen + 1;
         pToken->nUrlPathLen = len-2;
         pToken->pUrlPath[len-2] = 0;
@@ -85,7 +83,7 @@ static size_t writeMoveToken(void *pTokenStr, size_t size,  size_t nmemb,  void 
         return size * nmemb;
 }
 
-int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, struct MgrToken *pToken, int isHttps)
+int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, struct MgrToken *pToken, const char *pRsHost)
 {
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
                 return LINK_ARG_ERROR;
@@ -102,7 +100,8 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         char httpResp[1024+256];
         int nHttpRespBufLen = sizeof(httpResp);
         int nRealRespLen = 0;
-        int ret = LinkSimpleHttpPost(pUrl, httpResp, nHttpRespBufLen, &nRealRespLen, requetBody, strlen(requetBody), NULL);
+        int nBodyLen = strlen(requetBody);
+        int ret = LinkSimpleHttpPost(pUrl, httpResp, nHttpRespBufLen, &nRealRespLen, requetBody, nBodyLen, NULL);
         
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
@@ -116,7 +115,7 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         pToken->pUrlPath = requetBody;
         pToken->nUrlPathLen = strlen(requetBody);
         pToken->nCurlRet = 0;
-        pToken->isHttps = isHttps;
+        pToken->pSegUrl = pRsHost;
         
         if (writeMoveToken(httpResp, nRealRespLen, 1, pToken) == 0) {
                 LinkLogError("maybe response format error:%s", httpResp);
@@ -210,17 +209,29 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 isNewSeg = 0;
         }
         
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        char upHost[192] = {0};
+        
         char uptoken[1536] = {0};
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if(!isNewSeg) {
+                param.pSegUrl = upHost;
+                param.nSegUrlLen = sizeof(upHost);
+                int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
+                                                                         &param);
+                if (ret == LINK_BUFFER_IS_SMALL) {
+                        LinkLogError("segur buffer %d is too small. drop file", sizeof(upHost));
+                        return;
+                }
+                
                 struct MgrToken mgrToken;
                 int nUrlLen = 0;
-                nUrlLen = sprintf(uptoken, "%s", segmentMgr.handles[idx].pMgrTokenRequestUrl);
+                nUrlLen = sprintf(uptoken, "http://47.105.118.51:8087/uas/%s/token/api", segmentMgr.handles[idx].ua);
                 uptoken[nUrlLen] = 0;
-                mgrToken.isHttps = segmentMgr.handles[idx].useHttps;
-                int ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken, segmentMgr.handles[idx].useHttps);
+                ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken, upHost);
                 if (ret != 0 || mgrToken.nCurlRet != 0) {
-                        LinkLogError("getMoveToken fail:%d", ret, mgrToken.nCurlRet);
+                        LinkLogError("getMoveToken fail:%d [%s]", ret, mgrToken.nCurlRet, uptoken);
                         return;
                 }
                 
@@ -251,9 +262,6 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         
-        char upHost[192] = {0};
-        LinkUploadParam param;
-        memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
         param.nTokenBufLen = sizeof(uptoken);
         param.pUpHost = upHost;
@@ -309,11 +317,6 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].useHttps = 0;
                 segmentMgr.handles[seg].bucket[0] = 0;
                 segmentMgr.handles[seg].segUploadOk = 0;
-                segmentMgr.handles[seg].nMgrTokenRequestUrlLen = 0;
-                if (segmentMgr.handles[seg].pMgrTokenRequestUrl) {
-                        free(segmentMgr.handles[seg].pMgrTokenRequestUrl);
-                        segmentMgr.handles[seg].pMgrTokenRequestUrl = NULL;
-                }
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
                 segmentMgr.handles[seg].nUpdateIntervalSeconds = 30 * 1000000000LL;
         }
@@ -396,19 +399,6 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
         int i = 0;
         for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
                 if (segmentMgr.handles[i].handle == -1) {
-                        int nMoveUrlLen = pArg->nMgrTokenRequestUrlLen + 1;
-                        if (nMoveUrlLen > 1) {
-                                char *pTmp = (char *)malloc(nMoveUrlLen);
-                                if (pTmp == NULL) {
-                                        pthread_mutex_unlock(&segMgrMutex);
-                                        return LINK_NO_MEMORY;
-                                }
-                                memcpy(pTmp, pArg->pMgrTokenRequestUrl, pArg->nMgrTokenRequestUrlLen);
-                                pTmp[nMoveUrlLen - 1] = 0;
-                                segmentMgr.handles[i].pMgrTokenRequestUrl = pTmp;
-                                segmentMgr.handles[i].nMgrTokenRequestUrlLen = pArg->nMgrTokenRequestUrlLen;
-                        }
-                        
                         *pSeg = i;
                         segmentMgr.handles[i].handle  = i;
                         segmentMgr.handles[i].getUploadParamCallback = pArg->getUploadParamCallback;
