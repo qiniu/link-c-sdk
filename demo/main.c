@@ -220,28 +220,23 @@ static void GetPicCallback (void *pOpaque,  const char *pFileName, int nFilename
 int _TsUploaderSdkInit( StreamChannel ch )
 {
     int ret = 0;
-    LinkMediaArg mediaArg;
-    LinkPicUploadArg arg;
     LinkUploadArg userUploadArg;
-    char url[512] = { 0 };
 
-    memset( &mediaArg, 0, sizeof(mediaArg) );
-    memset( &arg, 0, sizeof(arg) );
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
     if ( ch == STREAM_MAIN ) {
-        arg.getPicCallback = GetPicCallback;
+        userUploadArg.getPictureCallback = GetPicCallback;
     }
 
     if ( gIpc.audioType == AUDIO_AAC ) {
-        mediaArg.nAudioFormat = LINK_AUDIO_AAC;
-        mediaArg.nSamplerate = 16000;
+        userUploadArg.nAudioFormat = LINK_AUDIO_AAC;
+        userUploadArg.nSampleRate = 16000;
     } else {
-        mediaArg.nAudioFormat = LINK_AUDIO_PCMU;
-        mediaArg.nSamplerate = 8000;
+        userUploadArg.nAudioFormat = LINK_AUDIO_PCMU;
+        userUploadArg.nSampleRate = 8000;
     }
-    mediaArg.nChannels = 1;
-    mediaArg.nVideoFormat = LINK_VIDEO_H264;
+    userUploadArg.nChannels = 1;
+    userUploadArg.nVideoFormat = LINK_VIDEO_H264;
 
     if ( STREAM_MAIN == ch ) {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "a" );
@@ -249,34 +244,21 @@ int _TsUploaderSdkInit( StreamChannel ch )
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "b" );
     }
     
+    //userUploadArg.pUploadStatisticCb = ReportUploadStatistic; //TODO
     userUploadArg.pDeviceId_ = gIpc.stream[ch].devId;
     userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[ch].devId);
-    userUploadArg.nUploaderBufferSize = 512;
-    userUploadArg.pUploadStatisticCb = ReportUploadStatistic;
-    userUploadArg.useHttps = 0;
-    if ( gIpc.config.tokenUrl ) {
-        if ( ch == STREAM_MAIN ) {
-            sprintf( url, "%s/uas/%sa/token/api", gIpc.config.tokenUrl, gIpc.devId );
-        } else {
-            sprintf( url, "%s/uas/%sb/token/api", gIpc.config.tokenUrl, gIpc.devId );
-        }
-    } else
-        userUploadArg.nMgrTokenRequestUrlLen = 0;
-    userUploadArg.pMgrTokenRequestUrl = url;
-    DBG_LOG("move seg url = %s\n", url );
-    memset( url, 0, sizeof(url) );
-    if ( gIpc.config.tokenUrl ) {
-        if ( ch == STREAM_MAIN ) {
-            sprintf( url, "%s/uas/%sa/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
-        } else {
-            sprintf( url, "%s/uas/%sb/token/upload?callback=false", gIpc.config.tokenUrl, gIpc.devId );
-        }
-    } else
-        userUploadArg.nUpTokenRequestUrlLen;
-    userUploadArg.pUpTokenRequestUrl = url;
-    userUploadArg.nUpTokenRequestUrlLen = strlen( url );
 
-    ret = LinkNewUploader( &gIpc.stream[ch].uploader, &mediaArg, &userUploadArg, &arg );
+    userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
+    userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
+    //TODO deviceak devicesk
+        /*
+        userUploadArg.pDeviceSk =;
+        userUploadArg.nDeviceSkLen;
+        userUploadArg.pDeviceAk =;
+        userUploadArg.nDeviceAkLen;
+         */
+        
+    ret = LinkNewUploader( &gIpc.stream[ch].uploader, &userUploadArg);
     if (ret != 0) {
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
