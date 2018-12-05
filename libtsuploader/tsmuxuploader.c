@@ -111,6 +111,7 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
 static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, LinkUploadZone _upzone);
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader);
+static void freeRemoteConfig(RemoteConfig *pRc);
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -642,6 +643,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                                 free(pFFTsMuxUploader->token_.pToken_);
                                 pFFTsMuxUploader->token_.pToken_ = NULL;
                         }
+                        freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
                         free(pFFTsMuxUploader);
                 }
                 free(pTsMuxCtx);
