@@ -159,7 +159,8 @@ void LinkInitSn()
                         }
                 }
         }
-         memcpy(gSn, "TEST_MACADDR", 12);
+        if (gSn[0] == 0)
+                memcpy(gSn, "TEST_MACADDR", 12);
 #else
         memcpy(gSn, "TEST_MACADDR", 12);
 #endif
