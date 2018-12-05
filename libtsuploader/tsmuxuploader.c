@@ -84,6 +84,7 @@ typedef struct _FFTsMuxUploader{
         int nUpdateSegmentInterval;
         
         char deviceId_[33];
+        char app_[33];
         Token token_;
         LinkTsUploadArg uploadArg;
         PictureUploader *pPicUploader;
@@ -109,8 +110,8 @@ typedef struct _FFTsMuxUploader{
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
 static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
-static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, LinkUploadZone _upzone);
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader);
+static void freeRemoteConfig(RemoteConfig *pRc);
 
 #include <net/if.h>
 #include <sys/ioctl.h>
@@ -642,6 +643,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                                 free(pFFTsMuxUploader->token_.pToken_);
                                 pFFTsMuxUploader->token_.pToken_ = NULL;
                         }
+                        freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
                         free(pFFTsMuxUploader);
                 }
                 free(pTsMuxCtx);
@@ -995,13 +997,8 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         int ret = 0;
         
-        if (_pUserUploadArg->nDeviceIdLen_ >= sizeof(pFFTsMuxUploader->deviceId_)) {
-                free(pFFTsMuxUploader);
-                LinkLogError("device(ua) max support lenght is 32");
-                return LINK_ARG_TOO_LONG;
-        }
         memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
-        pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
+        memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
         
         
         if (isWithPicAndSeg) {
@@ -1073,23 +1070,42 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
         }
-        if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
-                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_BUFFER_IS_SMALL;
-        }
-        int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
-        if (pParam->nUpHostLen - 1 < nUpHostLen) {
-                LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
-        pParam->pUpHost[nUpHostLen] = 0;
         
-        memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
-        pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
-        pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+        if (pParam->pTokenBuf != NULL) {
+                if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
+                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
+                pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
+                pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+        }
+        
+        
+        if (pParam->pUpHost != NULL) {
+                int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
+                if (pParam->nUpHostLen - 1 < nUpHostLen) {
+                        LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                pParam->nUpHostLen = nUpHostLen;
+                pParam->pUpHost[nUpHostLen] = 0;
+        }
+        
+        if (pParam->pSegUrl != NULL) {
+                int nSegLen = strlen(pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl);
+                if (pParam->nSegUrlLen - 1 < nSegLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pSegUrl, pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                pParam->nSegUrlLen = nSegLen;
+                pParam->pSegUrl[nSegLen] = 0;
+        }
         
         if (pParam->pTypeBuf != NULL && pParam->nTypeBufLen != 0) {
                 int nTypeLen = strlen(pFFTsMuxUploader->tsType);
@@ -1100,11 +1116,24 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 } else {
                         pParam->nTypeBufLen = 0;
                 }
+                if (pFFTsMuxUploader->isTypeOneshot) {
+                        pFFTsMuxUploader->isTypeOneshot = 0;
+                        memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+                }
         }
-        if (pFFTsMuxUploader->isTypeOneshot) {
-                pFFTsMuxUploader->isTypeOneshot = 0;
-                memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+        
+        if (pParam->pDeviceName != NULL) {
+                int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceId_);
+                if (pParam->nDeviceNameLen - 1 < nDeviceNameLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                pParam->nDeviceNameLen = nDeviceNameLen;
+                pParam->pDeviceName[nDeviceNameLen] = 0;
         }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
         return LINK_SUCCESS;
@@ -1112,9 +1141,15 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 
 int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
                                             const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg) {
-        if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN) {
-                LinkLogError("ak or sk is too long");
+        if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN
+            || _pUserUploadArg->nAppLen > 32 || _pUserUploadArg->nDeviceIdLen_ > 32) {
+                LinkLogError("ak or sk or app or devicename is too long");
                 return LINK_ARG_TOO_LONG;
+        }
+        if (_pUserUploadArg->nDeviceAkLen <= 0 || _pUserUploadArg->nDeviceSkLen <= 0
+            || _pUserUploadArg->nAppLen <= 0 || _pUserUploadArg->nDeviceIdLen_ <= 0) {
+                LinkLogError("ak or sk or app or devicename is not exits");
+                return LINK_ARG_ERROR;
         }
         //LinkTsMuxUploader *pTsMuxUploader
         int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
@@ -1135,8 +1170,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         memset(&arg, 0, sizeof(arg));
         arg.getUploadParamCallback = getUploadParamCallback;
         arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
-        arg.pDeviceId = pFFTsMuxUploader->deviceId_;
-        arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
@@ -1262,8 +1295,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         if (pFFTsMuxUploader->pPicUploader)
-                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
-                                                  strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), nTimestamp);
+                LinkSendItIsTimeToCaptureSignal(pFFTsMuxUploader->pPicUploader, nTimestamp);
 }
 
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
@@ -1282,17 +1314,6 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         //LinkTsUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        return LINK_SUCCESS;
-}
-
-static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, LinkUploadZone _upzone) {
-        
-        if (pFFTsMuxUploader->pPicUploader) {
-                LinkPicUploaderSetUploadZone(pFFTsMuxUploader->pPicUploader, _upzone);
-        }
-        if (pFFTsMuxUploader->segmentHandle != LINK_INVALIE_SEGMENT_HANDLE) {
-                LinkSetSegmentUploadZone(pFFTsMuxUploader->segmentHandle, _upzone);
-        }
         return LINK_SUCCESS;
 }
 
@@ -1447,13 +1468,11 @@ END:
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
-        int ret = LinkGetUploadToken(pBuf, 1024, &upzone, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
         if (ret != LINK_SUCCESS) {
-                LinkLogError("LinkGetUploadToken fail:%d", ret);
+                LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }
-        linkTsMuxUploaderSetUploadZone(pFFTsMuxUploader, upzone);
         setToken(pFFTsMuxUploader, pBuf, strlen(pBuf));
         return LINK_SUCCESS;
 }
@@ -1504,6 +1523,7 @@ static void *linkTokenThread(void * pOpaque) {
                                 }
                                 sleep(nNextTryTokenTime);
                                 nNextTryTokenTime *= 2;
+                                continue;
                         }
                         nNextTryTokenTime = 1;
                         shouldUpdateToken = 0;
@@ -1514,10 +1534,10 @@ static void *linkTokenThread(void * pOpaque) {
                 int stime = 0;
                 if (rcSleepTime > tokenSleepTime) {
                         shouldUpdateToken = 1;
-                        stime = tokenSleepTime - now;
+                        stime = tokenSleepTime - now - 10;
                 } else {
                         shouldUpdateRemoteCofig = 1;
-                        stime = rcSleepTime - now;
+                        stime = rcSleepTime - now - 10;
                 }
                 if (stime > 0) {
                         sleep(stime);

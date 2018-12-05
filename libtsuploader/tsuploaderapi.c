@@ -74,6 +74,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
         if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0
+            ||_pUserUploadArg->pApp == NULL || _pUserUploadArg->nAppLen == 0
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
                 LinkLogError("token or deviceid or argument is null");
@@ -102,6 +103,8 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         userUploadArg.nDeviceAkLen = _pUserUploadArg->nDeviceAkLen;
         userUploadArg.pDeviceSk = _pUserUploadArg->pDeviceSk;
         userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
+        userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->reserved1;
+        userUploadArg.pUploadStatArg = _pUserUploadArg->reserved2;
         
         LinkTsMuxUploader *pTsMuxUploader;
         int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);
@@ -193,7 +196,6 @@ struct HttpToken {
         int nDataLen;
         int nDeadline;
         int nHttpRet; //use with curl not ghttp
-        LinkUploadZone *pZone;
 };
 
 size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
@@ -213,27 +215,11 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
                 pToken->nHttpRet = LINK_JSON_FORMAT;
                 return 0;
         }
-        
-        char zone[10] = {0};
-        len = sizeof(zone) - 1;
-        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"zone\"", zone, &len);
-        if (ret == LINK_SUCCESS && pToken->pZone != NULL) {
-                if (strcmp(zone, "z1") == 0) {
-                        *pToken->pZone = LINK_ZONE_HUABEI;
-                } else if(strcmp(zone, "z2") == 0) {
-                        *pToken->pZone = LINK_ZONE_HUANAN;
-                } else if(strcmp(zone, "na0.") == 0) {
-                        *pToken->pZone = LINK_ZONE_BEIMEI;
-                } else if(strcmp(zone, "as0") == 0) {
-                        *pToken->pZone = LINK_ZONE_DONGNANYA;
-                } else {
-                        *pToken->pZone = LINK_ZONE_HUADONG;
-                }
-        }
+
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, int *pDeadline, const char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl)
 {
         
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
@@ -257,7 +243,6 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, LinkUploadZone *pZone, int *pDea
         token.nDataLen = nBufLen;
         token.nDeadline = 0;
         token.nHttpRet = 0;
-        token.pZone = pZone;
         
         if (writeData(httpResp, nRespLen,  1,  &token) == 0){
                 LinkLogError("maybe response format error:%s[%d]", httpResp, token.nHttpRet);

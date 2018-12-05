@@ -7,17 +7,23 @@
 #include <unistd.h>
 
 static char segStoreToken[1024];
+static char *gpMgrTokenRequestUrl;
+static int gnMgrTokenRequestUrlLen;
 static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam) {
         LinkLogDebug("in segGetTokenCallback");
         memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
+        memcpy(pParam->pSegUrl, gpMgrTokenRequestUrl, gnMgrTokenRequestUrlLen);
+        memcpy(pParam->pApp, "app1", 4);
+        memcpy(pParam->pDeviceName, "abc", 3);
         return strlen(segStoreToken);
+        
 }
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         int ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
         int nDeadline;
-        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, &nDeadline, pUpToken);
+        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), &nDeadline, pUpToken);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;
@@ -34,11 +40,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         SegmentArg arg;
         arg.getUploadParamCallback = segGetUploadParamCallback;
         arg.pGetUploadParamCallbackArg = NULL;
-        arg.pDeviceId = "abc";
-        arg.nDeviceIdLen = 3;
-        arg.pMgrTokenRequestUrl = (char *)pMgrUrl;
-        arg.nMgrTokenRequestUrlLen = strlen(arg.pMgrTokenRequestUrl);
-        arg.useHttps = 0;
+        gpMgrTokenRequestUrl = (char *)pMgrUrl;
+        gnMgrTokenRequestUrlLen = strlen(pMgrUrl);
         arg.pUploadStatisticCb = NULL;
         arg.pUploadStatArg = NULL;
         ret = LinkNewSegmentHandle(&segHandle, &arg);

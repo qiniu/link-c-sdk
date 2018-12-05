@@ -24,13 +24,8 @@ enum WaitFirstFlag {
 
 typedef struct _KodoUploader{
         LinkTsUploader uploader;
-#ifdef LINK_STREAM_UPLOAD
         LinkCircleQueue * pQueue_;
-#else
-        char *pTsData;
-        int nTsDataCap;
-        int nTsDataLen;
-#endif
+
         pthread_t workerId_;
         int isThreadStarted_;
         
@@ -133,6 +128,7 @@ static void * streamUpload(void *_pOpaque)
         char uptoken[1024] = {0};
         char upHost[192] = {0};
         char suffix[16] = {0};
+        char deviceName[33] = {0};
         int ret = 0;
         
         LinkUploadParam param;
@@ -143,6 +139,8 @@ static void * streamUpload(void *_pOpaque)
         param.nTypeBufLen = sizeof(suffix);
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
+        param.pDeviceName = deviceName;
+        param.nDeviceNameLen = sizeof(deviceName);
         
         char key[128] = {0};
         
@@ -205,10 +203,10 @@ static void * streamUpload(void *_pOpaque)
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
                         if (suffix[0] != 0) {
-                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", pUploader->uploadArg.pDeviceId_,
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
                         } else {
-                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", pUploader->uploadArg.pDeviceId_,
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         }
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
@@ -239,7 +237,7 @@ END:
         return NULL;
 }
 
-#ifdef LINK_STREAM_UPLOAD
+
 static int streamUploadStart(LinkTsUploader * _pUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pUploader;
@@ -294,51 +292,12 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         return;
 }
 
-#else
-
-static int memUploadStart(TsUploader * _pUploader)
-{
-        return LINK_SUCCESS;
-}
-
-static void memUploadStop(TsUploader * _pUploader)
-{
-        return;
-}
-
-static int memPushData(TsUploader *pTsUploader, char * pData, int nDataLen)
-{
-        KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-        if (pKodoUploader->pTsData == NULL) {
-                pKodoUploader->pTsData = malloc(pKodoUploader->nTsDataCap);
-                pKodoUploader->nTsDataLen = 0;
-        }
-        if (pKodoUploader->nTsDataLen + nDataLen > pKodoUploader->nTsDataCap){
-                char * tmp = malloc(pKodoUploader->nTsDataCap * 2);
-                memcpy(tmp, pKodoUploader->pTsData, pKodoUploader->nTsDataLen);
-                free(pKodoUploader->pTsData);
-                pKodoUploader->pTsData = tmp;
-                pKodoUploader->nTsDataCap *= 2;
-                memcpy(tmp + pKodoUploader->nTsDataLen, pData, nDataLen);
-                pKodoUploader->nTsDataLen += nDataLen;
-                return nDataLen;
-        }
-        memcpy(pKodoUploader->pTsData + pKodoUploader->nTsDataLen, pData, nDataLen);
-        pKodoUploader->nTsDataLen += nDataLen;
-        return nDataLen;
-}
-#endif
-
 static void getStatInfo(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *_pStatInfo)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-#ifdef LINK_STREAM_UPLOAD
+
         pKodoUploader->pQueue_->GetStatInfo(pKodoUploader->pQueue_, _pStatInfo);
-#else
-        _pStatInfo->nLen_ = 0;
-        _pStatInfo->nPopDataBytes_ = pKodoUploader->nTsDataLen;
-        _pStatInfo->nPopDataBytes_ = pKodoUploader->nTsDataLen;
-#endif
+
         return;
 }
 
@@ -376,28 +335,22 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
         }
         pthread_mutex_lock(&pKodoUploader->waitFirstMutex_);
         pKodoUploader->nWaitFirstMutexLocked_ = WF_LOCKED;
-#ifdef LINK_STREAM_UPLOAD
+
         ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 0, _policy, _nMaxItemLen, _nInitItemCount);
         if (ret != 0) {
                 free(pKodoUploader);
                 return ret;
         }
-#else
-        pKodoUploader->nTsDataCap = 1024 * 1024;
-#endif
+
         pKodoUploader->nFirstFrameTimestamp = -1;
         pKodoUploader->nLastFrameTimestamp = -1;
         pKodoUploader->uploadArg = *_pArg;
-#ifdef LINK_STREAM_UPLOAD
+
         pKodoUploader->uploader.UploadStart = streamUploadStart;
         pKodoUploader->uploader.UploadStop = streamUploadStop;
         pKodoUploader->uploader.Push = streamPushData;
         pKodoUploader->uploader.NotifyDataPrapared = notifyDataPrapared;
-#else
-        pKodoUploader->uploader.UploadStart = memUploadStart;
-        pKodoUploader->uploader.UploadStop = memUploadStop;
-        pKodoUploader->uploader.Push = memPushData;
-#endif
+
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
         pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
@@ -419,14 +372,12 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         KodoUploader * pKodoUploader = (KodoUploader *)(*_pUploader);
         
         pthread_mutex_destroy(&pKodoUploader->waitFirstMutex_);
-#ifdef LINK_STREAM_UPLOAD
+
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);
         }
         LinkDestroyQueue(&pKodoUploader->pQueue_);
-#else
-        free(pKodoUploader->pTsData);
-#endif
+
         
         free(pKodoUploader);
         * _pUploader = NULL;

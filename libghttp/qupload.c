@@ -289,7 +289,10 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
                 return -1;
         }
         
-        ghttp_set_uri(pRequest, pMoveUrl);
+        if (ghttp_set_uri(pRequest, pMoveUrl) == -1) {
+                ghttp_request_destroy(pRequest);
+                return -7;
+        }
         
         ghttp_set_type(pRequest, ghttp_type_post);
         
@@ -312,7 +315,8 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
                         ghttp_request_destroy(pRequest);
                         return -4;
                 } else {
-                        snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(pRequest));
+                        //fprintf(stderr, "pMoveUrl:%s token:%\n", pMoveUrl, pMoveToken);
+                        snprintf(put_ret->error, sizeof(put_ret->error), "%d %s",errno, ghttp_get_error(pRequest));
                         ghttp_request_destroy(pRequest);
                         return -5;
                 }

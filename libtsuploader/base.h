@@ -29,11 +29,17 @@ typedef void (*LinkSetKeyframeMetaInfo)(void *pUserArg, LinkKeyFrameMetaInfo *pM
 
 typedef struct {
         IN char *pTokenBuf;
-        IN int nTokenBufLen;
+        IN OUT int nTokenBufLen;
         IN char *pTypeBuf;
-        IN int nTypeBufLen;
+        IN OUT int nTypeBufLen;
         IN char *pUpHost;
-        IN int nUpHostLen;
+        IN OUT int nUpHostLen;
+        IN char* pSegUrl;
+        IN OUT int nSegUrlLen;
+        IN char* pDeviceName;
+        IN OUT int nDeviceNameLen;
+        IN char* pApp;
+        IN OUT int nAppLen;
 }LinkUploadParam;
 
 typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
@@ -50,15 +56,6 @@ typedef enum {
         LINK_UPLOAD_RESULT_FAIL = 2
 } LinkUploadResult;
 typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
-
-typedef enum _LinkUploadZone{
-        LINK_ZONE_UNKNOWN = 0,
-        LINK_ZONE_HUADONG = 1,
-        LINK_ZONE_HUABEI = 2,
-        LINK_ZONE_HUANAN = 3,
-        LINK_ZONE_BEIMEI = 4,
-        LINK_ZONE_DONGNANYA = 5,
-}LinkUploadZone;
 
 typedef enum {
         LINK_VIDEO_H264 = 1,
