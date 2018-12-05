@@ -798,8 +798,8 @@ static void * second_test(void * opaque) {
 
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
+        avuploader.userUploadArg.pDeviceName = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
@@ -825,7 +825,7 @@ static void do_start_file_test(AVuploader *pAvuploader){
                 }
                 if (cmdArg.IsFileLoop) {
                         cmdArg.nRoundCount++;
-                        LinkLogInfo(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceId_);
+                        LinkLogInfo(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceName);
                 }
         } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
 }
@@ -833,8 +833,8 @@ static void do_start_file_test(AVuploader *pAvuploader){
 static void * second_file_test(void * opaque) {
         AVuploader *pAuploader = (AVuploader *)opaque;;
         AVuploader avuploader = *pAuploader;
-        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa2;
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
+        avuploader.userUploadArg.pDeviceName = cmdArg.pUa2;
+        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa2);
        
 
         int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
@@ -901,8 +901,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
-        flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc99a");
-        flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
+        flag_str(&cmdArg.pUa1, "ua1", "ua(device name) name. default value is ipc99a");
+        flag_str(&cmdArg.pUa2, "ua2", "ua(device name) name");
         flag_str(&cmdArg.pUa1, "app1", "app name. default value is app99");
         flag_str(&cmdArg.pUa2, "app2", "app name");
         flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
@@ -1031,8 +1031,8 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-        avuploader.userUploadArg.pDeviceId_ = cmdArg.pUa1;
-        avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa1);
+        avuploader.userUploadArg.pDeviceName = cmdArg.pUa1;
+        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa1);
         //avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback; //TODO
         //avuploader.userUploadArg.pUploadStatArg = (void *)10;
         avuploader.userUploadArg.pConfigRequestUrl = cmdArg.pConfigUrl;

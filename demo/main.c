@@ -244,8 +244,8 @@ int _TsUploaderSdkInit( StreamChannel ch )
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "b" );
     }
     
-    userUploadArg.pDeviceId_ = gIpc.stream[ch].devId;
-    userUploadArg.nDeviceIdLen_ = strlen(gIpc.stream[ch].devId);
+    userUploadArg.pDeviceName = gIpc.stream[ch].devId;
+    userUploadArg.nDeviceNameLen = strlen(gIpc.stream[ch].devId);
 
     userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
     userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);

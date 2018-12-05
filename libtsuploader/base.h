@@ -84,8 +84,8 @@ typedef struct _LinkMediaArg{
 
 
 typedef struct _LinkUserUploadArg{
-        const char *pDeviceId_;
-        int   nDeviceIdLen_;
+        const char *pDeviceName;
+        int   nDeviceNameLen;
         const char * pApp;
         size_t nAppLen;
         const char * pConfigRequestUrl;
@@ -106,8 +106,8 @@ typedef struct _LinkUploadArg {
         size_t nChannels;                       /**< 音频通道数 */
         size_t nSampleRate;                     /**< 音频通道数 */
         LinkVideoFormat nVideoFormat;           /**< 视频格式 */
-        const char * pDeviceId_;               /**< 设备名 */
-        size_t nDeviceIdLen_;                  /**< 设备名长度 */
+        const char * pDeviceName;               /**< 设备名 */
+        size_t nDeviceNameLen;                  /**< 设备名长度 */
         const char * pApp;                      /**< 命名空间 */
         size_t nAppLen;                         /**< 命名空间长度 */
         const char * pConfigRequestUrl;         /**< 获取业务配置的请求地址 */

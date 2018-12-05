@@ -47,9 +47,9 @@ int LinkInit()
 int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaArg *_pAvArg, LinkUserUploadArg *_pUserUploadArg)
 {
         if (
-            _pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0 ||
+            _pUserUploadArg->pDeviceName == NULL || _pUserUploadArg->nDeviceNameLen == 0 ||
             _pTsMuxUploader == NULL || _pAvArg == NULL || _pUserUploadArg == NULL) {
-                LinkLogError("token or deviceid or argument is null");
+                LinkLogError("token or deviceName or argument is null");
                 return LINK_ARG_ERROR;
         }
 
@@ -73,11 +73,11 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 // LinkMediaArg *_pAvArg, IN LinkPicUploadArg *_pPicArg
 int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
-        if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0
+        if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceName == NULL || _pUserUploadArg->nDeviceNameLen == 0
             ||_pUserUploadArg->pApp == NULL || _pUserUploadArg->nAppLen == 0
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
-                LinkLogError("token or deviceid or argument is null");
+                LinkLogError("token or deviceName or argument is null");
                 return LINK_ARG_ERROR;
         }
         
@@ -95,8 +95,8 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         memset(&userUploadArg, 0, sizeof(userUploadArg));
         userUploadArg.nAppLen = _pUserUploadArg->nAppLen;
         userUploadArg.pApp = _pUserUploadArg->pApp;
-        userUploadArg.pDeviceId_ = _pUserUploadArg->pDeviceId_;
-        userUploadArg.nDeviceIdLen_ = _pUserUploadArg->nDeviceIdLen_;
+        userUploadArg.pDeviceName = _pUserUploadArg->pDeviceName;
+        userUploadArg.nDeviceNameLen = _pUserUploadArg->nDeviceNameLen;
         userUploadArg.pConfigRequestUrl = _pUserUploadArg->pConfigRequestUrl;
         userUploadArg.nConfigRequestUrlLen = _pUserUploadArg->nConfigRequestUrlLen;
         userUploadArg.pDeviceAk = _pUserUploadArg->pDeviceAk;
