@@ -1357,7 +1357,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         int nRespLen = 0, ret = 0;
         
         int nOffsetHost = snprintf(buf, sizeof(buf), "%s", pFFTsMuxUploader->pConfigRequestUrl);
-        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "/v1/device/config?sn=%s", gSn);
+        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s", gSn);
         const char *pInput = (const char *)buf + nOffsetHost;
         char *pOutput = buf + nOffsetHost + nOffset + 1;
         int nOutputLen = sizeof(buf) - nOffset - nOffsetHost - 1;
