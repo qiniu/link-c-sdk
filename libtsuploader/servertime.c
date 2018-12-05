@@ -5,37 +5,29 @@
 #include <time.h>
 #include "httptools.h"
 
-#define USE_CLOCK 1
+#define TRUST_LOCAL_TIME
 
-#ifdef USE_CLOCK
 static struct timespec tmResolution;
-#endif
 
-int uptimefd = -1;
+#ifdef TRUST_LOCAL_TIME
+int64_t LinkGetCurrentNanosecond()
+{
+        struct timespec tp;
+        clock_gettime(CLOCK_REALTIME, &tp);
+        return (int64_t)(tp.tv_sec * 1000000000ll + tp.tv_nsec / tmResolution.tv_nsec);
+}
 
+int LinkInitTime() {
+        clock_getres(CLOCK_MONOTONIC, &tmResolution);
+        
+        return LINK_SUCCESS;
+}
+#else
 static int64_t getUptime()
 {
-#ifdef USE_CLOCK
         struct timespec tp;
         clock_gettime(CLOCK_MONOTONIC, &tp);
         return (int64_t)(tp.tv_sec * 1000000000ll + tp.tv_nsec / tmResolution.tv_nsec);
-#else
-        char str[33];
-        if(uptimefd < 0) {
-                uptimefd = open("/proc/uptime", O_RDONLY);
-        }
-        int nReadLen = 0;
-        if (uptimefd >= 0) {
-                lseek(uptimefd, 0, SEEK_SET);
-                nReadLen = read(uptimefd, str, sizeof(str));
-        } else {
-                return -1;
-        }
-        str[nReadLen - 1] = 0;
-        char *pSpace = strchr(str, ' ');
-        *pSpace = 0;
-        return (int64_t)(atof(str) * 1000000000);
-#endif
 }
 
 static int64_t nServerTimestamp;
@@ -102,11 +94,12 @@ int64_t LinkGetCurrentNanosecond()
 }
 
 int LinkInitTime() {
-#ifdef USE_CLOCK
         clock_getres(CLOCK_MONOTONIC, &tmResolution);
-#endif
+
         int ret = 0;
         ret = getTimeFromServer(&nServerTimestamp);
         nLocalupTimestamp = getUptime();
         return ret;
+
 }
+#endif
