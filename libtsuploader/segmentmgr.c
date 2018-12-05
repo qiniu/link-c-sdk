@@ -11,7 +11,6 @@
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
 #define SEGMENT_INTERVAL 3
-#define SEGMENT_SET_UPLOADZONE 4
 typedef struct {
         int64_t nStart;
         int64_t nEndOrInt;
@@ -26,16 +25,13 @@ typedef struct {
         SegmentHandle handle;
         int isRestart;
         int segUploadOk;
-        char ua[32];
         char bucket[64];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
-        int useHttps;
         int64_t nUpdateIntervalSeconds;
         int64_t nLastUpdateTime;
-        LinkUploadZone uploadZone;
 }Seg;
 
 typedef struct {
@@ -152,22 +148,6 @@ static void setSegmentInt(SegInfo segInfo) {
         segmentMgr.handles[idx].nUpdateIntervalSeconds = segInfo.nEndOrInt;
 }
 
-static void setSegmentUploadZone(SegInfo segInfo) {
-        int i, idx = -1;
-        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
-                if (segmentMgr.handles[i].handle == segInfo.handle) {
-                        idx = i;
-                        break;
-                }
-        }
-        if (idx < 0) {
-                LinkLogWarn("wrong segment handle:%d", segInfo.handle);
-                return;
-        }
-        
-        segmentMgr.handles[idx].uploadZone = (LinkUploadZone)segInfo.nEndOrInt;
-}
-
 static void upadateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
@@ -193,8 +173,38 @@ static void upadateSegmentFile(SegInfo segInfo) {
         char oldKey[128] = {0};
         memset(oldKey, 0, sizeof(oldKey));
         int isNewSeg = 1;
+        if (segmentMgr.handles[idx].segUploadOk)
+                isNewSeg = 0;
+        
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        char upHost[192] = {0};
+        char app[33];
+        char deviceName[33];
+        char uptoken[1536] = {0};
+        
+        param.pDeviceName = deviceName;
+        param.nDeviceNameLen = sizeof(deviceName);
+        param.pApp = app;
+        param.nAppLen = sizeof(app);
+        if (isNewSeg) {
+                param.pTokenBuf = uptoken;
+                param.nTokenBufLen = sizeof(uptoken);
+                param.pUpHost = upHost;
+                param.nUpHostLen = sizeof(upHost);
+        } else {
+                param.pSegUrl = upHost;
+                param.nSegUrlLen = sizeof(upHost);
+        }
+        int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
+                                                                 &param);
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("fail to getUploadParamCallback:%d ", ret);
+                return;
+        }
+        
         if (segmentMgr.handles[idx].segUploadOk == 0) {
-                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].ua, segInfo.nStart, segInfo.nEndOrInt);
+                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", param.pDeviceName, segInfo.nStart, segInfo.nEndOrInt);
                 segmentMgr.handles[idx].nStart = segInfo.nStart;
                 segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
         } else {
@@ -202,32 +212,19 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, segInfo.nEndOrInt);
                         return;
                 }
-                snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, segmentMgr.handles[idx].ua,
+                snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
-                snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, segmentMgr.handles[idx].ua,
+                snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
                 isNewSeg = 0;
         }
         
-        LinkUploadParam param;
-        memset(&param, 0, sizeof(param));
-        char upHost[192] = {0};
         
-        char uptoken[1536] = {0};
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         if(!isNewSeg) {
-                param.pSegUrl = upHost;
-                param.nSegUrlLen = sizeof(upHost);
-                int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
-                                                                         &param);
-                if (ret == LINK_BUFFER_IS_SMALL) {
-                        LinkLogError("segur buffer %d is too small. drop file", sizeof(upHost));
-                        return;
-                }
-                
                 struct MgrToken mgrToken;
                 int nUrlLen = 0;
-                nUrlLen = sprintf(uptoken, "http://47.105.118.51:8087/uas/%s/token/api", segmentMgr.handles[idx].ua);
+                nUrlLen = sprintf(uptoken, "http://47.105.118.51:8087/uas/%s/token/api", param.pDeviceName);
                 uptoken[nUrlLen] = 0;
                 ret = getMoveToken(uptoken, sizeof(uptoken), uptoken, oldKey, key, &mgrToken, upHost);
                 if (ret != 0 || mgrToken.nCurlRet != 0) {
@@ -250,7 +247,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                                                      oldKey, key, putret.code, putret.reqid, putret.body);
                                 } else {
                                         LinkLogError("move seg:%s to %s httpcode=%d reqid:%s errmsg={not receive response}",
-                                                     oldKey, key, putret.reqid, putret.code);
+                                                     oldKey, key, putret.code, putret.reqid);
                                 }
                         }
                 }
@@ -262,16 +259,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         
-        param.pTokenBuf = uptoken;
-        param.nTokenBufLen = sizeof(uptoken);
-        param.pUpHost = upHost;
-        param.nUpHostLen = sizeof(upHost);
-        int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
-                                                                      &param);
-        if (ret == LINK_BUFFER_IS_SMALL) {
-                LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
-                return;
-        }
+        
 
         int nBLen = sizeof(segmentMgr.handles[idx].bucket);
         ret = LinkGetBucketFromUptoken(uptoken, segmentMgr.handles[idx].bucket, &nBLen);
@@ -314,7 +302,6 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].isRestart = 0;
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
-                segmentMgr.handles[seg].useHttps = 0;
                 segmentMgr.handles[seg].bucket[0] = 0;
                 segmentMgr.handles[seg].segUploadOk = 0;
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
@@ -349,8 +336,6 @@ static void * segmetMgrRun(void *_pOpaque) {
                                         upadateSegmentFile(segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_INTERVAL) {
                                         setSegmentInt(segInfo);
-                                } else if (segInfo.nOperation == SEGMENT_SET_UPLOADZONE) {
-                                        setSegmentUploadZone(segInfo);
                                 }
                         }
                 }
@@ -403,14 +388,10 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         segmentMgr.handles[i].handle  = i;
                         segmentMgr.handles[i].getUploadParamCallback = pArg->getUploadParamCallback;
                         segmentMgr.handles[i].pGetUploadParamCallbackArg = pArg->pGetUploadParamCallbackArg;
-                        memcpy(segmentMgr.handles[i].ua, pArg->pDeviceId, pArg->nDeviceIdLen);
-                        segmentMgr.handles[i].ua[pArg->nDeviceIdLen] = 0;
                         
                         segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
-                        segmentMgr.handles[i].useHttps = pArg->useHttps;
                         segmentMgr.handles[i].nUpdateIntervalSeconds = pArg->nUpdateIntervalSeconds;
-                        segmentMgr.handles[i].uploadZone = pArg->uploadZone;
                         if (pArg->nUpdateIntervalSeconds <= 0) {
                                 segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
                         }
@@ -433,23 +414,6 @@ void LinkSetSegmentUpdateInt(SegmentHandle seg, int64_t nSeconds) {
         segInfo.nEndOrInt = nSeconds * 1000000000;
         segInfo.isRestart = 0;
         segInfo.nOperation = SEGMENT_INTERVAL;
-        
-        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
-        
-        return;
-}
-
-void LinkSetSegmentUploadZone(SegmentHandle seg, LinkUploadZone upzone) {
-        if (!segMgrStarted) {
-                return;
-        }
-        
-        SegInfo segInfo;
-        segInfo.handle = seg;
-        segInfo.nStart = 0;
-        segInfo.nEndOrInt = (int)upzone;
-        segInfo.isRestart = 0;
-        segInfo.nOperation = SEGMENT_SET_UPLOADZONE;
         
         segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         

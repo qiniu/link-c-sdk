@@ -13,6 +13,8 @@ static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pPar
         LinkLogDebug("in segGetTokenCallback");
         memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
         memcpy(pParam->pSegUrl, gpMgrTokenRequestUrl, gnMgrTokenRequestUrlLen);
+        memcpy(pParam->pApp, "app1", 4);
+        memcpy(pParam->pDeviceName, "abc", 3);
         return strlen(segStoreToken);
         
 }
@@ -38,11 +40,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         SegmentArg arg;
         arg.getUploadParamCallback = segGetUploadParamCallback;
         arg.pGetUploadParamCallbackArg = NULL;
-        arg.pDeviceId = "abc";
-        arg.nDeviceIdLen = 3;
         gpMgrTokenRequestUrl = (char *)pMgrUrl;
         gnMgrTokenRequestUrlLen = strlen(pMgrUrl);
-        arg.useHttps = 0;
         arg.pUploadStatisticCb = NULL;
         arg.pUploadStatArg = NULL;
         ret = LinkNewSegmentHandle(&segHandle, &arg);

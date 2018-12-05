@@ -1171,8 +1171,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         memset(&arg, 0, sizeof(arg));
         arg.getUploadParamCallback = getUploadParamCallback;
         arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
-        arg.pDeviceId = pFFTsMuxUploader->deviceId_;
-        arg.nDeviceIdLen = _pUserUploadArg->nDeviceIdLen_;
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
@@ -1326,9 +1324,6 @@ static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, Lin
         
         if (pFFTsMuxUploader->pPicUploader) {
                 LinkPicUploaderSetUploadZone(pFFTsMuxUploader->pPicUploader, _upzone);
-        }
-        if (pFFTsMuxUploader->segmentHandle != LINK_INVALIE_SEGMENT_HANDLE) {
-                LinkSetSegmentUploadZone(pFFTsMuxUploader->segmentHandle, _upzone);
         }
         return LINK_SUCCESS;
 }
