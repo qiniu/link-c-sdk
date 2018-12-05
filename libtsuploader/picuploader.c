@@ -32,6 +32,7 @@ typedef struct {
         int64_t nTimestamp; //file name need
         pthread_t uploadPicThread;
         char deviceId[33];
+        char app[33];
         PicUploader *pPicUploader;
         char *pFileName;
 }LinkPicUploadSignal;
@@ -39,16 +40,22 @@ typedef struct {
 
 static void * uploadPicture(void *_pOpaque);
 
-int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen, int64_t nTimestamp) {
+int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen,
+                                              const char *pApp, int nAppLen, int64_t nSysTimestamp) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(LinkPicUploadSignal));
         sig.signalType_ = LinkPicUploadGetPicSignalCallback;
-        sig.nTimestamp = nTimestamp;
-        if( nDeviceIdLen > sizeof(sig.deviceId)) {
-                LinkLogWarn("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
-                nDeviceIdLen = sizeof(sig.deviceId)-1;
+        sig.nTimestamp = nSysTimestamp;
+        if( nDeviceIdLen > sizeof(sig.deviceId) - 1) {
+                LinkLogError("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
+                return LINK_ARG_TOO_LONG;
+        }
+        if( nAppLen > sizeof(sig.app) - 1) {
+                LinkLogError("app too long:%d(%s)", nAppLen, pApp);
+                return LINK_ARG_TOO_LONG;
         }
         memcpy(sig.deviceId, pDeviceId, nDeviceIdLen);
+        memcpy(sig.app, pApp, nAppLen);
         PicUploader *pPicUp = (PicUploader*)pPicUploader;
         return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
 }

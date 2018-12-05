@@ -84,6 +84,7 @@ typedef struct _FFTsMuxUploader{
         int nUpdateSegmentInterval;
         
         char deviceId_[33];
+        char app_[33];
         Token token_;
         LinkTsUploadArg uploadArg;
         PictureUploader *pPicUploader;
@@ -997,12 +998,8 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         int ret = 0;
         
-        if (_pUserUploadArg->nDeviceIdLen_ >= sizeof(pFFTsMuxUploader->deviceId_)) {
-                free(pFFTsMuxUploader);
-                LinkLogError("device(ua) max support lenght is 32");
-                return LINK_ARG_TOO_LONG;
-        }
         memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
+        memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
         
         
         if (isWithPicAndSeg) {
@@ -1145,9 +1142,15 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 
 int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
                                             const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg) {
-        if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN) {
-                LinkLogError("ak or sk is too long");
+        if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN
+            || _pUserUploadArg->nAppLen > 32 || _pUserUploadArg->nDeviceIdLen_ > 32) {
+                LinkLogError("ak or sk or app or devicename is too long");
                 return LINK_ARG_TOO_LONG;
+        }
+        if (_pUserUploadArg->nDeviceAkLen <= 0 || _pUserUploadArg->nDeviceSkLen <= 0
+            || _pUserUploadArg->nAppLen <= 0 || _pUserUploadArg->nDeviceIdLen_ <= 0) {
+                LinkLogError("ak or sk or app or devicename is not exits");
+                return LINK_ARG_ERROR;
         }
         //LinkTsMuxUploader *pTsMuxUploader
         int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
@@ -1296,7 +1299,8 @@ static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         if (pFFTsMuxUploader->pPicUploader)
                 LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->deviceId_,
-                                                  strlen(pFFTsMuxUploader->deviceId_), nTimestamp);
+                                                  strlen(pFFTsMuxUploader->deviceId_), pFFTsMuxUploader->app_,
+                                                  strlen(pFFTsMuxUploader->app_), nTimestamp);
 }
 
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)

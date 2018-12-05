@@ -68,7 +68,7 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
+                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, "app1", 4, ts);
                 ts += 4990;
                 sleep(5);
         }
@@ -97,7 +97,7 @@ void justTestAsyncUploadPicture(const char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, ts);
+                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, "app1", 4, ts);
                 
                 sleep(1);
                 

@@ -49,6 +49,8 @@ typedef struct {
         const char *pConfigUrl;
         const char *pUa1;
         const char *pUa2;
+        const char *pApp1;
+        const char *pApp2;
         const char *pAk;
         const char *pSk;
         bool IsFileLoop;

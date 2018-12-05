@@ -74,6 +74,7 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
         if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceId_ == NULL || _pUserUploadArg->nDeviceIdLen_ == 0
+            ||_pUserUploadArg->pApp == NULL || _pUserUploadArg->nAppLen == 0
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
                 LinkLogError("token or deviceid or argument is null");
