@@ -115,10 +115,10 @@ static void freeRemoteConfig(RemoteConfig *pRc);
 
 #include <net/if.h>
 #include <sys/ioctl.h>
-char gSn[32];
+static char gSn[32];
 
 
-void getmac()
+void LinkInitSn()
 {
 #ifndef __APPLE__
         #define MAXINTERFACES 16

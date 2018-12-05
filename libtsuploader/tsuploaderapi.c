@@ -23,6 +23,8 @@ int LinkInit()
         av_register_all();
     #endif
 #endif
+        LinkInitSn();
+        
         setenv("TZ", "GMT-8", 1);
 
         int ret = 0;
