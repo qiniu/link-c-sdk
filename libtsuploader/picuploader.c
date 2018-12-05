@@ -83,11 +83,6 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
         return ret;
 }
 
-void LinkPicUploaderSetUploadZone(PictureUploader *pPicUploader, LinkUploadZone upzone) {
-        PicUploader *pPicUp = (PicUploader *)pPicUploader;
-        pPicUp->picUpSettings_.uploadZone = upzone;
-}
-
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;

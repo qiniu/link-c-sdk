@@ -23,7 +23,7 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         int ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
         int nDeadline;
-        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), NULL, &nDeadline, pUpToken);
+        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), &nDeadline, pUpToken);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;

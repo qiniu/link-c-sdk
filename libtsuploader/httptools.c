@@ -93,45 +93,6 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
         return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType, NULL, 0);
 }
 
-const char *LinkGetUploadHost(int nUseHttps, LinkUploadZone zone) {
-        if (nUseHttps) {
-                switch(zone) {
-                        case LINK_ZONE_HUABEI:
-                                return "https://up-z1.qiniup.com";
-                        case LINK_ZONE_HUANAN:
-                                return "https://up-z2.qiniup.com";
-                        case LINK_ZONE_BEIMEI:
-                                return "https://up-na0.qiniup.com";
-                        case LINK_ZONE_DONGNANYA:
-                                return "https://up-as0.qiniup.com";
-                        default:
-                                return "https://up.qiniup.com";
-                }
-        } else {
-                switch(zone) {
-                        case LINK_ZONE_HUABEI:
-                                return "http://upload-z1.qiniup.com";
-                        case LINK_ZONE_HUANAN:
-                                return "http://upload-z2.qiniup.com";
-                        case LINK_ZONE_BEIMEI:
-                                return "http://upload-na0.qiniup.com";
-                        case LINK_ZONE_DONGNANYA:
-                                return "http://upload-as0.qiniup.com";
-                        default:
-                                return "http://upload.qiniup.com";
-                }
-        }
-}
-
-const char *LinkGetRsHost(int nUseHttps) {
-        if (nUseHttps) {
-                return "https://rs.qiniu.com";
-        } else {
-                return "http://rs.qiniu.com";
-        }
-}
-
-
 //https://developer.qiniu.com/kodo/manual/1201/access-token
 int LinkGetUserConfig(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                               IN const char *pToken, IN int nTokenLen) {

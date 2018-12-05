@@ -57,15 +57,6 @@ typedef enum {
 } LinkUploadResult;
 typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
-typedef enum _LinkUploadZone{
-        LINK_ZONE_UNKNOWN = 0,
-        LINK_ZONE_HUADONG = 1,
-        LINK_ZONE_HUABEI = 2,
-        LINK_ZONE_HUANAN = 3,
-        LINK_ZONE_BEIMEI = 4,
-        LINK_ZONE_DONGNANYA = 5,
-}LinkUploadZone;
-
 typedef enum {
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2

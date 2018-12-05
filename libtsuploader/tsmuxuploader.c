@@ -110,7 +110,6 @@ typedef struct _FFTsMuxUploader{
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
 static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
-static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, LinkUploadZone _upzone);
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader);
 static void freeRemoteConfig(RemoteConfig *pRc);
 
@@ -1320,14 +1319,6 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         return LINK_SUCCESS;
 }
 
-static int linkTsMuxUploaderSetUploadZone(FFTsMuxUploader *pFFTsMuxUploader, LinkUploadZone _upzone) {
-        
-        if (pFFTsMuxUploader->pPicUploader) {
-                LinkPicUploaderSetUploadZone(pFFTsMuxUploader->pPicUploader, _upzone);
-        }
-        return LINK_SUCCESS;
-}
-
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
         if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
@@ -1479,13 +1470,11 @@ END:
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
-        int ret = LinkGetUploadToken(pBuf, 1024, &upzone, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }
-        linkTsMuxUploaderSetUploadZone(pFFTsMuxUploader, upzone);
         setToken(pFFTsMuxUploader, pBuf, strlen(pBuf));
         return LINK_SUCCESS;
 }

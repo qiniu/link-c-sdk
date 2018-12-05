@@ -20,7 +20,6 @@ typedef struct {
         void *pGetUploadParamCallbackOpaque;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
-        LinkUploadZone uploadZone;
         int useHttps;
 }LinkPicUploadFullArg;
 
@@ -31,8 +30,6 @@ int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, con
 
 //  getPicCallback return , should invoke this function to notify picuploader to upload picture
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const char *pFileName, int nFileNameLen, const char *pBuf, int nBuflen);
-
-void LinkPicUploaderSetUploadZone(PictureUploader *pPicUploader, LinkUploadZone upzone);
 
 void LinkDestroyPictureUploader(PictureUploader **pPicUploader);
 

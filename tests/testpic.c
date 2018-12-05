@@ -47,9 +47,8 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 
 void justTestSyncUploadPicture(const char *pTokenUrl) {
         asyncType = 0;
-        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int nDeadline = 0;
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, &nDeadline, pTokenUrl);
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &nDeadline, pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
@@ -60,7 +59,6 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
         arg.getUploadParamCallback = getUploadParamCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetUploadParamCallbackOpaque = NULL;
-        arg.uploadZone = upzone;
         
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);
@@ -76,9 +74,8 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
 }
 
 void justTestAsyncUploadPicture(const char *pTokenUrl) {
-        LinkUploadZone upzone = LINK_ZONE_UNKNOWN;
         int nDeadline;
-        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &upzone, &nDeadline, pTokenUrl);
+        int ret = LinkGetUploadToken(gtestToken, sizeof(gtestToken), &nDeadline, pTokenUrl);
         assert(ret == LINK_SUCCESS);
         ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
@@ -89,7 +86,6 @@ void justTestAsyncUploadPicture(const char *pTokenUrl) {
         arg.getUploadParamCallback = getUploadParamCallback;
         arg.pGetPicCallbackOpaque = NULL;
         arg.pGetUploadParamCallbackOpaque = NULL;
-        arg.uploadZone = upzone;
         
         ret = LinkNewPictureUploader(&pPicUploader, &arg);
         assert(ret == LINK_SUCCESS);

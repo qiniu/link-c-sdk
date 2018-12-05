@@ -759,6 +759,9 @@ static void checkCmdArg(const char * name)
                 if (cmdArg.pUa1 == NULL) {
                         cmdArg.pUa1 = "ipc99a";
                 }
+                if (cmdArg.pApp1 == NULL) {
+                        cmdArg.pApp1 = "app99";
+                }
         }
         
         if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture || cmdArg.IsJustTestSegment) {
@@ -799,7 +802,6 @@ static void * second_test(void * opaque) {
         avuploader.userUploadArg.nDeviceIdLen_ = strlen(cmdArg.pUa2);
         avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
-        avuploader.userUploadArg.uploadZone_ = cmdArg.zone;
         
         int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
         if (ret != 0) {
@@ -901,6 +903,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
         flag_str(&cmdArg.pUa1, "ua1", "ua(deviceid) name. default value is ipc99a");
         flag_str(&cmdArg.pUa2, "ua2", "ua(deviceid) name");
+        flag_str(&cmdArg.pUa1, "app1", "app name. default value is app99");
+        flag_str(&cmdArg.pUa2, "app2", "app name");
         flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
         flag_str(&cmdArg.pSk, "sk", "device secret token(not kodo sk)");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
@@ -914,21 +918,19 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-        printf("cmdArg.IsInputFromFFmpeg=%d\n", cmdArg.IsInputFromFFmpeg);
+        printf("cmdArg.pApp1=%s\n", cmdArg.pApp1);
+        printf("cmdArg.pUa1=%s\n", cmdArg.pUa1);
         printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
         printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
         printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
-        printf("cmdArg.IsLocalToken=%d\n", cmdArg.IsLocalToken);
-        printf("cmdArg.IsTwoFileUpload=%d\n", cmdArg.IsTwoFileUpload);
-        printf("cmdArg.IsTestMove=%d\n", cmdArg.IsTestMove);
-        printf("cmdArg.nSleeptime=%d\n", cmdArg.nSleeptime);
         printf("cmdArg.pAFilePath=%s\n", cmdArg.pAFilePath);
         printf("cmdArg.pVFilePath=%s\n", cmdArg.pVFilePath);
         printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
         printf("cmdArg.pConfigUrl=%s\n", cmdArg.pConfigUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
-        printf("cmdArg.nLoopSleeptime=%d\n", cmdArg.nLoopSleeptime);
+        printf("cmdArg.pAk=%s\n", cmdArg.pAk);
+        printf("cmdArg.psk=%s\n", cmdArg.pSk);
 
         checkCmdArg(argv[0]);
         
@@ -1039,6 +1041,8 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pAk);
         avuploader.userUploadArg.pDeviceSk = cmdArg.pSk;
         avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pSk);
+        avuploader.userUploadArg.pApp = cmdArg.pApp1;
+        avuploader.userUploadArg.nAppLen = strlen(cmdArg.pApp1);
         
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {

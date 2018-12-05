@@ -34,10 +34,6 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
 int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                        IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType);
 
-const char *LinkGetUploadHost(int nUseHttps, LinkUploadZone zone);
-
-const char *LinkGetRsHost(int nUseHttps);
-
 int LinkGetUserConfig(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                       IN const char *pToken, IN int nTokenLen);
 
