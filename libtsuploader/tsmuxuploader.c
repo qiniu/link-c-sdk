@@ -1295,9 +1295,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         if (pFFTsMuxUploader->pPicUploader)
-                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->deviceId_,
-                                                  strlen(pFFTsMuxUploader->deviceId_), pFFTsMuxUploader->app_,
-                                                  strlen(pFFTsMuxUploader->app_), nTimestamp);
+                LinkSendItIsTimeToCaptureSignal(pFFTsMuxUploader->pPicUploader, nTimestamp);
 }
 
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)

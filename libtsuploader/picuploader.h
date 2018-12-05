@@ -25,8 +25,7 @@ typedef struct {
 
 int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadFullArg *pArg);
 
-int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen,
-                                              const char *pApp, int nAppLen, int64_t nSysTimestamp);
+int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysTimestamp);
 
 //  getPicCallback return , should invoke this function to notify picuploader to upload picture
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const char *pFileName, int nFileNameLen, const char *pBuf, int nBuflen);

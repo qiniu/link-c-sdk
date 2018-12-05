@@ -41,7 +41,12 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         if (pParam->nTokenBufLen < strlen(gtestToken)) {
                 return LINK_BUFFER_IS_SMALL;
         }
-        memcpy(pParam->pTokenBuf, gtestToken, strlen(gtestToken));
+        if (pParam->pTypeBuf != NULL)
+                memcpy(pParam->pTokenBuf, gtestToken, strlen(gtestToken));
+        if (pParam->pApp != NULL)
+                memcpy(pParam->pApp, "app1", 4);
+        if (pParam->pDeviceName != NULL)
+                memcpy(pParam->pDeviceName, "dname1", 6);
         return LINK_SUCCESS;
 }
 
@@ -66,7 +71,7 @@ void justTestSyncUploadPicture(const char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, "app1", 4, ts);
+                LinkSendItIsTimeToCaptureSignal(pPicUploader, ts);
                 ts += 4990;
                 sleep(5);
         }
@@ -93,7 +98,7 @@ void justTestAsyncUploadPicture(const char *pTokenUrl) {
         int64_t ts = LinkGetCurrentNanosecond() / 1000000;
         while(1) {
                 
-                LinkSendGetPictureSingalToPictureUploader(pPicUploader, "pic1", 4, "app1", 4, ts);
+                LinkSendItIsTimeToCaptureSignal(pPicUploader, ts);
                 
                 sleep(1);
                 

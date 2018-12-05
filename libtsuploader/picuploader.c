@@ -31,8 +31,6 @@ typedef struct {
         int nDataLen;
         int64_t nTimestamp; //file name need
         pthread_t uploadPicThread;
-        char deviceId[33];
-        char app[33];
         PicUploader *pPicUploader;
         char *pFileName;
 }LinkPicUploadSignal;
@@ -40,22 +38,12 @@ typedef struct {
 
 static void * uploadPicture(void *_pOpaque);
 
-int LinkSendGetPictureSingalToPictureUploader(PictureUploader *pPicUploader, const char *pDeviceId, int nDeviceIdLen,
-                                              const char *pApp, int nAppLen, int64_t nSysTimestamp) {
+int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysTimestamp) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(LinkPicUploadSignal));
         sig.signalType_ = LinkPicUploadGetPicSignalCallback;
         sig.nTimestamp = nSysTimestamp;
-        if( nDeviceIdLen > sizeof(sig.deviceId) - 1) {
-                LinkLogError("deviceid too long:%d(%s)", nDeviceIdLen, pDeviceId);
-                return LINK_ARG_TOO_LONG;
-        }
-        if( nAppLen > sizeof(sig.app) - 1) {
-                LinkLogError("app too long:%d(%s)", nAppLen, pApp);
-                return LINK_ARG_TOO_LONG;
-        }
-        memcpy(sig.deviceId, pDeviceId, nDeviceIdLen);
-        memcpy(sig.app, pApp, nAppLen);
+       
         PicUploader *pPicUp = (PicUploader*)pPicUploader;
         return pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
 }
@@ -119,9 +107,23 @@ static void * listenPicUpload(void *_pOpaque)
                                         break;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
+                                                LinkUploadParam param;
+                                                memset(&param, 0, sizeof(param));
+                                                char deviceName[33] = {0};
+                                                char app[33] = {0};
+                                                param.pDeviceName = deviceName;
+                                                param.nDeviceNameLen = sizeof(deviceName);
+                                                param.pApp = app;
+                                                param.nAppLen = sizeof(app);
+                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param);
+                                                if (r != LINK_SUCCESS) {
+                                                        LinkLogError("getUploadParamCallback fail:%d", r);
+                                                        break;
+                                                }
+                                                
                                                 char key[160] = {0};
                                                 memset(key, 0, sizeof(key));
-                                                snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", sig.deviceId, sig.nTimestamp);
+                                                snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
                                                                                             key, strlen(key));
@@ -210,7 +212,8 @@ static void * uploadPicture(void *_pOpaque) {
                 }
                 snprintf(key, sizeof(key), "%s", n);
         } else {
-                snprintf(key, sizeof(key), "frame/%s/%"PRId64"/0.jpg", pSig->deviceId, pSig->nTimestamp);
+                LinkLogError("picuploader pFileName not exits");
+                return NULL;
         }
         
         char uptoken[1024] = {0};
