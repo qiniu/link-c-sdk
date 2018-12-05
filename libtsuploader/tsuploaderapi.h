@@ -28,7 +28,7 @@ int LinkInit();
  *
  * @param[out] pTsMuxUploader 切片上传实例
  * @param[in]  pAvArg 上传的 audio/video 的格式参数
- * @param[in]  pUserUploadArg 上传需要的参数，用来设置 token,deviceid
+ * @param[in]  pUserUploadArg 上传需要的参数，用来设置 token,deviceName
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
@@ -43,7 +43,7 @@ int LinkCreateAndStartAVUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
  *
  * @param[out] pTsMuxUploader 切片上传实例
  * @param[in]  pAvArg 上传的 audio/video 的格式参数
- * @param[in]  pUserUploadArg 上传需要的参数，用来设置 token,deviceid
+ * @param[in]  pUserUploadArg 上传需要的参数，用来设置 token,deviceName
  * @param[in]  pPicArg 图片上传参数
  * @return LINK_SUCCESS 成功; 其它值 失败
  */

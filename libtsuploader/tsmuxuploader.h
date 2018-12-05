@@ -26,4 +26,5 @@ int LinkNewTsMuxUploaderWillPicAndSeg(OUT LinkTsMuxUploader **pTsMuxUploader, IN
                                       IN const LinkUserUploadArg *pUserUploadArg, IN const LinkPicUploadArg *pPicArg);
 int LinkTsMuxUploaderStart(IN LinkTsMuxUploader *pTsMuxUploader);
 void LinkDestroyTsMuxUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
+void LinkInitSn();
 #endif

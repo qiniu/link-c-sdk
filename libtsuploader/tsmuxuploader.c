@@ -83,7 +83,7 @@ typedef struct _FFTsMuxUploader{
         int nUploadBufferSize;
         int nUpdateSegmentInterval;
         
-        char deviceId_[33];
+        char deviceName_[33];
         char app_[33];
         Token token_;
         LinkTsUploadArg uploadArg;
@@ -115,10 +115,10 @@ static void freeRemoteConfig(RemoteConfig *pRc);
 
 #include <net/if.h>
 #include <sys/ioctl.h>
-char gSn[32];
+static char gSn[32];
 
 
-void getmac()
+void LinkInitSn()
 {
 #ifndef __APPLE__
         #define MAXINTERFACES 16
@@ -159,7 +159,8 @@ void getmac()
                         }
                 }
         }
-         memcpy(gSn, "TEST_MACADDR", 12);
+        if (gSn[0] == 0)
+                memcpy(gSn, "TEST_MACADDR", 12);
 #else
         memcpy(gSn, "TEST_MACADDR", 12);
 #endif
@@ -997,7 +998,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         int ret = 0;
         
-        memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
+        memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
         memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
         
         
@@ -1123,13 +1124,13 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         }
         
         if (pParam->pDeviceName != NULL) {
-                int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceId_);
+                int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceName_);
                 if (pParam->nDeviceNameLen - 1 < nDeviceNameLen) {
-                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->deviceName_, nDeviceNameLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceName_, nDeviceNameLen);
                 pParam->nDeviceNameLen = nDeviceNameLen;
                 pParam->pDeviceName[nDeviceNameLen] = 0;
         }
@@ -1142,12 +1143,12 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
 int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
                                             const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg) {
         if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN
-            || _pUserUploadArg->nAppLen > 32 || _pUserUploadArg->nDeviceIdLen_ > 32) {
+            || _pUserUploadArg->nAppLen > 32 || _pUserUploadArg->nDeviceNameLen > 32) {
                 LinkLogError("ak or sk or app or devicename is too long");
                 return LINK_ARG_TOO_LONG;
         }
         if (_pUserUploadArg->nDeviceAkLen <= 0 || _pUserUploadArg->nDeviceSkLen <= 0
-            || _pUserUploadArg->nAppLen <= 0 || _pUserUploadArg->nDeviceIdLen_ <= 0) {
+            || _pUserUploadArg->nAppLen <= 0 || _pUserUploadArg->nDeviceNameLen <= 0) {
                 LinkLogError("ak or sk or app or devicename is not exits");
                 return LINK_ARG_ERROR;
         }
