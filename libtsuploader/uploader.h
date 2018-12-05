@@ -11,15 +11,12 @@ typedef void (*LinkTsUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t
 typedef struct _LinkTsUploadArg {
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
-        LinkUploadZone uploadZone;
-        char    *pDeviceId_;
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
         int64_t nLastUploadTsTime_;
         LinkTsUploadArgUpadater UploadSegmentIdUpadate;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
-        int useHttps;
 }LinkTsUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;

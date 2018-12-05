@@ -1003,7 +1003,6 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
                 return LINK_ARG_TOO_LONG;
         }
         memcpy(pFFTsMuxUploader->deviceId_, _pUserUploadArg->pDeviceId_, _pUserUploadArg->nDeviceIdLen_);
-        pFFTsMuxUploader->uploadArg.pDeviceId_ = pFFTsMuxUploader->deviceId_;
         
         
         if (isWithPicAndSeg) {
@@ -1125,6 +1124,18 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                         pFFTsMuxUploader->isTypeOneshot = 0;
                         memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
                 }
+        }
+        
+        if (pParam->pDeviceName != NULL) {
+                int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceId_);
+                if (pParam->nDeviceNameLen - 1 < nDeviceNameLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceId_, nDeviceNameLen);
+                pParam->nDeviceNameLen = nDeviceNameLen;
+                pParam->pDeviceName[nDeviceNameLen] = 0;
         }
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1284,8 +1295,8 @@ int LinkResumeUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         if (pFFTsMuxUploader->pPicUploader)
-                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->uploadArg.pDeviceId_,
-                                                  strlen(pFFTsMuxUploader->uploadArg.pDeviceId_), nTimestamp);
+                LinkSendGetPictureSingalToPictureUploader(pFFTsMuxUploader->pPicUploader, pFFTsMuxUploader->deviceId_,
+                                                  strlen(pFFTsMuxUploader->deviceId_), nTimestamp);
 }
 
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)

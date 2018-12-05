@@ -29,13 +29,17 @@ typedef void (*LinkSetKeyframeMetaInfo)(void *pUserArg, LinkKeyFrameMetaInfo *pM
 
 typedef struct {
         IN char *pTokenBuf;
-        IN int nTokenBufLen;
+        IN OUT int nTokenBufLen;
         IN char *pTypeBuf;
-        IN int nTypeBufLen;
+        IN OUT int nTypeBufLen;
         IN char *pUpHost;
-        IN int nUpHostLen;
+        IN OUT int nUpHostLen;
         IN char* pSegUrl;
-        IN int nSegUrlLen;
+        IN OUT int nSegUrlLen;
+        IN char* pDeviceName;
+        IN OUT int nDeviceNameLen;
+        IN char* pApp;
+        IN OUT int nAppLen;
 }LinkUploadParam;
 
 typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
