@@ -102,6 +102,8 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         userUploadArg.nDeviceAkLen = _pUserUploadArg->nDeviceAkLen;
         userUploadArg.pDeviceSk = _pUserUploadArg->pDeviceSk;
         userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
+        userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->reserved1;
+        userUploadArg.pUploadStatArg = _pUserUploadArg->reserved2;
         
         LinkTsMuxUploader *pTsMuxUploader;
         int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);
