@@ -56,7 +56,6 @@ typedef struct  {
         char *pUpTokenRequestUrl;
         char *pUpHostUrl;
         char *pAppName;
-        int   useHttps;
         
         //not use now
         int   nUploaderBufferSize;
@@ -1163,6 +1162,18 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 pParam->pDeviceName[nDeviceNameLen] = 0;
         }
         
+        if (pParam->pApp != NULL) {
+                int nAppLen = strlen(pFFTsMuxUploader->app_);
+                if (pParam->nAppLen - 1 < nAppLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->app_, nAppLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pApp, pFFTsMuxUploader->app_, nAppLen);
+                pParam->nAppLen = nAppLen;
+                pParam->pApp[nAppLen] = 0;
+        }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
         return LINK_SUCCESS;
@@ -1474,23 +1485,17 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
         pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
         
-        pNode = cJSON_GetObjectItem(pSeg, "use_https");
+        pNode = cJSON_GetObjectItem(pSeg, "app_name");
         if (pNode != NULL) {
-                pRc->useHttps = pNode->valueint;
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pAppName = malloc(nCpyLen + 1);
+                if (pRc->pAppName == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pAppName, pNode->valuestring, nCpyLen);
+                pRc->pAppName[nCpyLen] = 0;
         }
         
-        pNode = cJSON_GetObjectItem(pSeg, "app_name");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
-        }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pAppName = malloc(nCpyLen + 1);
-        if (pRc->pAppName == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pAppName, pNode->valuestring, nCpyLen);
-        pRc->pAppName[nCpyLen] = 0;
         
         cJSON_Delete(pJsonRoot);
         

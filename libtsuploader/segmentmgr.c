@@ -204,7 +204,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
         }
         
         if (segmentMgr.handles[idx].segUploadOk == 0) {
-                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", param.pDeviceName, segInfo.nStart, segInfo.nEndOrInt);
+                snprintf(key, sizeof(key), "%s/%s/seg/%"PRId64"/%"PRId64"", app, param.pDeviceName, segInfo.nStart, segInfo.nEndOrInt);
                 segmentMgr.handles[idx].nStart = segInfo.nStart;
                 segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
         } else {
@@ -212,9 +212,9 @@ static void upadateSegmentFile(SegInfo segInfo) {
                         LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, segInfo.nEndOrInt);
                         return;
                 }
-                snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
+                snprintf(oldKey, sizeof(oldKey), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
-                snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
+                snprintf(key, sizeof(key), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
                 isNewSeg = 0;
         }

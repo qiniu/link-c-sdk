@@ -48,20 +48,6 @@ typedef struct _KodoUploader{
         int nMetaInfoLen;
 }KodoUploader;
 
-
-
-
-static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserData) {
-        char **pResp = (char **)pUserData;
-        int len = size * nmemb ;
-        char *respTxt = (char *)malloc(len +1);
-        memcpy(respTxt, resp, len);
-        
-        respTxt[len] = 0;
-        *pResp = respTxt;
-        return len;
-}
-
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
 {
@@ -129,6 +115,7 @@ static void * streamUpload(void *_pOpaque)
         char upHost[192] = {0};
         char suffix[16] = {0};
         char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
+        char app[LINK_MAX_APP_LEN+1] = {0};
         int ret = 0;
         
         LinkUploadParam param;
@@ -141,8 +128,10 @@ static void * streamUpload(void *_pOpaque)
         param.nUpHostLen = sizeof(upHost);
         param.pDeviceName = deviceName;
         param.nDeviceNameLen = sizeof(deviceName);
+        param.pApp = app;
+        param.nAppLen = sizeof(app);
         
-        char key[128] = {0};
+        char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
         enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
         // wait for first packet
@@ -160,10 +149,10 @@ static void * streamUpload(void *_pOpaque)
                                                           &param);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
-                        LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
+                        LinkLogError("param buffer is too small. drop file");
                         goto END;
                 } else {
-                        LinkLogError("not get uptoken yet:%s", key);
+                        LinkLogError("not get param yet:%d", ret);
                         goto END;
                 }
         }
@@ -198,10 +187,10 @@ static void * streamUpload(void *_pOpaque)
                 if (r > 0) {
                         //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
                         if (suffix[0] != 0) {
-                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
+                                sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pApp, param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
                         } else {
-                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
+                                sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pApp, param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         }
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
