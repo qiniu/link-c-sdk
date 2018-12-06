@@ -154,15 +154,6 @@ int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
         return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);
 }
 
-void LinkUpdateNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
-{
-        if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {
-                LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
-                return;
-        }
-        _pTsMuxUploader->SetUpdateSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
-}
-
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
         LinkDestroyTsMuxUploader(pTsMuxUploader);
