@@ -12,6 +12,11 @@
 #include <fcntl.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <signal.h>
+#include <execinfo.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "tsuploaderapi.h"
 #include "security.h"
@@ -112,7 +117,6 @@ int AlarmCallback( int alarm, void *data )
             LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
-        char *file = (char *) malloc(  strlen((char *)data)+1 );
         void *pBuf = NULL;
         int size = 0, ret = 0;
 
@@ -145,13 +149,11 @@ int AlarmCallback( int alarm, void *data )
         ret = LoadFile( (char *)data, size, pBuf );
         if ( ret < 0 ) {
             DBG_ERROR("LoadFile error\n");
+            free( pBuf );
             return 0;
         }
-        memset( file, 0, strlen((char *)data)+1 );
-        memcpy( file, (char *)data, strlen((char *)data) );
         memset( lastPicName, 0, sizeof(lastPicName) );
         memcpy( lastPicName, (char *)data, sizeof(lastPicName) );
-        DBG_LOG("notify jpeg file : %s \n", file );
 
         LinkPushPicture( gIpc.stream[STREAM_MAIN].uploader, (char *)data,
                                 strlen((char *)data), pBuf, size ); 
@@ -227,7 +229,6 @@ int _TsUploaderSdkInit( StreamChannel ch )
     if ( ch == STREAM_MAIN ) {
         userUploadArg.getPictureCallback = GetPicCallback;
     }
-
     if ( gIpc.audioType == AUDIO_AAC ) {
         userUploadArg.nAudioFormat = LINK_AUDIO_AAC;
         userUploadArg.nSampleRate = 16000;
@@ -235,18 +236,17 @@ int _TsUploaderSdkInit( StreamChannel ch )
         userUploadArg.nAudioFormat = LINK_AUDIO_PCMU;
         userUploadArg.nSampleRate = 8000;
     }
-    userUploadArg.nChannels = 1;
-    userUploadArg.nVideoFormat = LINK_VIDEO_H264;
-
     if ( STREAM_MAIN == ch ) {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "a" );
     } else {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "b" );
     }
-    
+    userUploadArg.nChannels = 1;
+    userUploadArg.nVideoFormat = LINK_VIDEO_H264;
     userUploadArg.pDeviceName = gIpc.stream[ch].devId;
     userUploadArg.nDeviceNameLen = strlen(gIpc.stream[ch].devId);
-
+    userUploadArg.pApp = gIpc.stream[ch].devId;
+    userUploadArg.nAppLen = strlen(gIpc.stream[ch].devId);
     userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
     userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
     if ( gIpc.config.ak ) {
@@ -368,6 +368,52 @@ char *GetAacFile()
     return gIpc.config.aac_file;
 }
 
+void SignalHandler( int sig )
+{
+    FILE *fp = fopen( "/tmp/oem/app/crash.log", "w+" );
+    if ( fp ) {
+        char buffer[32] = { 0 };
+        void *array[20];
+        size_t size;
+        char **strings;
+        size_t i;
+
+        size = backtrace (array, 20);
+        strings = backtrace_symbols (array, size);
+
+        sprintf( buffer, "get sig %d\n", sig );
+        fwrite( buffer, strlen(buffer), 1, fp );
+        memset( buffer, 0, sizeof(buffer) );
+        sprintf( buffer, "Obtained %zd stack frames.\n", size );
+        fwrite( buffer, strlen(buffer), 1, fp );
+        for ( i=0; i<size; i++ ) {
+            fwrite( strings[i], strlen(strings[i]), 1, fp );
+        }
+        fclose( fp );
+    }
+    DBG_LOG("get sig %d\n", sig );
+    switch( sig ) {
+    case SIGINT:
+    case SIGQUIT:
+    case SIGABRT:
+    case SIGSEGV:
+    case SIGKILL:
+    case SIGTERM:
+        exit(0);
+        break;
+
+    }
+}
+
+void SignalSetup()
+{
+    int i = 0;
+
+    for ( i=0; i<32; i++ ) {
+        signal( i, SignalHandler );
+    }
+}
+
 
 int main()
 {
@@ -377,6 +423,7 @@ int main()
     gIpc.version = "v00.00.07";
     gIpc.running = 1;
 
+    SignalSetup();
     InitConfig();
     UpdateConfig();
     
@@ -411,9 +458,9 @@ int main()
         sleep( gIpc.config.heartBeatInterval );
         DbgGetMemUsed( used );
         cpu_usage = DbgGetCpuUsage();
-        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\ntoken_url : %s\nreanme_url : %s\n",
-                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage,
-                gIpc.config.tokenUrl, gIpc.config.renameTokenUrl );
+        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\n",
+                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage );
+        DBG_LOG(" toekn url : %s\n", gIpc.config.tokenUrl );
     }
 
     CaptureDevDeinit();
