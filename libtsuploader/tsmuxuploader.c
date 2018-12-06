@@ -83,8 +83,8 @@ typedef struct _FFTsMuxUploader{
         int nUploadBufferSize;
         int nUpdateSegmentInterval;
         
-        char deviceName_[33];
-        char app_[33];
+        char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
+        char app_[LINK_MAX_APP_LEN+1];
         Token token_;
         LinkTsUploadArg uploadArg;
         PictureUploader *pPicUploader;
@@ -906,8 +906,11 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
         
         if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
+                pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
                 pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
+                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
                 return;
         }
 
@@ -915,7 +918,12 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
                 _pUploadArg->nSegmentId_ = nNow;
+                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+        } else {
+                pFFTsMuxUploader->uploadArg.nSegSeqNum++;
         }
+        pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
+        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
         pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
         return;
 }
@@ -1469,8 +1477,14 @@ END:
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        int nOffset = snprintf(pBuf, 1024, "%s", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        
+        ///v1/device/uploadtoken?session=<session>&sequence=<sequence>&start=<startTimestamp>&now=<nowTimestamp>
+        //TODO add query arg
+        
+        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf);
         if (ret != LINK_SUCCESS) {
+                free(pBuf);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }

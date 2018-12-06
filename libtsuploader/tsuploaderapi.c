@@ -79,7 +79,12 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
             ||_pUserUploadArg->pApp == NULL || _pUserUploadArg->nAppLen == 0
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
-                LinkLogError("token or deviceName or argument is null");
+                LinkLogError("app or deviceName or ak or sk argument is null");
+                return LINK_ARG_ERROR;
+        }
+        if (_pUserUploadArg->nAppLen > LINK_MAX_APP_LEN || _pUserUploadArg->nDeviceNameLen > LINK_MAX_DEVICE_NAME_LEN) {
+                LinkLogError("app or deviceName is too long:%d %d", _pUserUploadArg->nAppLen,
+                             _pUserUploadArg->nDeviceNameLen);
                 return LINK_ARG_ERROR;
         }
         

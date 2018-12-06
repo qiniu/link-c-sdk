@@ -128,7 +128,7 @@ static void * streamUpload(void *_pOpaque)
         char uptoken[1024] = {0};
         char upHost[192] = {0};
         char suffix[16] = {0};
-        char deviceName[33] = {0};
+        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
         int ret = 0;
         
         LinkUploadParam param;
