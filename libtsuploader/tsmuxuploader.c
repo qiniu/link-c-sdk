@@ -52,11 +52,12 @@ typedef struct _Token {
 
 typedef struct  {
         int updateConfigInterval;
+        int nTsDuration; //millisecond
+        int nSessionDuration; //millisecond
+        int nSessionTimeout; //millisecond
         char *pMgrTokenRequestUrl;
         char *pUpTokenRequestUrl;
         char *pUpHostUrl;
-        char *pAppName;
-        int   useHttps;
         
         //not use now
         int   nUploaderBufferSize;
@@ -81,7 +82,6 @@ typedef struct _FFTsMuxUploader{
         LinkUploadState ffMuxSatte;
         
         int nUploadBufferSize;
-        int nUpdateSegmentInterval;
         
         char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
         char app_[LINK_MAX_APP_LEN+1];
@@ -103,6 +103,9 @@ typedef struct _FFTsMuxUploader{
         
         char ak[41];
         char sk[41];
+        uint8_t isMaxThreadLimited;
+        int nMaxUploadThreadNum;
+        int nUploadThreadNum;
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
 }FFTsMuxUploader;
@@ -442,8 +445,8 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
         return -2;
 }
 
-static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int64_t nSysNanotime, int _nIsSegStart,
-                       const char * _pData, int _nDataLen)
+static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo,
+                       int64_t nSysNanotime, int _nIsSegStart, const char * _pData, int _nDataLen)
 {
         int ret;
         int shouldSwitch = 0;
@@ -451,14 +454,19 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         if (pFFTsMuxUploader->nFirstTimestamp == -1) {
                 pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
         }
-        LinkUploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == LINK_UPLOAD_FAIL) {
-        if ( ustate != LINK_UPLOAD_INIT) {
-                if (ustate == LINK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL) {
-                        LinkLogDebug("upload fail. drop the data");
+        if (pFFTsMuxUploader->pTsMuxCtx) {
+                LinkUploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+                //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == LINK_UPLOAD_FAIL) {
+                if ( ustate != LINK_UPLOAD_INIT) {
+                        if (ustate == LINK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL) {
+                                LinkLogDebug("upload fail. drop the data");
+                        }
+                        pFFTsMuxUploader->ffMuxSatte = ustate;
+                        shouldSwitch = 1;
                 }
-                pFFTsMuxUploader->ffMuxSatte = ustate;
+        } else {
                 shouldSwitch = 1;
+                //assert(pFFTsMuxUploader->nUploadThreadNum == 0);
         }
         int isVideoKeyframe = 0;
         int isSameAsBefore = 0;
@@ -476,8 +484,10 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         }
         // if start new uploader, start from keyframe
         if (isVideoKeyframe || shouldSwitch) {
-                if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > 4980 && pFFTsMuxUploader->nKeyFrameCount > 0)
+                if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > pFFTsMuxUploader->remoteConfig.nTsDuration
+                                      && pFFTsMuxUploader->nKeyFrameCount > 0)
                    //at least 1 keyframe and aoubt last 5 second
+                   || shouldSwitch
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_INIT){   // upload finished
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
@@ -487,16 +497,25 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
                         int64_t nDiff = (nSysNanotime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
-                        if (nDiff < 1000) {
-                                LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
+                        if (nIsKeyFrame) {
+                                if (nDiff < 1000) {
+                                        LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
+                                }
+                                pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         }
-                        pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         if (_nIsSegStart) {
                                 pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
-                        ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
-                        if (ret != 0) {
-                                return ret;
+                        if (pFFTsMuxUploader->nUploadThreadNum >= pFFTsMuxUploader->nMaxUploadThreadNum) {
+                                pFFTsMuxUploader->isMaxThreadLimited = 1;
+                                LinkLogWarn("reach max thread limit:%d", pFFTsMuxUploader->nUploadThreadNum);
+                        } else {
+                                ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
+                                if (ret != LINK_SUCCESS) {
+                                        return ret;
+                                }else {
+                                        pFFTsMuxUploader->nUploadThreadNum++;
+                                }
                         }
                 }
                 if (isVideoKeyframe) {
@@ -907,15 +926,20 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         
         if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
                 pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
-                pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
+                pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
                 pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
                 _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
                 return;
         }
+        
+        int64_t nDuration = pFFTsMuxUploader->uploadArg.nLastEndTsTime - pFFTsMuxUploader->uploadArg.nSegmentId_;
+        if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
+                //TODO report seg info
+        }
 
-        int64_t nDiff = pFFTsMuxUploader->nUpdateSegmentInterval * 1000000000LL;
-        if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
+        int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
+        if (nNow - pFFTsMuxUploader->uploadArg.nLastEndTsTime >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
                 _pUploadArg->nSegmentId_ = nNow;
                 pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
@@ -924,7 +948,7 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         }
         pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
         _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
-        pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
+        pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
         return;
 }
 
@@ -954,16 +978,6 @@ static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
         return nUsed + (nUsed/188) * 4;
 }
 
-static void setUpdateSegmentInterval(LinkTsMuxUploader* _pTsMuxUploader, int nInterval)
-{
-        if (nInterval < 15) {
-                LinkLogWarn("setNewSegmentInterval is to small:%d. ge 15 required", nInterval);
-                return;
-        }
-        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
-        pFFTsMuxUploader->nUpdateSegmentInterval = nInterval;
-}
-
 static void freeRemoteConfig(RemoteConfig *pRc) {
         if (pRc->pUpHostUrl) {
                 free(pRc->pUpHostUrl);
@@ -980,10 +994,6 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
                 pRc->pUpTokenRequestUrl = NULL;
         }
         
-        if (pRc->pAppName) {
-                free(pRc->pAppName);
-                pRc->pAppName = NULL;
-        }
         return;
 }
 
@@ -1008,7 +1018,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
         memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
-        
+        pFFTsMuxUploader->nMaxUploadThreadNum = _pUserUploadArg->nMaxUploadThreadNum;
+        if (pFFTsMuxUploader->nMaxUploadThreadNum <= 0 || pFFTsMuxUploader->nMaxUploadThreadNum > 100)
+                pFFTsMuxUploader->nMaxUploadThreadNum = 3;
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
@@ -1029,8 +1041,6 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
                 pFFTsMuxUploader->pConfigRequestUrl[_pUserUploadArg->nConfigRequestUrlLen] = 0;
         }
         
-        pFFTsMuxUploader->nUpdateSegmentInterval = 30;
-        
         pFFTsMuxUploader->nFirstTimestamp = -1;
         
         ret = pthread_mutex_init(&pFFTsMuxUploader->muxUploaderMutex_, NULL);
@@ -1049,7 +1059,6 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
-        pFFTsMuxUploader->tsMuxUploader_.SetUpdateSegmentInterval = setUpdateSegmentInterval;
         pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
         pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
@@ -1141,6 +1150,18 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
                 memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceName_, nDeviceNameLen);
                 pParam->nDeviceNameLen = nDeviceNameLen;
                 pParam->pDeviceName[nDeviceNameLen] = 0;
+        }
+        
+        if (pParam->pApp != NULL) {
+                int nAppLen = strlen(pFFTsMuxUploader->app_);
+                if (pParam->nAppLen - 1 < nAppLen) {
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->app_, nAppLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pApp, pFFTsMuxUploader->app_, nAppLen);
+                pParam->nAppLen = nAppLen;
+                pParam->pApp[nAppLen] = 0;
         }
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1280,7 +1301,6 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pFFTsMuxUploader->nFirstTimestamp = 0;
         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
         pushRecycle(pFFTsMuxUploader);
-        ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
         
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 
@@ -1307,6 +1327,16 @@ static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
                 LinkSendItIsTimeToCaptureSignal(pFFTsMuxUploader->pPicUploader, nTimestamp);
 }
 
+static void uploadThreadNumDec(void *pOpaque, int64_t nTimestamp) {
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->isMaxThreadLimited)
+                pFFTsMuxUploader->isMaxThreadLimited = 0;
+        pFFTsMuxUploader->nUploadThreadNum--;
+        LinkLogDebug("threadnum:%d", pFFTsMuxUploader->nUploadThreadNum);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+}
+
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
@@ -1320,10 +1350,11 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        //LinkTsUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        return LINK_SUCCESS;
+        LinkTsUploaderSetTsEndUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, uploadThreadNumDec, pFFTsMuxUploader);
+        
+        ret = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        return ret;
 }
 
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
@@ -1397,7 +1428,14 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         }
         pRc->updateConfigInterval = pNode->valueint;
         
-        pNode = cJSON_GetObjectItem(pJsonRoot, "uploadUrl");
+        
+        cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
+        if (pSeg == NULL) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_JSON_FORMAT;
+        }
+        
+        pNode = cJSON_GetObjectItem(pSeg, "uploadUrl");
         if (pNode == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
@@ -1411,14 +1449,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         pRc->pUpHostUrl[nCpyLen] = 0;
         
         
-        cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
-        if (pSeg == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
-        }
-        
-        
-        pNode = cJSON_GetObjectItem(pSeg, "token_request_url");
+        pNode = cJSON_GetObjectItem(pSeg, "tokenRequestUrl");
         if (pNode == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
@@ -1431,7 +1462,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
         pRc->pUpTokenRequestUrl[nCpyLen] = 0;
         
-        pNode = cJSON_GetObjectItem(pSeg, "seg_report_url");
+        pNode = cJSON_GetObjectItem(pSeg, "segReportUrl");
         if (pNode == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
@@ -1444,23 +1475,28 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
         pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
         
-        pNode = cJSON_GetObjectItem(pSeg, "use_https");
+        pNode = cJSON_GetObjectItem(pSeg, "tsDuration");
         if (pNode != NULL) {
-                pRc->useHttps = pNode->valueint;
+                pRc->nTsDuration = pNode->valueint * 1000;
+        }
+        if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
+                pRc->nTsDuration = 5000;
+        
+        pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
+        if (pNode != NULL) {
+                pRc->nSessionDuration = pNode->valueint * 1000;
+        }
+        if (pRc->nSessionDuration < 600 * 1000) {
+                pRc->nSessionDuration = 600 * 1000;
         }
         
-        pNode = cJSON_GetObjectItem(pSeg, "app_name");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        pNode = cJSON_GetObjectItem(pSeg, "sessionTimeout");
+        if (pNode != NULL) {
+                pRc->nSessionTimeout = pNode->valueint * 1000;
         }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pAppName = malloc(nCpyLen + 1);
-        if (pRc->pAppName == NULL) {
-                goto END;
+        if (pRc->nSessionTimeout < 1000) {
+                pRc->nSessionTimeout = 3000;
         }
-        memcpy(pRc->pAppName, pNode->valuestring, nCpyLen);
-        pRc->pAppName[nCpyLen] = 0;
         
         cJSON_Delete(pJsonRoot);
         

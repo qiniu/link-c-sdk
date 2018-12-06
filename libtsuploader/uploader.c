@@ -42,25 +42,11 @@ typedef struct _KodoUploader{
         
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
-        LinkTsStartUploadCallback tsStartUploadCallback;
-        void *pTsStartUploadCallbackArg;
+        LinkEndUploadCallback pTsEndUploadCallback;
+        void *pTsEndUploadCallbackArg;
         LinkKeyFrameMetaInfo metaInfo[10];
         int nMetaInfoLen;
 }KodoUploader;
-
-
-
-
-static size_t writeResult(void *resp, size_t size,  size_t nmemb,  void *pUserData) {
-        char **pResp = (char **)pUserData;
-        int len = size * nmemb ;
-        char *respTxt = (char *)malloc(len +1);
-        memcpy(respTxt, resp, len);
-        
-        respTxt[len] = 0;
-        *pResp = respTxt;
-        return len;
-}
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
@@ -129,6 +115,7 @@ static void * streamUpload(void *_pOpaque)
         char upHost[192] = {0};
         char suffix[16] = {0};
         char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
+        char app[LINK_MAX_APP_LEN+1] = {0};
         int ret = 0;
         
         LinkUploadParam param;
@@ -141,8 +128,10 @@ static void * streamUpload(void *_pOpaque)
         param.nUpHostLen = sizeof(upHost);
         param.pDeviceName = deviceName;
         param.nDeviceNameLen = sizeof(deviceName);
+        param.pApp = app;
+        param.nAppLen = sizeof(app);
         
-        char key[128] = {0};
+        char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
         enum CircleQueuePolicy qtype = pUploader->pQueue_->GetType(pUploader->pQueue_);
         // wait for first packet
@@ -160,10 +149,10 @@ static void * streamUpload(void *_pOpaque)
                                                           &param);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
-                        LinkLogError("token buffer %d is too small. drop file:%s", sizeof(uptoken), key);
+                        LinkLogError("param buffer is too small. drop file");
                         goto END;
                 } else {
-                        LinkLogError("not get uptoken yet:%s", key);
+                        LinkLogError("not get param yet:%d", ret);
                         goto END;
                 }
         }
@@ -176,7 +165,7 @@ static void * streamUpload(void *_pOpaque)
         if (pUploader->uploadArg.nSegmentId_ == 0) {
                 pUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
-        pUploader->uploadArg.nLastUploadTsTime_ = tsStartTime;
+        pUploader->uploadArg.nLastStartTime_ = tsStartTime;
         if (pUploader->uploadArg.UploadSegmentIdUpadate) {
                 pUploader->uploadArg.UploadSegmentIdUpadate(pUploader->uploadArg.pUploadArgKeeper_, &pUploader->uploadArg, tsStartTime,
                                                             tsStartTime + tsDuration * 1000000);
@@ -190,17 +179,13 @@ static void * streamUpload(void *_pOpaque)
         }
         memset(key, 0, sizeof(key));
         
-        
-        if (pUploader->tsStartUploadCallback) {
-                pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, tsStartTime / 1000000);
-        }
-        
 
         if (qtype == TSQ_APPEND) {
                 int r, l;
                 char *bufData;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
+#ifdef LINK_USE_OLD_NAME
                         //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
                         if (suffix[0] != 0) {
                                 sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
@@ -209,6 +194,17 @@ static void * streamUpload(void *_pOpaque)
                                 sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         }
+                        
+#else
+                        // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
+                        if (suffix[0] != 0) {
+                                sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pApp, param.pDeviceName,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
+                        } else {
+                                sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pApp, param.pDeviceName,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                        }
+#endif
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
                         int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUploader->metaInfo,
@@ -232,6 +228,9 @@ static void * streamUpload(void *_pOpaque)
 END:
         if (pUploader->uploadArg.pUploadStatisticCb) {
                 pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
+        }
+        if (pUploader->pTsEndUploadCallback) {
+                pUploader->pTsEndUploadCallback(pUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
 
         return NULL;
@@ -361,10 +360,10 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
         return LINK_SUCCESS;
 }
 
-void LinkTsUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque) {
+void LinkTsUploaderSetTsEndUploadCallback(LinkTsUploader * _pUploader, LinkEndUploadCallback cb, void *pOpaque) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
-        pKodoUploader->tsStartUploadCallback = cb;
-        pKodoUploader->pTsStartUploadCallbackArg = pOpaque;
+        pKodoUploader->pTsEndUploadCallback = cb;
+        pKodoUploader->pTsEndUploadCallbackArg = pOpaque;
 }
 
 void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)

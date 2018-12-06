@@ -62,12 +62,6 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
                 return ret;
         }
         
-        ret = LinkTsMuxUploaderStart(pTsMuxUploader);
-        if (ret != 0){
-                LinkDestroyTsMuxUploader(&pTsMuxUploader);
-                LinkLogError("UploadStart fail:%d", ret);
-                return ret;
-        }
         *_pTsMuxUploader = pTsMuxUploader;
 
         return LINK_SUCCESS;
@@ -112,6 +106,7 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
         userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->reserved1;
         userUploadArg.pUploadStatArg = _pUserUploadArg->reserved2;
+        userUploadArg.nMaxUploadThreadNum = _pUserUploadArg->nMaxUploadThreadNum;
         
         LinkTsMuxUploader *pTsMuxUploader;
         int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);
@@ -120,12 +115,6 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
                 return ret;
         }
         
-        ret = LinkTsMuxUploaderStart(pTsMuxUploader);
-        if (ret != 0){
-                LinkDestroyTsMuxUploader(&pTsMuxUploader);
-                LinkLogError("UploadStart fail:%d", ret);
-                return ret;
-        }
         *_pTsMuxUploader = pTsMuxUploader;
         
         return LINK_SUCCESS;
@@ -163,15 +152,6 @@ void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
 int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
 {
         return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);
-}
-
-void LinkUpdateNewSegmentInterval(LinkTsMuxUploader *_pTsMuxUploader, int _nIntervalSecond)
-{
-        if (_pTsMuxUploader == NULL || _nIntervalSecond < 0) {
-                LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nIntervalSecond);
-                return;
-        }
-        _pTsMuxUploader->SetUpdateSegmentInterval(_pTsMuxUploader, _nIntervalSecond);
 }
 
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
