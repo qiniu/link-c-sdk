@@ -906,8 +906,11 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
         
         if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
+                pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
                 pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
+                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
                 return;
         }
 
@@ -915,7 +918,12 @@ static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t n
         if (nNow - pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ >= nDiff) {
                 pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
                 _pUploadArg->nSegmentId_ = nNow;
+                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+        } else {
+                pFFTsMuxUploader->uploadArg.nSegSeqNum++;
         }
+        pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
+        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
         pFFTsMuxUploader->uploadArg.nLastUploadTsTime_ = _pUploadArg->nLastUploadTsTime_;
         return;
 }
