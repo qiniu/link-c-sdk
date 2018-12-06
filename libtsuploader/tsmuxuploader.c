@@ -83,8 +83,8 @@ typedef struct _FFTsMuxUploader{
         int nUploadBufferSize;
         int nUpdateSegmentInterval;
         
-        char deviceName_[33];
-        char app_[33];
+        char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
+        char app_[LINK_MAX_APP_LEN+1];
         Token token_;
         LinkTsUploadArg uploadArg;
         PictureUploader *pPicUploader;
@@ -1469,8 +1469,14 @@ END:
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        int nOffset = snprintf(pBuf, 1024, "%s", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        
+        ///v1/device/uploadtoken?session=<session>&sequence=<sequence>&start=<startTimestamp>&now=<nowTimestamp>
+        //TODO add query arg
+        
+        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf);
         if (ret != LINK_SUCCESS) {
+                free(pBuf);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }

@@ -109,8 +109,8 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
-                                                char deviceName[33] = {0};
-                                                char app[33] = {0};
+                                                char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
+                                                char app[LINK_MAX_APP_LEN+1] = {0};
                                                 param.pDeviceName = deviceName;
                                                 param.nDeviceNameLen = sizeof(deviceName);
                                                 param.pApp = app;

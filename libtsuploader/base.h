@@ -19,6 +19,10 @@
 #define IN
 #endif
 
+#define LINK_MAX_APP_LEN 200
+#define LINK_MAX_BUCKET_LEN 63
+#define LINK_MAX_DEVICE_NAME_LEN 200
+
 typedef struct {
         int64_t nTimestamp90Khz;
         int nOffset;

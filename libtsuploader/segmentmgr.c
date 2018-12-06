@@ -25,7 +25,7 @@ typedef struct {
         SegmentHandle handle;
         int isRestart;
         int segUploadOk;
-        char bucket[64];
+        char bucket[LINK_MAX_BUCKET_LEN+1];
         LinkGetUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
@@ -179,8 +179,8 @@ static void upadateSegmentFile(SegInfo segInfo) {
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         char upHost[192] = {0};
-        char app[33];
-        char deviceName[33];
+        char app[LINK_MAX_APP_LEN+1];
+        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1];
         char uptoken[1536] = {0};
         
         param.pDeviceName = deviceName;
