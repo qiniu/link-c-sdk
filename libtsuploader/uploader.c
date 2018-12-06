@@ -185,7 +185,18 @@ static void * streamUpload(void *_pOpaque)
                 char *bufData;
                 r = LinkGetQueueBuffer(pUploader->pQueue_, &bufData, &l);
                 if (r > 0) {
+#ifdef LINK_USE_OLD_NAME
                         //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
+                        if (suffix[0] != 0) {
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
+                        } else {
+                                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
+                                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                        }
+                        
+#else
+                        // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
                         if (suffix[0] != 0) {
                                 sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pApp, param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
@@ -193,6 +204,7 @@ static void * streamUpload(void *_pOpaque)
                                 sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pApp, param.pDeviceName,
                                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                         }
+#endif
                         LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploader->pQueue_, l);
 
                         int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUploader->metaInfo,

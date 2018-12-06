@@ -23,6 +23,8 @@
 #define LINK_MAX_BUCKET_LEN 63
 #define LINK_MAX_DEVICE_NAME_LEN 200
 
+#define LINK_USE_OLD_NAME
+
 typedef struct {
         int64_t nTimestamp90Khz;
         int nOffset;

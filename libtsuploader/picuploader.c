@@ -123,7 +123,11 @@ static void * listenPicUpload(void *_pOpaque)
                                                 
                                                 char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
                                                 memset(key, 0, sizeof(key));
+#ifdef LINK_USE_OLD_NAME
+                                                snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
+#else
                                                 snprintf(key, sizeof(key), "%s_%s_frame_%"PRId64"_0.jpg", app, deviceName, sig.nTimestamp);
+#endif
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
                                                                                             key, strlen(key));
