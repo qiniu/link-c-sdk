@@ -103,6 +103,9 @@ typedef struct _FFTsMuxUploader{
         
         char ak[41];
         char sk[41];
+        uint8_t isMaxThreadLimited;
+        int nMaxUploadThreadNum;
+        int nUploadThreadNum;
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
 }FFTsMuxUploader;
@@ -442,8 +445,8 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
         return -2;
 }
 
-static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo, int64_t nSysNanotime, int _nIsSegStart,
-                       const char * _pData, int _nDataLen)
+static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo,
+                       int64_t nSysNanotime, int _nIsSegStart, const char * _pData, int _nDataLen)
 {
         int ret;
         int shouldSwitch = 0;
@@ -451,14 +454,19 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         if (pFFTsMuxUploader->nFirstTimestamp == -1) {
                 pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
         }
-        LinkUploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == LINK_UPLOAD_FAIL) {
-        if ( ustate != LINK_UPLOAD_INIT) {
-                if (ustate == LINK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL) {
-                        LinkLogDebug("upload fail. drop the data");
+        if (pFFTsMuxUploader->pTsMuxCtx) {
+                LinkUploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+                //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == LINK_UPLOAD_FAIL) {
+                if ( ustate != LINK_UPLOAD_INIT) {
+                        if (ustate == LINK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL) {
+                                LinkLogDebug("upload fail. drop the data");
+                        }
+                        pFFTsMuxUploader->ffMuxSatte = ustate;
+                        shouldSwitch = 1;
                 }
-                pFFTsMuxUploader->ffMuxSatte = ustate;
+        } else {
                 shouldSwitch = 1;
+                //assert(pFFTsMuxUploader->nUploadThreadNum == 0);
         }
         int isVideoKeyframe = 0;
         int isSameAsBefore = 0;
@@ -478,6 +486,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         if (isVideoKeyframe || shouldSwitch) {
                 if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > 4980 && pFFTsMuxUploader->nKeyFrameCount > 0)
                    //at least 1 keyframe and aoubt last 5 second
+                   || shouldSwitch
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0)// new segment is specified
                    ||  pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_INIT){   // upload finished
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
@@ -487,16 +496,25 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
                         pushRecycle(pFFTsMuxUploader);
                         int64_t nDiff = (nSysNanotime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
-                        if (nDiff < 1000) {
-                                LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
+                        if (nIsKeyFrame) {
+                                if (nDiff < 1000) {
+                                        LinkLogWarn("get picture callback too frequency:%"PRId64"ms", nDiff);
+                                }
+                                pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         }
-                        pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         if (_nIsSegStart) {
                                 pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
-                        ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
-                        if (ret != 0) {
-                                return ret;
+                        if (pFFTsMuxUploader->nUploadThreadNum >= pFFTsMuxUploader->nMaxUploadThreadNum) {
+                                pFFTsMuxUploader->isMaxThreadLimited = 1;
+                                LinkLogWarn("reach max thread limit:%d", pFFTsMuxUploader->nUploadThreadNum);
+                        } else {
+                                ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
+                                if (ret != LINK_SUCCESS) {
+                                        return ret;
+                                }else {
+                                        pFFTsMuxUploader->nUploadThreadNum++;
+                                }
                         }
                 }
                 if (isVideoKeyframe) {
@@ -1008,7 +1026,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
         memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
-        
+        pFFTsMuxUploader->nMaxUploadThreadNum = _pUserUploadArg->nMaxUploadThreadNum;
+        if (pFFTsMuxUploader->nMaxUploadThreadNum <= 0 || pFFTsMuxUploader->nMaxUploadThreadNum > 100)
+                pFFTsMuxUploader->nMaxUploadThreadNum = 3;
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
@@ -1280,7 +1300,6 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pFFTsMuxUploader->nFirstTimestamp = 0;
         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
         pushRecycle(pFFTsMuxUploader);
-        ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
         
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 
@@ -1307,6 +1326,16 @@ static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
                 LinkSendItIsTimeToCaptureSignal(pFFTsMuxUploader->pPicUploader, nTimestamp);
 }
 
+static void uploadThreadNumDec(void *pOpaque, int64_t nTimestamp) {
+        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
+        pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->isMaxThreadLimited)
+                pFFTsMuxUploader->isMaxThreadLimited = 0;
+        pFFTsMuxUploader->nUploadThreadNum--;
+        LinkLogDebug("threadnum:%d", pFFTsMuxUploader->nUploadThreadNum);
+        pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
+}
+
 int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
@@ -1320,10 +1349,11 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
                 free(pFFTsMuxUploader);
                 return ret;
         }
-        //LinkTsUploaderSetTsStartUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, linkCapturePictureCallback, pFFTsMuxUploader);
         
-        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        return LINK_SUCCESS;
+        LinkTsUploaderSetTsEndUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, uploadThreadNumDec, pFFTsMuxUploader);
+        
+        ret = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        return ret;
 }
 
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {

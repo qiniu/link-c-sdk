@@ -42,8 +42,8 @@ typedef struct _KodoUploader{
         
         pthread_mutex_t waitFirstMutex_;
         enum WaitFirstFlag nWaitFirstMutexLocked_;
-        LinkTsStartUploadCallback tsStartUploadCallback;
-        void *pTsStartUploadCallbackArg;
+        LinkEndUploadCallback pTsEndUploadCallback;
+        void *pTsEndUploadCallbackArg;
         LinkKeyFrameMetaInfo metaInfo[10];
         int nMetaInfoLen;
 }KodoUploader;
@@ -190,11 +190,6 @@ static void * streamUpload(void *_pOpaque)
         }
         memset(key, 0, sizeof(key));
         
-        
-        if (pUploader->tsStartUploadCallback) {
-                pUploader->tsStartUploadCallback(pUploader->pTsStartUploadCallbackArg, tsStartTime / 1000000);
-        }
-        
 
         if (qtype == TSQ_APPEND) {
                 int r, l;
@@ -232,6 +227,9 @@ static void * streamUpload(void *_pOpaque)
 END:
         if (pUploader->uploadArg.pUploadStatisticCb) {
                 pUploader->uploadArg.pUploadStatisticCb(pUploader->uploadArg.pUploadStatArg, LINK_UPLOAD_TS, uploadResult);
+        }
+        if (pUploader->pTsEndUploadCallback) {
+                pUploader->pTsEndUploadCallback(pUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
 
         return NULL;
@@ -361,10 +359,10 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
         return LINK_SUCCESS;
 }
 
-void LinkTsUploaderSetTsStartUploadCallback(LinkTsUploader * _pUploader, LinkTsStartUploadCallback cb, void *pOpaque) {
+void LinkTsUploaderSetTsEndUploadCallback(LinkTsUploader * _pUploader, LinkEndUploadCallback cb, void *pOpaque) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
-        pKodoUploader->tsStartUploadCallback = cb;
-        pKodoUploader->pTsStartUploadCallbackArg = pOpaque;
+        pKodoUploader->pTsEndUploadCallback = cb;
+        pKodoUploader->pTsEndUploadCallbackArg = pOpaque;
 }
 
 void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)

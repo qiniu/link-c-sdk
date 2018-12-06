@@ -98,7 +98,7 @@ typedef struct _LinkUserUploadArg{
         size_t nDeviceAkLen;
         const char *pDeviceSk;
         size_t nDeviceSkLen;
-        
+        size_t nMaxUploadThreadNum;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
 }LinkUserUploadArg;
@@ -121,8 +121,8 @@ typedef struct _LinkUploadArg {
         const char *pDeviceSk;                  /**< 设备 SECRET KEY */
         size_t nDeviceSkLen;                    /**< 设备 SECRET KEY 长度 */
         void(*getPictureCallback)(void *pUserData, const char *pFilename, int nFilenameLen);
-        void *pGetPictureCallbackUserData;
-        /**< 图片上传回调函数 */
+        void *pGetPictureCallbackUserData;      /**< 图片上传回调函数 */
+        size_t nMaxUploadThreadNum;             /*ts切片最多开启的线程数*/
         void * reserved1;                       /**< 预留1 */
         void * reserved2;                       /**< 预留2 */
 }LinkUploadArg;
