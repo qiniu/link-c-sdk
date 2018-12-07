@@ -15,12 +15,7 @@
 #include "security.h"
 #include "cJSON/cJSON.h"
 #include "b64/urlsafe_b64.h"
-
-#ifdef USE_OWN_TSMUX
 #include "tsmux.h"
-#else
-#include <libavformat/avformat.h>
-#endif
 
 #define FF_OUT_LEN 4096
 #define QUEUE_INIT_LEN 150
@@ -33,13 +28,9 @@
 typedef struct _FFTsMuxContext{
         LinkAsyncInterface asyncWait;
         LinkTsUploader *pTsUploader_;
-#ifdef USE_OWN_TSMUX
+
         LinkTsMuxerContext *pFmtCtx_;
-#else
-        AVFormatContext *pFmtCtx_;
-        int nOutVideoindex_;
-        int nOutAudioindex_;
-#endif
+
         int64_t nPrevAudioTimestamp;
         int64_t nPrevVideoTimestamp;
         LinkTsMuxUploader * pTsMuxUploader;
@@ -221,9 +212,7 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
         if (_pFFTsMuxUploader) {
                 
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
-#ifndef USE_OWN_TSMUX
-                        av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
-#endif
+
                         if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
                                 _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
                         LinkLogError("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
@@ -259,12 +248,6 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
 
 static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag,
                 int _nIsKeyframe, int64_t nSysNanotime){
-#ifndef USE_OWN_TSMUX
-        AVPacket pkt;
-        av_init_packet(&pkt);
-        pkt.data = (uint8_t *)_pData;
-        pkt.size = _nDataLen;
-#endif
         
         //LinkLogTrace("push thread id:%d\n", (int)pthread_self());
         
@@ -292,12 +275,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         LinkLogWarn("audio pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                         return 0;
                 }
-#ifndef USE_OWN_TSMUX
-                int isAdtsAdded = 0;
-                pkt.pts = _nTimestamp * 90;
-                pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
-                pkt.dts = pkt.pts;
-#endif
+
                 pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
                 
                 unsigned char * pAData = (unsigned char * )_pData;
@@ -332,39 +310,26 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
                         memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
 
-#ifdef USE_OWN_TSMUX
                         LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t *)pFFTsMuxUploader->pAACBuf, varHeader.aac_frame_length, _nTimestamp);
-#else
-                        pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
-                        pkt.size = varHeader.aac_frame_length;
-                        isAdtsAdded = 1;
-#endif
+
                 } 
-#ifdef USE_OWN_TSMUX
+
                 else {
                         ret = LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp);
                 }
-#endif
+
         }else{
                 //fprintf(stderr, "video frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
                         LinkLogWarn("video pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                         return 0;
                 }
-#ifdef USE_OWN_TSMUX
                 ret = LinkMuxerVideo(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp, _nIsKeyframe);
-#else
-                pkt.pts = _nTimestamp * 90;
-                pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
-                pkt.dts = pkt.pts;
-#endif
+
                 pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
         }
         
         
-#ifndef USE_OWN_TSMUX
-        ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt);
-#endif
         if (ret == 0) {
                 pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime);
         } else {
@@ -372,12 +337,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         LinkLogError("Error muxing packet:%d", ret);
                 pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_FAIL;
         }
-        
-#ifndef USE_OWN_TSMUX
-        if (isAdtsAdded) {
-                free(pkt.data);
-        }
-#endif
+
         return ret;
 }
 
@@ -632,33 +592,16 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         FFTsMuxContext *pTsMuxCtx = (FFTsMuxContext*)_pOpaque;
         
         if (pTsMuxCtx) {
-#ifndef USE_OWN_TSMUX
-                if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_->pb) {
-                                avio_flush(pTsMuxCtx->pFmtCtx_->pb);
-                        }
-                }
-#endif
+
                 pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
-                
                 LinkUploaderStatInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
                 LinkLogDebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
                          statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
                 LinkDestroyTsUploader(&pTsMuxCtx->pTsUploader_);
-#ifdef USE_OWN_TSMUX
+
                 LinkDestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
-#else
-                if (pTsMuxCtx->pFmtCtx_->pb && pTsMuxCtx->pFmtCtx_->pb->buffer)  {
-                        av_free(pTsMuxCtx->pFmtCtx_->pb->buffer);
-                }
-                if (!(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
-                        avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                if (pTsMuxCtx->pFmtCtx_->pb) {
-                        avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
-                }
-                avformat_free_context(pTsMuxCtx->pFmtCtx_);
-#endif
+
                 FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxCtx->pTsMuxUploader);
                 if (pFFTsMuxUploader) {
                         pthread_cancel(pFFTsMuxUploader->tokenThread);
@@ -752,7 +695,6 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
                            int nQBufSize, enum CircleQueuePolicy queueType)
-#ifdef USE_OWN_TSMUX
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
         if (pTsMuxCtx == NULL) {
@@ -789,130 +731,6 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         * _pTsMuxCtx = pTsMuxCtx;
         return LINK_SUCCESS;
 }
-#else
-{
-        FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
-        if (pTsMuxCtx == NULL) {
-                return LINK_NO_MEMORY;
-        }
-        memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
-        
-        int nBufsize = getBufferSize();
-        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
-        if (ret != 0) {
-                free(pTsMuxCtx);
-                return ret;
-        }
-        
-        uint8_t *pOutBuffer = NULL;
-        //Output
-        ret = avformat_alloc_output_context2(&pTsMuxCtx->pFmtCtx_, NULL, "mpegts", NULL);
-        if (ret < 0) {
-                getFFmpegErrorMsg(ret);
-                LinkLogError("Could not create output context:%d(%s)", ret, msg);
-                ret = LINK_NO_MEMORY;
-                goto end;
-        }
-        AVOutputFormat *pOutFmt = pTsMuxCtx->pFmtCtx_->oformat;
-        pOutBuffer = (unsigned char*)av_malloc(4096);
-        AVIOContext *avio_out = avio_alloc_context(pOutBuffer, 4096, 1, pTsMuxCtx, NULL, writeTsPacketToMem, NULL);
-        pTsMuxCtx->pFmtCtx_->pb = avio_out;
-        pTsMuxCtx->pFmtCtx_->flags = AVFMT_FLAG_CUSTOM_IO;
-        pOutFmt->flags |= AVFMT_NOFILE;
-        pOutFmt->flags |= AVFMT_NODIMENSIONS;
-        //ofmt->video_codec //是否指定为ifmt_ctx_v的视频的codec_type.同理音频也一样
-        //测试下来即使video_codec和ifmt_ctx_v的视频的codec_type不一样也是没有问题的
-        
-        //add video
-        AVStream *pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
-        if (!pOutStream) {
-                getFFmpegErrorMsg(ret);
-                LinkLogError("Failed allocating output stream:%d(%s)", ret, msg);
-                ret = LINK_NO_MEMORY;
-                goto end;
-        }
-        pOutStream->time_base.num = 1;
-        pOutStream->time_base.den = 90000;
-        pTsMuxCtx->nOutVideoindex_ = pOutStream->index;
-        pOutStream->codecpar->codec_tag = 0;
-        pOutStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
-        if (_pAvArg->nVideoFormat == LINK_VIDEO_H264)
-                pOutStream->codecpar->codec_id = AV_CODEC_ID_H264;
-                else
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_H265;
-                        //end add video
-                        
-                        //add audio
-                        pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
-                        if (!pOutStream) {
-                                getFFmpegErrorMsg(ret);
-                                LinkLogError("Failed allocating output stream:%d(%s)", ret, msg);
-                                ret = LINK_NO_MEMORY;
-                                goto end;
-                        }
-        pOutStream->time_base.num = 1;
-        pOutStream->time_base.den = 90000;
-        pTsMuxCtx->nOutAudioindex_ = pOutStream->index;
-        pOutStream->codecpar->codec_tag = 0;
-        pOutStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
-        switch(_pAvArg->nAudioFormat){
-                case LINK_AUDIO_PCMU:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_MULAW;
-                        break;
-                case LINK_AUDIO_PCMA:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_ALAW;
-                        break;
-                case LINK_AUDIO_AAC:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_AAC;
-                        break;
-        }
-        pOutStream->codecpar->sample_rate = _pAvArg->nSamplerate;
-        pOutStream->codecpar->channels = _pAvArg->nChannels;
-        pOutStream->codecpar->channel_layout = av_get_default_channel_layout(pOutStream->codecpar->channels);
-        //end add audio
-        
-        //printf("==========Output Information==========\n");
-        //av_dump_format(pTsMuxCtx->pFmtCtx_, 0, "xx.ts", 1);
-        //printf("======================================\n");
-        
-        //Open output file
-        if (!(pOutFmt->flags & AVFMT_NOFILE)) {
-                if ((ret = avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE)) < 0) {
-                        getFFmpegErrorMsg(ret);
-                        LinkLogError("Could not open output:%d(%s)", ret, msg);
-                        ret = LINK_OPEN_TS_ERR;
-                        goto end;
-                }
-        }
-        //Write file header
-        int erno = 0;
-        if ((erno = avformat_write_header(pTsMuxCtx->pFmtCtx_, NULL)) < 0) {
-                getFFmpegErrorMsg(erno);
-                LinkLogError("fail to write ts header:%d(%s)", erno, msg);
-                ret = LINK_WRITE_TS_ERR;
-                goto end;
-        }
-        
-        pTsMuxCtx->asyncWait.function = waitToCompleUploadAndDestroyTsMuxContext;
-        *_pTsMuxCtx = pTsMuxCtx;
-        return LINK_SUCCESS;
-end:
-        if (pOutBuffer) {
-                av_free(pOutBuffer);
-        }
-        if (pTsMuxCtx->pFmtCtx_->pb)
-                avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
-                if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
-                                avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                        avformat_free_context(pTsMuxCtx->pFmtCtx_);
-                }
-        if (pTsMuxCtx->pTsUploader_)
-                DestroyUploader(&pTsMuxCtx->pTsUploader_);
-                
-                return ret;
-}
-#endif
 
 static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen)
 {
