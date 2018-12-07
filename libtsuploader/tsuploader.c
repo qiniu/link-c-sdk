@@ -161,8 +161,8 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 pUploadCmd->pKodoUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
         pUploadCmd->pKodoUploader->uploadArg.nLastStartTime_ = tsStartTime;
-        if (pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpadate) {
-                pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpadate(pUploadCmd->pKodoUploader->uploadArg.pUploadArgKeeper_,
+        if (pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpdate) {
+                pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpdate(pUploadCmd->pKodoUploader->uploadArg.pUploadArgKeeper_,
                                                                             &pUploadCmd->pKodoUploader->uploadArg, tsStartTime,
                                                             tsStartTime + tsDuration * 1000000);
         }

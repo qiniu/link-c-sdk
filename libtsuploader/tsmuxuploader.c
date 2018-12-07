@@ -738,7 +738,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
         return ;
 }
 
-static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
+static void updateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkTsUploadArg *_pUploadArg = (LinkTsUploadArg *)pArg;
@@ -842,9 +842,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
+                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpdate = updateSegmentId;
         } else {
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = NULL;
+                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpdate = NULL;
                 pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = NULL;
         }
         

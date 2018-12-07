@@ -15,7 +15,7 @@ typedef struct _LinkTsUploadArg {
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
         int64_t nLastStartTime_;
-        LinkTsUploadArgUpadater UploadSegmentIdUpadate;
+        LinkTsUploadArgUpadater UploadSegmentIdUpdate;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int64_t nSegSeqNum;

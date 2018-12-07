@@ -148,7 +148,7 @@ static void setSegmentInt(SegInfo segInfo) {
         segmentMgr.handles[idx].nUpdateIntervalSeconds = segInfo.nEndOrInt;
 }
 
-static void upadateSegmentFile(SegInfo segInfo) {
+static void updateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
         int i, idx = -1;
@@ -344,7 +344,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                                 if (segInfo.nOperation == SEGMENT_RELEASE) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
-                                        upadateSegmentFile(segInfo);
+                                        updateSegmentFile(segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_INTERVAL) {
                                         setSegmentInt(segInfo);
                                 }
