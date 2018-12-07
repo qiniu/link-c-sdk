@@ -7,6 +7,36 @@
 int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         char *pOutput, int *pOutputLen) { //EVP_MAX_MD_SIZE
         
+        *pOutputLen=20;
+        unsigned char * res = HMAC(EVP_sha1(), pKey, nKeyLen, pInput, nInputLen, pOutput, pOutputLen);
+        if (res == NULL) {
+                return LINK_WOLFSSL_ERR;
+        }
+        *pOutputLen = 20;
+        return LINK_SUCCESS;
+        
+#if 0
+        Hmac hmac;
+        memset(&hmac, 0, sizeof(hmac));
+        int ret = 0;
+        
+        ret = wc_HmacSetKey(&hmac, SHA, (byte*)pKey, nKeyLen);
+        if (ret != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
+
+        if( (ret = wc_HmacUpdate(&hmac, (byte*)pInput, nInputLen)) != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
+        
+        if ((ret = wc_HmacFinal(&hmac, (byte*)pOutput)) != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
+        *pOutputLen = 20;
+        return LINK_SUCCESS;
+#endif
+
+#if 0
         int ret = 0;
         Sha sha;
         
@@ -14,7 +44,8 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         if (ret != 0) {
                 return LINK_WOLFSSL_ERR;
         }
-        
+        INVALID_DEVID;
+        wc_HmacInit();
         ret = wc_ShaUpdate(&sha, (unsigned char*)pInput, nInputLen);
         if (ret != 0) {
                 wc_ShaFree(&sha);
@@ -30,6 +61,7 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         *pOutputLen = 20;
         
         return LINK_SUCCESS;
+#endif
 
 #if 0
         int ret = 0;

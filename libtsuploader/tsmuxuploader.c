@@ -1396,15 +1396,18 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         int nRespLen = 0, ret = 0;
         
         int nOffsetHost = snprintf(buf, sizeof(buf), "%s", pFFTsMuxUploader->pConfigRequestUrl);
-        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s", gSn);
-        const char *pInput = (const char *)buf + nOffsetHost;
+        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s\n", gSn);
+        const char *pInput = strchr(buf+8, '/');
+        
+        //const char *pInput = (const char *)buf + nOffsetHost;
         char *pOutput = buf + nOffsetHost + nOffset + 1;
         int nOutputLen = sizeof(buf) - nOffset - nOffsetHost - 1;
-
-        ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, nOffset, pOutput, &nOutputLen);
+        
+        ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, strlen(pInput), pOutput, &nOutputLen);
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
+        buf[nOffsetHost + nOffset - 1] = 0;
 
         char *pToken = pOutput + nOutputLen;
         int nTokenOffset = snprintf(pToken, 42, "%s:", pFFTsMuxUploader->ak);
