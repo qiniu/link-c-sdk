@@ -15,11 +15,18 @@ size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
 
+enum LinkTsuCmdType {
+        LINK_TSU_UPLOAD = 1,
+        LINK_TSU_QUIT = 2,
+        LINK_TSU_AUDIO_TIME = 3,
+        LINK_TSU_VIDEO_TIME = 4,
+        LINK_TSU_SEG_TIME = 5
+};
+
 typedef struct _TsUploaderMeta {
         int64_t nFirstFrameTimestamp;
         int64_t nLastFrameTimestamp;
         int64_t nTsStartTimestamp;
-        LinkUploadState state;
         LinkKeyFrameMetaInfo metaInfo[10];
         int nMetaInfoLen;
 }TsUploaderMeta;
@@ -47,15 +54,25 @@ typedef struct _KodoUploader{
         LinkEndUploadCallback pTsEndUploadCallback;
         void *pTsEndUploadCallbackArg;
         int nQuit_;
+        Session session;
 }KodoUploader;
 
-
-
-typedef struct _TsUploaderCommand {
-        int nCommandType;
+typedef struct _TsUploaderCommandTs {
         void *pData;
         KodoUploader *pKodoUploader;
         TsUploaderMeta* pUpMeta;
+}TsUploaderCommandTs;
+typedef struct _TsUploaderCommandTime {
+        int64_t nAvTimestamp;
+        int64_t nSysTimestamp;
+}TsUploaderCommandTime;
+
+typedef struct _TsUploaderCommand {
+        enum LinkTsuCmdType nCommandType;
+        union{
+                TsUploaderCommandTs ts;
+                TsUploaderCommandTime time;
+        };
 }TsUploaderCommand;
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
@@ -122,7 +139,9 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
         char app[LINK_MAX_APP_LEN+1] = {0};
         int ret = 0;
-        LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->pData;
+        LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
+        KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
+        TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
@@ -139,11 +158,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
-        TsUploaderMeta* pUpMeta = pUploadCmd->pUpMeta;
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
 
-        ret = pUploadCmd->pKodoUploader->uploadArg.getUploadParamCallback(
-                                        pUploadCmd->pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
+        ret = pKodoUploader->uploadArg.getUploadParamCallback(
+                                        pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
                                         &param);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
@@ -160,16 +178,16 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsDuration = pUpMeta->nLastFrameTimestamp - pUpMeta->nFirstFrameTimestamp;
         
-        if (pUploadCmd->pKodoUploader->uploadArg.nSegmentId_ == 0) {
-                pUploadCmd->pKodoUploader->uploadArg.nSegmentId_ = tsStartTime;
+        if (pKodoUploader->uploadArg.nSegmentId_ == 0) {
+                pKodoUploader->uploadArg.nSegmentId_ = tsStartTime;
         }
-        pUploadCmd->pKodoUploader->uploadArg.nLastStartTime_ = tsStartTime;
-        if (pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpdate) {
-                pUploadCmd->pKodoUploader->uploadArg.UploadSegmentIdUpdate(pUploadCmd->pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                            &pUploadCmd->pKodoUploader->uploadArg, tsStartTime,
+        pKodoUploader->uploadArg.nLastStartTime_ = tsStartTime;
+        if (pKodoUploader->uploadArg.UploadSegmentIdUpdate) {
+                pKodoUploader->uploadArg.UploadSegmentIdUpdate(pKodoUploader->uploadArg.pUploadArgKeeper_,
+                                                                            &pKodoUploader->uploadArg, tsStartTime,
                                                             tsStartTime + tsDuration * 1000000);
         }
-        uint64_t nSegmentId = pUploadCmd->pKodoUploader->uploadArg.nSegmentId_;
+        uint64_t nSegmentId = pKodoUploader->uploadArg.nSegmentId_;
         
         int nDeleteAfterDays_ = 0;
         ret = LinkGetDeleteAfterDaysFromUptoken(uptoken, &nDeleteAfterDays_);
@@ -203,18 +221,18 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                 }
 #endif
-                LinkLogDebug("upload start:%s q:%p  len:%d", key, pUploadCmd->pData, l);
+                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
                 
                 int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo,
                                            pUpMeta->nMetaInfoLen);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
-                        pUploadCmd->pKodoUploader->state = LINK_UPLOAD_OK;
+                        pKodoUploader->state = LINK_UPLOAD_OK;
                 } else {
-                        pUploadCmd->pKodoUploader->state = LINK_UPLOAD_FAIL;
+                        pKodoUploader->state = LINK_UPLOAD_FAIL;
                 }
-                if (pUploadCmd->pKodoUploader->uploadArg.pUploadStatisticCb) {
-                        pUploadCmd->pKodoUploader->uploadArg.pUploadStatisticCb(pUploadCmd->pKodoUploader->uploadArg.pUploadStatArg,
+                if (pKodoUploader->uploadArg.pUploadStatisticCb) {
+                        pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                                 LINK_UPLOAD_TS, uploadResult);
                 }
                 goto END;
@@ -225,20 +243,20 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 
 
 END:
-        if (pUploadCmd->pKodoUploader->uploadArg.pUploadStatisticCb) {
-                pUploadCmd->pKodoUploader->uploadArg.pUploadStatisticCb(pUploadCmd->pKodoUploader->uploadArg.pUploadStatArg,
+        if (pKodoUploader->uploadArg.pUploadStatisticCb) {
+                pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
-        if (pUploadCmd->pKodoUploader->pTsEndUploadCallback) {
-                pUploadCmd->pKodoUploader->pTsEndUploadCallback(pUploadCmd->pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
+        if (pKodoUploader->pTsEndUploadCallback) {
+                pKodoUploader->pTsEndUploadCallback(pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
 
         LinkDestroyQueue(&pDataQueue);
         free(pUpMeta);
         
-        pthread_mutex_lock(&pUploadCmd->pKodoUploader->uploadMutex_);
-        pUploadCmd->pKodoUploader->nTsCacheNum--;
-        pthread_mutex_unlock(&pUploadCmd->pKodoUploader->uploadMutex_);
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
+        pKodoUploader->nTsCacheNum--;
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
 
         return NULL;
 }
@@ -286,10 +304,10 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
         TsUploaderCommand uploadCommand;
-        uploadCommand.nCommandType = 1;
-        uploadCommand.pData = pKodoUploader->pQueue_;
-        uploadCommand.pKodoUploader = pKodoUploader;
-        uploadCommand.pUpMeta = pKodoUploader->pUpMeta;
+        uploadCommand.nCommandType = LINK_TSU_UPLOAD;
+        uploadCommand.ts.pData = pKodoUploader->pQueue_;
+        uploadCommand.ts.pKodoUploader = pKodoUploader;
+        uploadCommand.ts.pUpMeta = pKodoUploader->pUpMeta;
         
         pKodoUploader->pQueue_ = NULL;
         pKodoUploader->pUpMeta = NULL;
@@ -299,8 +317,8 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
-                free(uploadCommand.pUpMeta);
-                LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.pData));
+                free(uploadCommand.ts.pUpMeta);
+                LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 LinkLogError("drop ts file due to ts queue is full");
         } else {
                 LinkLogDebug("-------->push a queue\n", nCurCacheNum);
@@ -324,11 +342,29 @@ static void getStatInfo(LinkTsUploader *pTsUploader, LinkUploaderStatInfo *_pSta
         return;
 }
 
-void recordTimestamp(LinkTsUploader *_pTsUploader, int64_t _nTimestamp, int64_t nSysNanotime)
-{
+void reportTimeInfo(LinkTsUploader *_pTsUploader, int64_t _nTimestamp, int64_t nSysNanotime,
+                    enum LinkUploaderTimeInfoType tmtype) {
+        
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
+        
+        TsUploaderCommand tmcmd;
+        if (tmtype == LINK_AUDIO_TIMESTAMP) {
+                tmcmd.nCommandType = LINK_TSU_AUDIO_TIME;
+        }
+        else if (tmtype == LINK_VIDEO_TIMESTAMP){
+                tmcmd.nCommandType = LINK_TSU_VIDEO_TIME;
+        }
+        else if (tmtype == LINK_SEG_TIMESTAMP){
+                tmcmd.nCommandType = LINK_TSU_SEG_TIME;
+        }
+        tmcmd.time.nAvTimestamp = _nTimestamp;
+        tmcmd.time.nSysTimestamp = nSysNanotime;
+        
+        pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
+        
+
         if(pKodoUploader->pUpMeta) {
-                if (pKodoUploader->pUpMeta->nFirstFrameTimestamp == -1) {
+                if (pKodoUploader->pUpMeta->nFirstFrameTimestamp <= 0) {
                         pKodoUploader->pUpMeta->nTsStartTimestamp = nSysNanotime;
                         pKodoUploader->pUpMeta->nFirstFrameTimestamp = _nTimestamp;
                         pKodoUploader->pUpMeta->nLastFrameTimestamp = _nTimestamp;
@@ -342,6 +378,21 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         return pKodoUploader->state;
+}
+
+static void handleAudioTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
+        //pKodoUploader->session.
+}
+
+static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
+        
+}
+
+static void handleSegTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
+        //TODO update session id
+        //TODOreport sessiond end
+        pKodoUploader->session.nSessionStartTime = pTi->nSysTimestamp;
+        //TODOfresh token
 }
 
 static void * listenTsUpload(void *_pOpaque)
@@ -358,11 +409,20 @@ static void * listenTsUpload(void *_pOpaque)
                 }
                 
                 switch (cmd.nCommandType) {
-                        case 1:
+                        case LINK_TSU_UPLOAD:
                                 streamUpload(&cmd);
                                 break;
-                        case 2:
+                        case LINK_TSU_QUIT:
                                 return NULL;
+                        case LINK_TSU_AUDIO_TIME:
+                                handleAudioTimeReport(pKodoUploader, &cmd.time);
+                                break;
+                        case LINK_TSU_VIDEO_TIME:
+                                handleVideoTimeReport(pKodoUploader, &cmd.time);
+                                break;
+                        case LINK_TSU_SEG_TIME:
+                                handleSegTimeReport(pKodoUploader, &cmd.time);
+                                break;
                         default:
                                 break;
                 }
@@ -386,7 +446,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
         pKodoUploader->uploader.NotifyDataPrapared = notifyDataPrapared;
         
         pKodoUploader->uploader.GetStatInfo = getStatInfo;
-        pKodoUploader->uploader.RecordTimestamp = recordTimestamp;
+        pKodoUploader->uploader.ReportTimeInfo = reportTimeInfo;
         pKodoUploader->uploader.GetUploaderState = getUploaderState;
         
         pKodoUploader->policy = _policy;
@@ -399,7 +459,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return ret;
         }
         
-        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 0, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 2);
+        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 0, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 512);
         if (ret != 0) {
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 free(pKodoUploader);
@@ -443,8 +503,8 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         pKodoUploader->nQuit_ = 1;
         
         TsUploaderCommand uploadCommand;
-        uploadCommand.nCommandType = 2;
-        pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(int));
+        uploadCommand.nCommandType = LINK_TSU_QUIT;
+        pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
         
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);

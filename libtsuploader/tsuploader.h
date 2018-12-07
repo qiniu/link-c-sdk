@@ -24,12 +24,18 @@ typedef struct _LinkTsUploadArg {
 
 typedef struct _LinkTsUploader LinkTsUploader;
 
+enum LinkUploaderTimeInfoType {
+        LINK_AUDIO_TIMESTAMP = 1,
+        LINK_VIDEO_TIMESTAMP = 2,
+        LINK_SEG_TIMESTAMP = 3,
+};
+
 typedef struct _LinkTsUploader{
         LinkUploadState (*GetUploaderState)(IN LinkTsUploader *pTsUploader);
         void (*NotifyDataPrapared)(IN LinkTsUploader *pTsUploader);
         int(*Push)(IN LinkTsUploader *pTsUploader, IN const char * pData, int nDataLen);
         void (*GetStatInfo)(IN LinkTsUploader *pTsUploader, IN LinkUploaderStatInfo *pStatInfo);
-        void (*RecordTimestamp)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp, IN int64_t nSysNanotime);
+        void (*ReportTimeInfo)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp, IN int64_t nSysNanotime, IN enum LinkUploaderTimeInfoType tmtype);
 }LinkTsUploader;
 
 int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg *pArg, IN enum CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);

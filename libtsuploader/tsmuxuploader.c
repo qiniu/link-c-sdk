@@ -56,17 +56,6 @@ typedef struct  {
         int   nUpdateIntervalSeconds;
 }RemoteConfig;
 
-#define LINK_MAX_SESSION_ID_LEN 20
-typedef struct _Session { // seg report info
-        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
-        int64_t nTsSequenceNumber;
-        int64_t nSessionStartTime;
-        int64_t nAudioGapFromLastReport;
-        int64_t nVideoGapFromLastReport;
-        int64_t nAccAudioDuration;
-        int64_t nAccVideoDuration;
-} Session;
-
 typedef struct _FFTsMuxUploader{
         LinkTsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
@@ -278,8 +267,9 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         }
         
         int ret = 0;
-        
+        enum LinkUploaderTimeInfoType tmtype = LINK_VIDEO_TIMESTAMP;
         if (_nFlag == LINK_STREAM_TYPE_AUDIO){
+                tmtype = LINK_AUDIO_TIMESTAMP;
                 //fprintf(stderr, "audio frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
                         LinkLogWarn("audio pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
@@ -341,7 +331,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         
         
         if (ret == 0) {
-                pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime);
+                pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime, tmtype);
         } else {
                 if (pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL)
                         LinkLogError("Error muxing packet:%d", ret);

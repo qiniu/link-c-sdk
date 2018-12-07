@@ -129,6 +129,21 @@ typedef struct _LinkUploadArg {
         void * reserved2;                       /**< 预留2 */
 }LinkUploadArg;
 
+#define LINK_MAX_SESSION_ID_LEN 20
+typedef struct _Session { // seg report info
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+        int64_t nTsSequenceNumber;
+        int64_t nSessionStartTime;
+        
+        int64_t nAudioGapFromLastReport;
+        int64_t nVideoGapFromLastReport;
+        
+        int64_t nAccSessionAudioDuration; // tad
+        int64_t nAccSessionVideoDuration; // tvd
+        
+        int64_t nAccReportAudioDuration; // ad
+        int64_t nAccReportVideoDuration; // vd
+} Session;
 
 
 #define LINK_STREAM_UPLOAD 1
