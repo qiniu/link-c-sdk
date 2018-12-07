@@ -23,12 +23,8 @@ typedef struct _LinkTsUploadArg {
 }LinkTsUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;
-typedef int (*StreamUploadStart)(LinkTsUploader* pUploader);
-typedef void (*StreamUploadStop)(LinkTsUploader*);
 
 typedef struct _LinkTsUploader{
-        StreamUploadStart UploadStart;
-        StreamUploadStop UploadStop;
         LinkUploadState (*GetUploaderState)(IN LinkTsUploader *pTsUploader);
         void (*NotifyDataPrapared)(IN LinkTsUploader *pTsUploader);
         int(*Push)(IN LinkTsUploader *pTsUploader, IN const char * pData, int nDataLen);
