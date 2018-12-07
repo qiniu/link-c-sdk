@@ -37,9 +37,9 @@ typedef struct _FFTsMuxContext{
         LinkTsMuxerContext *pFmtCtx_;
 #else
         AVFormatContext *pFmtCtx_;
-#endif
         int nOutVideoindex_;
         int nOutAudioindex_;
+#endif
         int64_t nPrevAudioTimestamp;
         int64_t nPrevVideoTimestamp;
         LinkTsMuxUploader * pTsMuxUploader;
@@ -64,6 +64,17 @@ typedef struct  {
         int   nNewSegmentInterval;
         int   nUpdateIntervalSeconds;
 }RemoteConfig;
+
+#define LINK_MAX_SESSION_ID_LEN 20
+typedef struct _Session { // seg report info
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+        int64_t nTsSequenceNumber;
+        int64_t nSessionStartTime;
+        int64_t nAudioGapFromLastReport;
+        int64_t nVideoGapFromLastReport;
+        int64_t nAccAudioDuration;
+        int64_t nAccVideoDuration;
+} Session;
 
 typedef struct _FFTsMuxUploader{
         LinkTsMuxUploader tsMuxUploader_;
@@ -286,8 +297,9 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
                 pkt.dts = pkt.pts;
-                pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
 #endif
+                pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
+                
                 unsigned char * pAData = (unsigned char * )_pData;
                 if (pFFTsMuxUploader->avArg.nAudioFormat ==  LINK_AUDIO_AAC && (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0)) {
                         LinkADTSFixheader fixHeader;
@@ -345,8 +357,8 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                 pkt.pts = _nTimestamp * 90;
                 pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
                 pkt.dts = pkt.pts;
-                pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
 #endif
+                pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
         }
         
         
