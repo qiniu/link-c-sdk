@@ -33,6 +33,10 @@ typedef struct _KodoUploader{
         enum CircleQueuePolicy policy;
         int nMaxItemLen;
         int nInitItemCount;
+        
+        pthread_mutex_t uploadMutex_;
+        int nTsCacheNum;
+        int nTsMaxCacheNum;
 
         pthread_t workerId_;
         int isThreadStarted_;
@@ -135,7 +139,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
-       
+        TsUploaderMeta* pUpMeta = pUploadCmd->pUpMeta;
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
 
         ret = pUploadCmd->pKodoUploader->uploadArg.getUploadParamCallback(
@@ -151,7 +155,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 }
         }
         
-        TsUploaderMeta* pUpMeta = pUploadCmd->pUpMeta;
         int64_t tsStartTime = pUpMeta->nTsStartTimestamp;
         
         
@@ -232,6 +235,11 @@ END:
 
         LinkDestroyQueue(&pDataQueue);
         free(pUpMeta);
+        
+        pthread_mutex_lock(&pUploadCmd->pKodoUploader->uploadMutex_);
+        pUploadCmd->pKodoUploader->nTsCacheNum--;
+        pthread_mutex_unlock(&pUploadCmd->pKodoUploader->uploadMutex_);
+
         return NULL;
 }
 
@@ -286,16 +294,21 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         pKodoUploader->pQueue_ = NULL;
         pKodoUploader->pUpMeta = NULL;
         
-        LinkUploaderStatInfo info = {0};
-        pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-        if (info.nLen_ >= 2) {
+        int nCurCacheNum = 0;
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
+        nCurCacheNum = pKodoUploader->nTsCacheNum;
+        
+        if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
                 free(uploadCommand.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.pData));
                 LinkLogError("drop ts file due to ts queue is full");
         } else {
-                LinkLogDebug("-------->push a queue\n", info.nLen_);
-                pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+                LinkLogDebug("-------->push a queue\n", nCurCacheNum);
+                int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+                if (ret == LINK_SUCCESS)
+                        pKodoUploader->nTsCacheNum++;
         }
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
         
         allocDataQueueAndUploadMeta(pKodoUploader);
         
@@ -393,7 +406,15 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 free(pKodoUploader->pUpMeta);
                 return ret;
         }
-        
+        ret = pthread_mutex_init(&pKodoUploader->uploadMutex_, NULL);
+        if (ret != 0){
+                LinkDestroyQueue(&pKodoUploader->pQueue_);
+                LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
+                free(pKodoUploader->pUpMeta);
+                free(pKodoUploader);
+                return LINK_MUTEX_ERROR;
+        }
+        pKodoUploader->nTsMaxCacheNum = 2;
         ret = pthread_create(&pKodoUploader->workerId_, NULL, listenTsUpload, pKodoUploader);
         if (ret != 0) {
                 LinkDestroyQueue(&pKodoUploader->pQueue_);

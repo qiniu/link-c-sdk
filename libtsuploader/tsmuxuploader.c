@@ -75,8 +75,7 @@ typedef struct _FFTsMuxUploader{
         int nAACBufLen;
         FFTsMuxContext *pTsMuxCtx;
         
-        int64_t nLastTimestamp;
-        int64_t nFirstTimestamp; //initial to -1
+        int64_t nFirstTimestamp; //determinate if to cut ts file
         int64_t nLastPicCallbackSystime; //upload picture need
         int nKeyFrameCount;
         int nFrameCount;
@@ -88,7 +87,7 @@ typedef struct _FFTsMuxUploader{
         char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
         char app_[LINK_MAX_APP_LEN+1];
         Token token_;
-        LinkTsUploadArg uploadArg;
+        LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
@@ -479,7 +478,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                                 pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         }
                         if (_nIsSegStart) {
-                                pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
+                                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
 
                 }
@@ -745,31 +744,31 @@ static void updateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nE
 
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
         
-        if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
-                pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
-                pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
-                pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
-                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
-                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
+        if (pFFTsMuxUploader->uploadArgBak.nSegmentId_ == 0) {
+                pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
+                pFFTsMuxUploader->uploadArgBak.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = _pUploadArg->nSegmentId_;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
+                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
                 return;
         }
         
-        int64_t nDuration = pFFTsMuxUploader->uploadArg.nLastEndTsTime - pFFTsMuxUploader->uploadArg.nSegmentId_;
+        int64_t nDuration = pFFTsMuxUploader->uploadArgBak.nLastEndTsTime - pFFTsMuxUploader->uploadArgBak.nSegmentId_;
         if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
                 //TODO report seg info
         }
 
         int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
-        if (nNow - pFFTsMuxUploader->uploadArg.nLastEndTsTime >= nDiff) {
-                pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
+        if (nNow - pFFTsMuxUploader->uploadArgBak.nLastEndTsTime >= nDiff) {
+                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = nNow;
                 _pUploadArg->nSegmentId_ = nNow;
-                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
         } else {
-                pFFTsMuxUploader->uploadArg.nSegSeqNum++;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum++;
         }
-        pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
-        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
-        pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+        pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
+        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
+        pFFTsMuxUploader->uploadArgBak.nLastStartTime_ = _pUploadArg->nLastStartTime_;
         return;
 }
 
@@ -841,18 +840,18 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
         
         if (isWithPicAndSeg) {
-                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpdate = updateSegmentId;
+                pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = pFFTsMuxUploader;
+                pFFTsMuxUploader->uploadArgBak.UploadSegmentIdUpdate = updateSegmentId;
         } else {
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpdate = NULL;
-                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = NULL;
+                pFFTsMuxUploader->uploadArgBak.UploadSegmentIdUpdate = NULL;
+                pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = NULL;
         }
         
         //pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_; //TODO
-        pFFTsMuxUploader->uploadArg.getUploadParamCallback = getUploadParamCallback;
-        pFFTsMuxUploader->uploadArg.pGetUploadParamCallbackArg = pFFTsMuxUploader;
-        pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
-        pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        pFFTsMuxUploader->uploadArgBak.getUploadParamCallback = getUploadParamCallback;
+        pFFTsMuxUploader->uploadArgBak.pGetUploadParamCallbackArg = pFFTsMuxUploader;
+        pFFTsMuxUploader->uploadArgBak.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        pFFTsMuxUploader->uploadArgBak.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         pFFTsMuxUploader->pConfigRequestUrl = (char *)(pFFTsMuxUploader) + sizeof(FFTsMuxUploader);
         if (pFFTsMuxUploader->pConfigRequestUrl) {
                 memcpy(pFFTsMuxUploader->pConfigRequestUrl, _pUserUploadArg->pConfigRequestUrl, _pUserUploadArg->nConfigRequestUrlLen);
@@ -1170,7 +1169,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         
         int nBufsize = getBufferSize(pFFTsMuxUploader);
         int ret = newTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg,
-                                  &pFFTsMuxUploader->uploadArg, nBufsize, pFFTsMuxUploader->queueType_);
+                                  &pFFTsMuxUploader->uploadArgBak, nBufsize, pFFTsMuxUploader->queueType_);
         if (ret != 0) {
                 return ret;
         }
