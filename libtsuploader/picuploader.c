@@ -1,7 +1,7 @@
 #include "picuploader.h"
 #include "resource.h"
 #include "queue.h"
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "fixjson.h"
 #include <qupload.h>
 #include "httptools.h"

@@ -29,8 +29,8 @@ endif()
 add_library(tsuploader STATIC
     resource.c
     resource.h
-    uploader.h
-    uploader.c
+    tsuploader.h
+    tsuploader.c
     base.h
     adts.h
     adts.c
@@ -45,7 +45,7 @@ add_library(tsuploader STATIC
     tsmuxuploader.c
     tsmuxuploader.h
     tsuploaderapi.c
-    tsuploaderapi.h
+    uploader.h
     httptools.h
     httptools.c
     tsmux.h

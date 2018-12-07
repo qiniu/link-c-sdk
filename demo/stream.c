@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include "stream.h"
 #include "queue.h"
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "dev_core.h"
 #include "main.h"
 #include "dbg.h"

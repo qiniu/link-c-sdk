@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "security.h"
 #include "main.h"
 #include "log2file.h"

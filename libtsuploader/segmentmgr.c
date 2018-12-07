@@ -1,7 +1,7 @@
 #include "segmentmgr.h"
 #include "resource.h"
 #include "queue.h"
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "fixjson.h"
 #include "servertime.h"
 #include "b64/urlsafe_b64.h"

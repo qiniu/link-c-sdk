@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <time.h>
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "adts.h"
 #include <stdint.h>
 #include "dbg.h"
