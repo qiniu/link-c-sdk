@@ -1380,9 +1380,11 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
         
         int rcSleepUntilTime = 0x7FFFFFFF;
         int nNextTryRcTime = 1;
+        int shouldUpdateRc = 0;
         
-        int tokenSleepTime = 0x7FFFFFFF;
+        int tokenSleepUntilTime = 0x7FFFFFFF;
         int nNextTryTokenTime = 1;
+        int shouldUpdateToken = 0;
         
         RemoteConfig rc;
         int now;
@@ -1394,54 +1396,73 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 SessionUpdateParam param;
                 param.nType = 0;
                 now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                int nWait = rcSleepUntilTime - now;
-                if (nWait <= 0) {
-                        nWait = 0;
+                
+                int nWaitRc = rcSleepUntilTime - now;
+                int nWaitToken = tokenSleepUntilTime - now;
+                int nWait = nWaitRc;
+                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
+                        nWait = nWaitToken;
                 }
                 ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
                                                                       sizeof(SessionUpdateParam), nWait);
-
-                memset(&info, 0, sizeof(info));
-                pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                
+                if (ret < 0 && (ret != LINK_SUCCESS && ret != LINK_TIMEOUT)) {
+                        LinkLogError("updatequeue fail:%d", ret);
+                        continue;
+                }
                 
                 if (param.nType == 3) {
                         continue;
                 }
+
+                memset(&info, 0, sizeof(info));
+                pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                
                 int getRcOk = 0; // after getRemoteConfig success,must update token
-                if (param.nType == 2 || ret == LINK_TIMEOUT) {
+                if (param.nType == 2 || shouldUpdateRc || ret == LINK_TIMEOUT) {
                         getRcOk = 0;
                         ret = getRemoteConfig(pFFTsMuxUploader, &rc);
+                        now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
                                 LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime);
-                                sleep(nNextTryRcTime);
+                                rcSleepUntilTime = now + nNextTryRcTime;
                                 nNextTryRcTime *= 2;
+                                shouldUpdateRc = 1;
+                                
+                                shouldUpdateToken = 0; //rc is Higher priority than token
+                                nNextTryTokenTime = 1;
+                                continue;
                         }
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
                         nNextTryRcTime = 1;
-                        rcSleepUntilTime = (int)(LinkGetCurrentNanosecond() / 1000000000) + rc.updateConfigInterval;
+                        shouldUpdateRc = 0;
+                        rcSleepUntilTime = now + rc.updateConfigInterval;
                         getRcOk = 1;
 
                 }
                 
-                if (param.nType == 1 || getRcOk) { //update token
-                        ret = updateToken(pFFTsMuxUploader, &tokenSleepTime, &param);
+                if (shouldUpdateRc) {
+                        LinkLogWarn("before update token, must update remote config");
+                        continue;
+                }
+                
+                if (param.nType == 1 || shouldUpdateToken || getRcOk) { //update token
+                        ret = updateToken(pFFTsMuxUploader, &tokenSleepUntilTime, &param);
+                        now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryTokenTime > 16) {
                                         nNextTryTokenTime = 16;
                                 }
-                                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                                if (now >= rcSleepUntilTime || pFFTsMuxUploader->isQuit) {
-                                        nNextTryTokenTime = 1;
-                                        continue;
-                                }
-                                sleep(nNextTryTokenTime);
+                                tokenSleepUntilTime = now + nNextTryTokenTime;
+                                shouldUpdateToken = 1;
                                 nNextTryTokenTime *= 2;
                                 continue;
                         }
                         nNextTryTokenTime = 1;
                         pFFTsMuxUploader->isReady = 1;
+                        shouldUpdateToken = 0;
                 }
         }
         
