@@ -26,7 +26,7 @@ typedef struct {
         int isRestart;
         int segUploadOk;
         char bucket[LINK_MAX_BUCKET_LEN+1];
-        LinkGetUploadParamCallback getUploadParamCallback;
+        LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
@@ -197,7 +197,7 @@ static void updateSegmentFile(SegInfo segInfo) {
                 param.nSegUrlLen = sizeof(upHost);
         }
         int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
-                                                                 &param);
+                                                                 &param, LINK_UPLOAD_CB_GETPARAM);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("fail to getUploadParamCallback:%d ", ret);
                 return;

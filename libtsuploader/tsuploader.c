@@ -8,6 +8,7 @@
 #include <time.h>
 #include "fixjson.h"
 #include "b64/b64.h"
+#include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
 
@@ -55,6 +56,7 @@ typedef struct _KodoUploader{
         void *pTsEndUploadCallbackArg;
         int nQuit_;
         Session session;
+        int nTokenDeadline;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -155,14 +157,17 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.nDeviceNameLen = sizeof(deviceName);
         param.pApp = app;
         param.nAppLen = sizeof(app);
+        param.nTokenDeadline = pKodoUploader->nTokenDeadline;
+        strcpy(param.sessionId, pKodoUploader->session.sessionId);
+        param.nSeqNum = pKodoUploader->session.nTsSequenceNumber;
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
 
-        ret = pKodoUploader->uploadArg.getUploadParamCallback(
+        ret = pKodoUploader->uploadArg.uploadParamCallback(
                                         pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
-                                        &param);
+                                        &param, LINK_UPLOAD_CB_GETPARAM);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
                         LinkLogError("param buffer is too small. drop file");
@@ -190,10 +195,13 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         uint64_t nSegmentId = pKodoUploader->uploadArg.nSegmentId_;
         
         int nDeleteAfterDays_ = 0;
-        ret = LinkGetDeleteAfterDaysFromUptoken(uptoken, &nDeleteAfterDays_);
+        int nDeadline = 0;
+        ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, &nDeadline);
         if (ret != LINK_SUCCESS) {
                 LinkLogWarn("not get deleteafterdays");
         }
+        pKodoUploader->nTokenDeadline = nDeadline;
+
         memset(key, 0, sizeof(key));
         
         
@@ -380,19 +388,41 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
         return pKodoUploader->state;
 }
 
+static void updateSessionIdAndCallback(KodoUploader * pKodoUploader, int64_t v, int nseqnum) {
+        
+        char str[15] = {0};
+        sprintf(str, "%"PRId64"", v/1000000);
+        urlsafe_b64_encode(str, strlen(str), pKodoUploader->session.sessionId, sizeof(pKodoUploader->session.sessionId));
+        
+        LinkUploadParam param;
+        param.nSeqNum = nseqnum;
+        //TODO first session timestamp, should callback to notify update token
+        strcpy(param.sessionId, pKodoUploader->session.sessionId);
+        pKodoUploader->uploadArg.uploadParamCallback(
+                                                     pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
+                                                     &param, LINK_UPLOAD_CB_UPTOKEN);
+
+}
+
 static void handleAudioTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
         //pKodoUploader->session.
 }
 
 static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
         
+        if (pKodoUploader->session.sessionId[0] == 0) {
+                updateSessionIdAndCallback(pKodoUploader, pTi->nAvTimestamp, 0);
+        }
+        //TODO handle session info
 }
 
 static void handleSegTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
         //TODO update session id
-        //TODOreport sessiond end
+        updateSessionIdAndCallback(pKodoUploader, pTi->nAvTimestamp, 0);
+        
+        //TODO report sessiond end
         pKodoUploader->session.nSessionStartTime = pTi->nSysTimestamp;
-        //TODOfresh token
+        //TODO fresh token
 }
 
 static void * listenTsUpload(void *_pOpaque)

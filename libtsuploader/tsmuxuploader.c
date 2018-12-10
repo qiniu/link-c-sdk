@@ -56,6 +56,12 @@ typedef struct  {
         int   nUpdateIntervalSeconds;
 }RemoteConfig;
 
+typedef struct _SessionUpdateParam {
+        int nType; //1 for token update
+        int64_t nSeqNum;
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+}SessionUpdateParam;
+
 typedef struct _FFTsMuxUploader{
         LinkTsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
@@ -95,10 +101,12 @@ typedef struct _FFTsMuxUploader{
         char sk[41];
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
+        
+        LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
-static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype);
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader);
 static void freeRemoteConfig(RemoteConfig *pRc);
@@ -584,11 +592,14 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 
                 FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxCtx->pTsMuxUploader);
                 if (pFFTsMuxUploader) {
-                        pthread_cancel(pFFTsMuxUploader->tokenThread);
+                        SessionUpdateParam upparam;
+                        upparam.nType = 3;
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
                         pthread_join(pFFTsMuxUploader->tokenThread, NULL);
                         if (pFFTsMuxUploader->pVideoMeta) {
                                 free(pFFTsMuxUploader->pVideoMeta);
                         }
+                        LinkDestroyQueue(&pFFTsMuxUploader->pUpdateQueue_);
                         LinkReleaseSegmentHandle(&pFFTsMuxUploader->segmentHandle);
                         LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
                         if (pFFTsMuxUploader->pAACBuf) {
@@ -838,7 +849,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         }
         
         //pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_; //TODO
-        pFFTsMuxUploader->uploadArgBak.getUploadParamCallback = getUploadParamCallback;
+        pFFTsMuxUploader->uploadArgBak.uploadParamCallback = uploadParamCallback;
         pFFTsMuxUploader->uploadArgBak.pGetUploadParamCallbackArg = pFFTsMuxUploader;
         pFFTsMuxUploader->uploadArgBak.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArgBak.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
@@ -896,9 +907,28 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         return linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 0);
 }
 
-static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam) {
+static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        
+        
+        SessionUpdateParam upparam;
+        upparam.nType = 1;
+        upparam.nSeqNum = pParam->nSeqNum;
+        strcpy(upparam.sessionId, pParam->sessionId);
+        
+        if (pParam->nTokenDeadline > 1544421373) {
+                int shouldUpdateToken = pParam->nTokenDeadline - (int)(LinkGetCurrentNanosecond() / 1000000000);
+                if (shouldUpdateToken <= 20) {
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+                }
+        }
+        
+        if (cbtype == LINK_UPLOAD_CB_UPTOKEN) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_SUCCESS;
+        }
+        
         if (pFFTsMuxUploader->token_.pToken_ == NULL) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
@@ -1013,7 +1043,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         SegmentHandle segHandle;
         SegmentArg arg;
         memset(&arg, 0, sizeof(arg));
-        arg.getUploadParamCallback = getUploadParamCallback;
+        arg.getUploadParamCallback = uploadParamCallback;
         arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
@@ -1028,7 +1058,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
         fullArg.pGetPicCallbackOpaque = _pPicArg->pGetPicCallbackOpaque;
-        fullArg.getUploadParamCallback = getUploadParamCallback;
+        fullArg.getUploadParamCallback = uploadParamCallback;
         fullArg.pGetUploadParamCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
@@ -1250,45 +1280,43 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 return LINK_JSON_FORMAT;
         }
         
+        int nCpyLen = 0;
         pNode = cJSON_GetObjectItem(pSeg, "uploadUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pUpHostUrl = malloc(nCpyLen + 1);
+                if (pRc->pUpHostUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pUpHostUrl, pNode->valuestring, nCpyLen);
+                pRc->pUpHostUrl[nCpyLen] = 0;
         }
-        int nCpyLen = strlen(pNode->valuestring);
-        pRc->pUpHostUrl = malloc(nCpyLen + 1);
-        if (pRc->pUpHostUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pUpHostUrl, pNode->valuestring, nCpyLen);
-        pRc->pUpHostUrl[nCpyLen] = 0;
-        
         
         pNode = cJSON_GetObjectItem(pSeg, "tokenRequestUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pUpTokenRequestUrl = malloc(nCpyLen + 1);
+                if (pRc->pUpTokenRequestUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
+                pRc->pUpTokenRequestUrl[nCpyLen] = 0;
+                LinkLogInfo("tokenurl:%s", pRc->pUpTokenRequestUrl);
         }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pUpTokenRequestUrl = malloc(nCpyLen + 1);
-        if (pRc->pUpTokenRequestUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
-        pRc->pUpTokenRequestUrl[nCpyLen] = 0;
+        
         
         pNode = cJSON_GetObjectItem(pSeg, "segReportUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pMgrTokenRequestUrl = malloc(nCpyLen + 1);
+                if (pRc->pMgrTokenRequestUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
+                pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
+                LinkLogInfo("segReportUrl:%s", pRc->pMgrTokenRequestUrl);
         }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pMgrTokenRequestUrl = malloc(nCpyLen + 1);
-        if (pRc->pMgrTokenRequestUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
-        pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
+        
         
         pNode = cJSON_GetObjectItem(pSeg, "tsDuration");
         if (pNode != NULL) {
@@ -1296,6 +1324,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         }
         if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
                 pRc->nTsDuration = 5000;
+        LinkLogInfo("tsDuration:%d", pRc->nTsDuration);
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
         if (pNode != NULL) {
@@ -1304,6 +1333,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nSessionDuration < 600 * 1000) {
                 pRc->nSessionDuration = 600 * 1000;
         }
+        LinkLogInfo("nSessionDuration:%d", pRc->nSessionDuration);
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionTimeout");
         if (pNode != NULL) {
@@ -1312,6 +1342,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nSessionTimeout < 1000) {
                 pRc->nSessionTimeout = 3000;
         }
+        LinkLogInfo("nSessionTimeout:%d", pRc->nSessionTimeout);
         
         cJSON_Delete(pJsonRoot);
         
@@ -1325,13 +1356,13 @@ END:
         return LINK_NO_MEMORY;
 }
 
-static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
+static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, SessionUpdateParam *pSParam) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        int nOffset = snprintf(pBuf, 1024, "%s", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        snprintf(pBuf, 1024, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
+                 pSParam->sessionId, pSParam->nSeqNum);
         
-        ///v1/device/uploadtoken?session=<session>&sequence=<sequence>&start=<startTimestamp>&now=<nowTimestamp>
-        //TODO add query arg
+        // /v1/device/uploadtoken?session=<session>&sequence=<sequence>
         
         int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf);
         if (ret != LINK_SUCCESS) {
@@ -1340,50 +1371,68 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
                 return ret;
         }
         setToken(pFFTsMuxUploader, pBuf, strlen(pBuf));
+        LinkLogInfo("gettoken:%s", pBuf);
         return LINK_SUCCESS;
 }
 
-static void *linkTokenThread(void * pOpaque) {
+static void *linkTokenAndConfigThread(void * pOpaque) {
         FFTsMuxUploader* pFFTsMuxUploader = (FFTsMuxUploader*) pOpaque;
         
-        int rcSleepTime = 0x7FFFFFFF;
+        int rcSleepUntilTime = 0x7FFFFFFF;
         int nNextTryRcTime = 1;
         
         int tokenSleepTime = 0x7FFFFFFF;
         int nNextTryTokenTime = 1;
         
-        int shouldUpdateRemoteCofig = 1;
-        int shouldUpdateToken = 1;
         RemoteConfig rc;
         int now;
-        while(!pFFTsMuxUploader->isQuit) {
+        LinkUploaderStatInfo info;
+        while(!pFFTsMuxUploader->isQuit || info.nLen_ != 0) {
 
                 int ret = 0;
-                if (shouldUpdateRemoteCofig) {
+                
+                SessionUpdateParam param;
+                param.nType = 0;
+                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
+                int nWait = rcSleepUntilTime - now;
+                if (nWait <= 0) {
+                        nWait = 0;
+                }
+                ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
+                                                                      sizeof(SessionUpdateParam), nWait);
+
+                memset(&info, 0, sizeof(info));
+                pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                
+                if (param.nType == 3) {
+                        continue;
+                }
+                int getRcOk = 0; // after getRemoteConfig success,must update token
+                if (param.nType == 2 || ret == LINK_TIMEOUT) {
+                        getRcOk = 0;
                         ret = getRemoteConfig(pFFTsMuxUploader, &rc);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
-                                
+                                LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime);
                                 sleep(nNextTryRcTime);
                                 nNextTryRcTime *= 2;
                         }
-                        nNextTryRcTime = 1;
-                        shouldUpdateRemoteCofig = 0;
-                        rcSleepTime = (int)(LinkGetCurrentNanosecond() / 1000000000) + rc.updateConfigInterval;
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
+                        nNextTryRcTime = 1;
+                        rcSleepUntilTime = (int)(LinkGetCurrentNanosecond() / 1000000000) + rc.updateConfigInterval;
+                        getRcOk = 1;
+
                 }
                 
-                if (shouldUpdateToken) {
-                        ret = updateToken(pFFTsMuxUploader, &tokenSleepTime);
+                if (param.nType == 1 || getRcOk) { //update token
+                        ret = updateToken(pFFTsMuxUploader, &tokenSleepTime, &param);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryTokenTime > 16) {
                                         nNextTryTokenTime = 16;
                                 }
                                 now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                                if (now >= rcSleepTime) {
-                                        shouldUpdateRemoteCofig = 1;
-                                        nNextTryRcTime = 1;
+                                if (now >= rcSleepUntilTime || pFFTsMuxUploader->isQuit) {
                                         nNextTryTokenTime = 1;
                                         continue;
                                 }
@@ -1392,21 +1441,7 @@ static void *linkTokenThread(void * pOpaque) {
                                 continue;
                         }
                         nNextTryTokenTime = 1;
-                        shouldUpdateToken = 0;
                         pFFTsMuxUploader->isReady = 1;
-                }
-                
-                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                int stime = 0;
-                if (rcSleepTime > tokenSleepTime) {
-                        shouldUpdateToken = 1;
-                        stime = tokenSleepTime - now - 10;
-                } else {
-                        shouldUpdateRemoteCofig = 1;
-                        stime = rcSleepTime - now - 10;
-                }
-                if (stime > 0) {
-                        sleep(stime);
                 }
         }
         
@@ -1415,8 +1450,19 @@ static void *linkTokenThread(void * pOpaque) {
 
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) {
         
-        int ret = pthread_create(&pFFTsMuxUploader->tokenThread, NULL, linkTokenThread, pFFTsMuxUploader);
+        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, 0, TSQ_FIX_LENGTH, sizeof(SessionUpdateParam), 50);
         if (ret != 0) {
+                return ret;
+        }
+        
+        //update remote config
+        SessionUpdateParam upparam;
+        upparam.nType = 2;
+        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+        
+        ret = pthread_create(&pFFTsMuxUploader->tokenThread, NULL, linkTokenAndConfigThread, pFFTsMuxUploader);
+        if (ret != 0) {
+                LinkDestroyQueue(&pFFTsMuxUploader->pUpdateQueue_);
                 return LINK_THREAD_ERROR;
         }
 

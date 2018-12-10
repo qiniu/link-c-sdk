@@ -10,7 +10,7 @@ typedef void (*LinkTsUploadArgUpadater)(void *pOpaque, void* pUploadArg, int64_t
 typedef void (*LinkEndUploadCallback)(void *pOpaque, int64_t nTimestamp);
 
 typedef struct _LinkTsUploadArg {
-        LinkGetUploadParamCallback getUploadParamCallback;
+        LinkUploadParamCallback uploadParamCallback;
         void *pGetUploadParamCallbackArg;
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;

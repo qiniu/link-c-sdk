@@ -7,7 +7,7 @@ typedef int SegmentHandle;
 
 
 typedef struct {
-        LinkGetUploadParamCallback getUploadParamCallback;
+        LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;

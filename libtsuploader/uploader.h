@@ -1,5 +1,5 @@
 /**
- * @file tsuploaderapi.h
+ * @file uploader.h
  * @author Qiniu.com
  * @copyright 2018(c) Shanghai Qiniu Information Technologies Co., Ltd.
  * @brief link-c-sdk api header file

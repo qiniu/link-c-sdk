@@ -22,6 +22,7 @@
 #define LINK_MAX_APP_LEN 200
 #define LINK_MAX_BUCKET_LEN 63
 #define LINK_MAX_DEVICE_NAME_LEN 200
+#define LINK_MAX_SESSION_ID_LEN 20
 
 #define LINK_USE_OLD_NAME
 
@@ -46,9 +47,17 @@ typedef struct {
         IN OUT int nDeviceNameLen;
         IN char* pApp;
         IN OUT int nAppLen;
+        int64_t nSeqNum;
+        int nTokenDeadline;
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
 }LinkUploadParam;
 
-typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+typedef enum {
+        LINK_UPLOAD_CB_GETPARAM = 1,
+        LINK_UPLOAD_CB_UPTOKEN = 2
+} LinkUploadCbType;
+
+typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);
 
 typedef enum {
         LINK_UPLOAD_TS = 1,
@@ -129,7 +138,7 @@ typedef struct _LinkUploadArg {
         void * reserved2;                       /**< 预留2 */
 }LinkUploadArg;
 
-#define LINK_MAX_SESSION_ID_LEN 20
+
 typedef struct _Session { // seg report info
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
         int64_t nTsSequenceNumber;

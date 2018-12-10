@@ -16,7 +16,7 @@ typedef struct {
 typedef struct {
         LinkGetPictureCallback getPicCallback;
         void *pGetPicCallbackOpaque;
-        LinkGetUploadParamCallback getUploadParamCallback;
+        LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackOpaque;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;

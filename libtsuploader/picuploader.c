@@ -115,7 +115,7 @@ static void * listenPicUpload(void *_pOpaque)
                                                 param.nDeviceNameLen = sizeof(deviceName);
                                                 param.pApp = app;
                                                 param.nAppLen = sizeof(app);
-                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param);
+                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
                                                         break;
@@ -233,7 +233,7 @@ static void * uploadPicture(void *_pOpaque) {
         int isFirst = 0, tryCount = 2;
         while(tryCount-- > 0) {
                 ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
-                                                                                    &param);
+                                                                                    &param, LINK_UPLOAD_CB_GETPARAM);
                 if (ret != LINK_SUCCESS) {
                         if (ret == LINK_BUFFER_IS_SMALL) {
                                 LinkLogError("param buffer is too small. drop file:");
