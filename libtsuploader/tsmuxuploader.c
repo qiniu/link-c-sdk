@@ -89,7 +89,6 @@ typedef struct _FFTsMuxUploader{
         int8_t isPause;
         int8_t isTypeOneshot;
         int8_t isQuit;
-        int8_t isReady;
         char tsType[16];
         
         pthread_t tokenThread;
@@ -103,6 +102,7 @@ typedef struct _FFTsMuxUploader{
         RemoteConfig remoteConfig;
         
         LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -491,10 +491,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (!pFFTsMuxUploader->isReady) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return LINK_NOT_INITED;
-        }
+        
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return LINK_PAUSED;
@@ -539,10 +536,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (!pFFTsMuxUploader->isReady) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return LINK_NOT_INITED;
-        }
+
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return LINK_PAUSED;
@@ -913,10 +907,19 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         
         
         SessionUpdateParam upparam;
-        upparam.nType = 1;
         upparam.nSeqNum = pParam->nSeqNum;
-        strcpy(upparam.sessionId, pParam->sessionId);
+        if (pParam->sessionId[0] != 0) {
+                strcpy(upparam.sessionId, pParam->sessionId);
+                
+                if (pFFTsMuxUploader->sessionId[0] == 0 || strcmp(pParam->sessionId, pFFTsMuxUploader->sessionId) != 0) {
+                        //update remote config
+                        upparam.nType = 2;
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+                        strcpy(pFFTsMuxUploader->sessionId, pParam->sessionId);
+                }
+        }
         
+        upparam.nType = 1;
         if (pParam->nTokenDeadline > 1544421373) {
                 int shouldUpdateToken = pParam->nTokenDeadline - (int)(LinkGetCurrentNanosecond() / 1000000000);
                 if (shouldUpdateToken <= 20) {
@@ -1461,7 +1464,6 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                                 continue;
                         }
                         nNextTryTokenTime = 1;
-                        pFFTsMuxUploader->isReady = 1;
                         shouldUpdateToken = 0;
                 }
         }
@@ -1475,11 +1477,6 @@ static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) 
         if (ret != 0) {
                 return ret;
         }
-        
-        //update remote config
-        SessionUpdateParam upparam;
-        upparam.nType = 2;
-        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         ret = pthread_create(&pFFTsMuxUploader->tokenThread, NULL, linkTokenAndConfigThread, pFFTsMuxUploader);
         if (ret != 0) {

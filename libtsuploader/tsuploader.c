@@ -395,6 +395,7 @@ static void updateSessionIdAndCallback(KodoUploader * pKodoUploader, int64_t v, 
         urlsafe_b64_encode(str, strlen(str), pKodoUploader->session.sessionId, sizeof(pKodoUploader->session.sessionId));
         
         LinkUploadParam param;
+        memset(&param, 0, sizeof(LinkUploadParam));
         param.nSeqNum = nseqnum;
         //TODO first session timestamp, should callback to notify update token
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
