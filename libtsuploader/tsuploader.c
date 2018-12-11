@@ -316,10 +316,8 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         
         if (pKodoUploader->pUpMeta != NULL) {
                 pKodoUploader->pQueue_ = NULL;
-                fprintf(stderr, "create dataq start:\n");
                 int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 0, pKodoUploader->policy,
                                              pKodoUploader->nMaxItemLen, pKodoUploader->nInitItemCount);
-                fprintf(stderr, "create dataq end:%p:%d %p\n",pKodoUploader->pQueue_, ret, pKodoUploader->pQueue_->Push);
                 if (ret != 0) {
                         free(pKodoUploader->pUpMeta);
                         pKodoUploader->pUpMeta = NULL;
