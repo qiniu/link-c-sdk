@@ -1083,16 +1083,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         return ret;
 }
 
-void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t _nSeconds) {
-        if (_pTsMuxUploader == NULL || _nSeconds <= 0) {
-                return;
-        }
-        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-        
-        LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
-        return;
-}
-
 int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
         if (_pTsMuxUploader == NULL || _pType == NULL) {
                 return LINK_ARG_ERROR;

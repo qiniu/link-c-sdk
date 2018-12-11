@@ -144,15 +144,15 @@ typedef struct _LinkSession { // seg report info
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
         int64_t nSessionStartTime;
         int64_t nTsSequenceNumber;
-        
-        int64_t nAudioGapFromLastReport; // ad
-        int64_t nVideoGapFromLastReport; // vd
+        int nSessionEndResonCode;
         
         int64_t nAccSessionDuration;
         int64_t nAccSessionAudioDuration; // tad
         int64_t nAccSessionVideoDuration; // tvd
         
         // report scope
+        int64_t nAudioGapFromLastReport; // ad
+        int64_t nVideoGapFromLastReport; // vd
         int64_t nLastReportAccSessionAudioDuration;
         int64_t nLastReportAccSessionVideoDuration;
         

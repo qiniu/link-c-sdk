@@ -69,18 +69,6 @@ int LinkPushPicture(IN LinkTsMuxUploader *pTsMuxUploader,
                                 );
 
 /**
- * 片段文件更新间隔时间
- *
- *
- * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] nSeconds 片段文件重命名间隔时间
- * @return NULL
- */
-void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *pTsMuxUploader,
-                                  IN int64_t nSeconds
-                                  );
-
-/**
  * 通知当前没有可上传数据
  *
  * 此函数用于当上传结束时，将当前已缓存的资源完成进行上传
