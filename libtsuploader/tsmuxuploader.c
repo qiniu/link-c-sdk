@@ -732,7 +732,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
         return ;
 }
 
-static void updateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
+static void updateSegmentId(void *_pOpaque, void* pArg, LinkSession* pSession,int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkTsUploadArg *_pUploadArg = (LinkTsUploadArg *)pArg;
@@ -748,22 +748,28 @@ static void updateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nE
                 return;
         }
         
+        int isSegIdChange = 0;
         int64_t nDuration = pFFTsMuxUploader->uploadArgBak.nLastEndTsTime - pFFTsMuxUploader->uploadArgBak.nSegmentId_;
         if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
-                //TODO report seg info
+                isSegIdChange = 1;
         }
 
         int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
         if (nNow - pFFTsMuxUploader->uploadArgBak.nLastEndTsTime >= nDiff) {
-                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = nNow;
-                _pUploadArg->nSegmentId_ = nNow;
-                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
+                 isSegIdChange = 1;
         } else {
                 pFFTsMuxUploader->uploadArgBak.nSegSeqNum++;
         }
         pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
         _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
         pFFTsMuxUploader->uploadArgBak.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+        if (isSegIdChange) {
+                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = nNow;
+                _pUploadArg->nSegmentId_ = nNow;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
+                //TODO update remote config
+        }
+        //TODO report seg info
         return;
 }
 
@@ -1441,6 +1447,8 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
                         nNextTryRcTime = 1;
                         shouldUpdateRc = 0;
+                        shouldUpdateToken = 0; //rc is Higher priority than token
+                        nNextTryTokenTime = 1;
                         rcSleepUntilTime = now + rc.updateConfigInterval;
                         getRcOk = 1;
 
