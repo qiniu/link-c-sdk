@@ -87,7 +87,7 @@ http_req_prepare(http_req *a_req)
       (a_req->type == http_req_type_trace))
     {
       if (a_req->body_len > 0) {
-      sprintf(l_buf, "%d", a_req->body_len);
+      sprintf(l_buf, "%d", a_req->body_len+a_req->body1_len+a_req->body2_len);
       http_hdr_set_value(a_req->headers,
 			 http_hdr_Content_Length,
 			 l_buf);
@@ -205,6 +205,10 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
     {
       /* append the information to the buffer */
       http_trans_append_data_to_buf(a_conn, a_req->body, a_req->body_len);
+      if (a_req->body1)
+        http_trans_append_data_to_buf(a_conn, a_req->body1, a_req->body1_len);
+      if (a_req->body2)
+        http_trans_append_data_to_buf(a_conn, a_req->body2, a_req->body2_len);
       a_req->state = http_req_state_sending_body;
     http_req_state_sending_body_jump:
       do {

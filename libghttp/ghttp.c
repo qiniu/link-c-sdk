@@ -332,6 +332,31 @@ ghttp_set_body(ghttp_request *a_request, const char *a_body, int a_len)
   return 0;
 }
 
+int ghttp_set_body3(ghttp_request *a_request, const char *a_body, int a_len,
+                    const char *a1_body, int a1_len, const char *a2_body, int a2_len) {
+        /* check to make sure the request is there */
+        if (!a_request)
+                return -1;
+        /* check to make sure the body is there */
+        if ((a_len > 0) && (a_body == NULL))
+                return -1;
+        /* check to make sure that it makes sense */
+        if ((a_request->req->type != http_req_type_post) &&
+            (a_request->req->type != http_req_type_put) &&
+            (a_request->req->type != http_req_type_proppatch) &&
+            (a_request->req->type != http_req_type_propfind) &&
+            (a_request->req->type != http_req_type_lock))
+                return -1;
+        /* set the variables */
+        a_request->req->body = a_body;
+        a_request->req->body_len = a_len;
+        a_request->req->body1 = a1_body;
+        a_request->req->body1_len = a1_len;
+        a_request->req->body2 = a2_body;
+        a_request->req->body2_len = a2_len;
+        return 0;
+}
+
 int
 ghttp_set_sync(ghttp_request *a_request,
 	       ghttp_sync_mode a_mode)
