@@ -212,7 +212,8 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         }
         if (form_data_p == NULL) {
                 snprintf(put_ret->error, sizeof(put_ret->error), "read file error");
-                free(form_data);
+                if (form_data != static_form_data)
+                        free(form_data);
                 return -3;
         }
         
@@ -230,7 +231,8 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         request = ghttp_request_new();
         if (request == NULL) {
                 snprintf(put_ret->error, sizeof(put_ret->error), "ghttp_request_new return null");
-                free(form_data);
+                if (form_data != static_form_data)
+                        free(form_data);
                 return -4;
         }
         
@@ -252,7 +254,8 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
                         getReqidAndResponse(request, put_ret);
                 }
                 ghttp_request_destroy(request);
-                free(form_data);
+                if (form_data != static_form_data)
+                        free(form_data);
                 return -5;
         }
         
