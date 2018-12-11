@@ -737,7 +737,7 @@ static void updateSegmentId(void *_pOpaque, void* pArg, LinkSession* pSession,in
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkTsUploadArg *_pUploadArg = (LinkTsUploadArg *)pArg;
 
-        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
+        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         
         if (pFFTsMuxUploader->uploadArgBak.nSegmentId_ == 0) {
                 pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
@@ -842,9 +842,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = pFFTsMuxUploader;
-                pFFTsMuxUploader->uploadArgBak.UploadSegmentIdUpdate = updateSegmentId;
+                pFFTsMuxUploader->uploadArgBak.UploadUpdateSegmentId = updateSegmentId;
         } else {
-                pFFTsMuxUploader->uploadArgBak.UploadSegmentIdUpdate = NULL;
+                pFFTsMuxUploader->uploadArgBak.UploadUpdateSegmentId = NULL;
                 pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = NULL;
         }
         

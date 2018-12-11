@@ -74,7 +74,7 @@ typedef struct _TsUploaderCommand {
         };
 }TsUploaderCommand;
 
-static void resetCurrentTsTime(KodoUploader * pKodoUploader);
+static void updateSessionId(KodoUploader * pKodoUploader, int64_t v);
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
@@ -132,16 +132,33 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         return retCode;
 }
 
-static void statisticSegInfo(KodoUploader * pKodoUploader) {
+static void statisticSegInfo(LinkSession *pSession) {
         
-        int64_t nDiffAudio = pKodoUploader->session.nLastAudioFrameTimestamp - pKodoUploader->session.nFirstAudioFrameTimestamp;
-        int64_t nDiffVideo = pKodoUploader->session.nLastVideoFrameTimestamp - pKodoUploader->session.nFirstVideoFrameTimestamp;
+        int64_t nDiffAudio = pSession->nLastAudioFrameTimestamp - pSession->nFirstAudioFrameTimestamp;
+        int64_t nDiffVideo = pSession->nLastVideoFrameTimestamp - pSession->nFirstVideoFrameTimestamp;
         
-        pKodoUploader->session.nAccSessionAudioDuration += nDiffAudio;
-        pKodoUploader->session.nAccSessionVideoDuration += nDiffVideo;
+        pSession->nAccSessionAudioDuration += nDiffAudio;
+        pSession->nAccSessionVideoDuration += nDiffVideo;
         
-        pKodoUploader->session.nAudioGapFromLastReport += nDiffAudio;
-        pKodoUploader->session.nVideoGapFromLastReport += nDiffVideo;
+        pSession->nAudioGapFromLastReport += nDiffAudio;
+        pSession->nVideoGapFromLastReport += nDiffVideo;
+        
+        pSession->nAccSessionVideoDuration += (pSession->nLastFrameTimestamp - pSession->nFirstFrameTimestamp);
+}
+
+static void resetSessionCurrentTsScope(LinkSession *pSession) {
+        pSession->nTsStartTime = 0;
+        pSession->nFirstFrameTimestamp = 0;
+        pSession->nLastFrameTimestamp = 0;
+        pSession->nFirstAudioFrameTimestamp = 0;
+        pSession->nLastAudioFrameTimestamp = 0;
+        pSession->nFirstVideoFrameTimestamp = 0;
+        pSession->nLastVideoFrameTimestamp = 0;
+}
+
+static void resetSessionReportScope(LinkSession *pSession) {
+        pSession->nAudioGapFromLastReport = 0;
+        pSession->nVideoGapFromLastReport = 0;
 }
 
 static void * streamUpload(TsUploaderCommand *pUploadCmd) {
@@ -171,8 +188,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.nAppLen = sizeof(app);
         param.nTokenDeadline = pKodoUploader->nTokenDeadline;
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
-        pKodoUploader->session.nTsSequenceNumber++;
-        param.nSeqNum = pKodoUploader->session.nTsSequenceNumber;
+        param.nSeqNum = pKodoUploader->session.nTsSequenceNumber++;
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
@@ -191,28 +207,29 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 }
         }
         
-        int64_t tsStartTime = pSession->nSessionStartTime;
-        
-        
+        int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nLastFrameTimestamp - pSession->nFirstFrameTimestamp;
-        
         if (pKodoUploader->uploadArg.nSegmentId_ == 0) {
-                pKodoUploader->uploadArg.nSegmentId_ = tsStartTime;
+                pKodoUploader->uploadArg.nSegmentId_ = pSession->nSessionStartTime;
         }
-        pKodoUploader->uploadArg.nLastStartTime_ = tsStartTime;
+        
+        pKodoUploader->uploadArg.nLastStartTime_ = tsStartTime; //TODO nLastStartTime_ not use now
+        
         int64_t nSegmentIdBak = pKodoUploader->uploadArg.nSegmentId_;
         
-        statisticSegInfo(pKodoUploader);
-        if (pKodoUploader->uploadArg.UploadSegmentIdUpdate) {
-                pKodoUploader->uploadArg.UploadSegmentIdUpdate(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                               &pKodoUploader->uploadArg, &pKodoUploader->session, tsStartTime,
+        statisticSegInfo(pSession);
+        
+        if (pKodoUploader->uploadArg.UploadUpdateSegmentId) {
+                pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
+                                                               &pKodoUploader->uploadArg, pSession, pSession->nSessionStartTime,
                                                                tsStartTime + tsDuration * 1000000);
                 if (nSegmentIdBak != pKodoUploader->uploadArg.nSegmentId_) {
                         //TODO session change
-                        pKodoUploader->session.nTsSequenceNumber = 0;
-                        
+                        updateSessionId(pKodoUploader, pKodoUploader->uploadArg.nSegmentId_);
                 }
+                resetSessionReportScope(pSession);
         }
+        resetSessionCurrentTsScope(pSession);
         uint64_t nSegmentId = pKodoUploader->uploadArg.nSegmentId_;
         
         int nDeleteAfterDays_ = 0;
@@ -286,7 +303,6 @@ END:
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         pKodoUploader->nTsCacheNum--;
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
-        resetCurrentTsTime(pKodoUploader);
         return NULL;
 }
 
@@ -398,11 +414,26 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
         return pKodoUploader->state;
 }
 
-static void updateSessionIdAndCallback(KodoUploader * pKodoUploader, int64_t v, int nseqnum) {
-        
+static void updateSessionId(KodoUploader * pKodoUploader, int64_t v) {
         char str[15] = {0};
         sprintf(str, "%"PRId64"", v/1000000);
         urlsafe_b64_encode(str, strlen(str), pKodoUploader->session.sessionId, sizeof(pKodoUploader->session.sessionId));
+        
+        pKodoUploader->session.nSessionStartTime =  v;
+        
+        pKodoUploader->session.nTsSequenceNumber = 0;
+        
+        pKodoUploader->session.nAudioGapFromLastReport = 0;
+        pKodoUploader->session.nVideoGapFromLastReport = 0;
+        
+        pKodoUploader->session.nAccSessionDuration = 0;
+        pKodoUploader->session.nAccSessionAudioDuration = 0;
+        pKodoUploader->session.nAccSessionVideoDuration = 0;
+}
+
+static void updateSessionIdAndCallback(KodoUploader * pKodoUploader, int64_t v, int nseqnum) {
+        
+        updateSessionId(pKodoUploader, v);
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(LinkUploadParam));
@@ -413,16 +444,6 @@ static void updateSessionIdAndCallback(KodoUploader * pKodoUploader, int64_t v, 
                                                      pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
                                                      &param, LINK_UPLOAD_CB_UPTOKEN);
 
-}
-
-static void resetCurrentTsTime(KodoUploader * pKodoUploader) {
-        pKodoUploader->session.nFirstAudioFrameTimestamp = 0;
-        pKodoUploader->session.nLastAudioFrameTimestamp = 0;
-        pKodoUploader->session.nFirstVideoFrameTimestamp = 0;
-        pKodoUploader->session.nLastVideoFrameTimestamp  = 0;
-        
-        pKodoUploader->session.nFirstFrameTimestamp = 0;
-        pKodoUploader->session.nLastFrameTimestamp = 0;
 }
 
 static void handleAudioTimeReport(KodoUploader * pKodoUploader, TsUploaderCommandTime *pTi) {
@@ -441,14 +462,16 @@ static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
                 pKodoUploader->session.nFirstFrameTimestamp = pTi->nAvTimestamp;
         pKodoUploader->session.nLastFrameTimestamp = pTi->nAvTimestamp;
         
-        if (pKodoUploader->session.sessionId[0] == 0) {
-                pKodoUploader->session.nSessionStartTime = pTi->nSysTimestamp;
-                updateSessionIdAndCallback(pKodoUploader, pTi->nAvTimestamp, 0);
-        }
-        
         if (pKodoUploader->session.nFirstVideoFrameTimestamp <= 0)
                 pKodoUploader->session.nFirstVideoFrameTimestamp = pTi->nAvTimestamp;
         pKodoUploader->session.nLastVideoFrameTimestamp = pTi->nAvTimestamp;
+        
+        if (pKodoUploader->session.nTsStartTime <= 0)
+                pKodoUploader->session.nTsStartTime = pTi->nSysTimestamp;
+        
+        if (pKodoUploader->session.sessionId[0] == 0) {
+                updateSessionIdAndCallback(pKodoUploader, pTi->nSysTimestamp, 0);
+        }
 }
 
 // TODO don't need this kind of report??
