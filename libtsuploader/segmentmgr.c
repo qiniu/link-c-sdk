@@ -10,7 +10,7 @@
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
-#define SEGMENT_INTERVAL 3
+#define SEGMENT_QUIT 3
 typedef struct {
         SegmentHandle handle;
         uint8_t nOperation;
@@ -335,6 +335,8 @@ static void * segmetMgrRun(void *_pOpaque) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
                                         updateSegmentFile(segInfo);
+                                } else if (segInfo.nOperation == SEGMENT_QUIT) {
+                                        continue;
                                 }
                         }
                 }
@@ -428,6 +430,11 @@ void LinkUninitSegmentMgr() {
         }
         segmentMgr.nQuit_ = 1;
         pthread_mutex_unlock(&segMgrMutex);
+        
+        SegInfo segInfo;
+        segInfo.nOperation = SEGMENT_QUIT;
+        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        
         pthread_join(segmentMgr.segMgrThread_, NULL);
         return;
 }
