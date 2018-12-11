@@ -316,8 +316,10 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         
         if (pKodoUploader->pUpMeta != NULL) {
                 pKodoUploader->pQueue_ = NULL;
+                fprintf(stderr, "create dataq start:\n");
                 int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 0, pKodoUploader->policy,
                                              pKodoUploader->nMaxItemLen, pKodoUploader->nInitItemCount);
+                fprintf(stderr, "create dataq end:%p:%d %p\n",pKodoUploader->pQueue_, ret, pKodoUploader->pQueue_->Push);
                 if (ret != 0) {
                         free(pKodoUploader->pUpMeta);
                         pKodoUploader->pUpMeta = NULL;
@@ -331,32 +333,36 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
 static int streamPushData(LinkTsUploader *pTsUploader, const char * pData, int nDataLen)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
-        
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         if (pKodoUploader->pQueue_ == NULL) {
                 int ret = allocDataQueueAndUploadMeta(pKodoUploader);
                 if (ret != LINK_SUCCESS) {
+                        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
                         return ret;
                 }
         }
         
         int ret = pKodoUploader->pQueue_->Push(pKodoUploader->pQueue_, (char *)pData, nDataLen);
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
         return ret;
 }
 
 static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         TsUploaderCommand uploadCommand;
         uploadCommand.nCommandType = LINK_TSU_UPLOAD;
         uploadCommand.ts.pData = pKodoUploader->pQueue_;
         uploadCommand.ts.pKodoUploader = pKodoUploader;
         uploadCommand.ts.pUpMeta = pKodoUploader->pUpMeta;
         
+       
         pKodoUploader->pQueue_ = NULL;
         pKodoUploader->pUpMeta = NULL;
         
         int nCurCacheNum = 0;
-        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
+        
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
@@ -369,9 +375,8 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
                 if (ret == LINK_SUCCESS)
                         pKodoUploader->nTsCacheNum++;
         }
-        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
-        
         allocDataQueueAndUploadMeta(pKodoUploader);
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
         
         return;
 }
