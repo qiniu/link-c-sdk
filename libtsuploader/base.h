@@ -50,11 +50,15 @@ typedef struct {
         int64_t nSeqNum;
         int nTokenDeadline;
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+        char *pAk;
+        int nAkLen;
+        char *pSk;
+        int nSkLen;
 }LinkUploadParam;
 
 typedef enum {
         LINK_UPLOAD_CB_GETPARAM = 1,
-        LINK_UPLOAD_CB_UPTOKEN = 2
+        LINK_UPLOAD_CB_UPREMOTECONFIG = 2
 } LinkUploadCbType;
 
 typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);
@@ -144,7 +148,9 @@ typedef struct _LinkSession { // seg report info
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
         int64_t nSessionStartTime;
         int64_t nTsSequenceNumber;
+        int64_t nSessionEndTime;
         int nSessionEndResonCode;
+        int isNewSessionStarted;
         
         int64_t nAccSessionDuration;
         int64_t nAccSessionAudioDuration; // tad
@@ -166,6 +172,7 @@ typedef struct _LinkSession { // seg report info
         int64_t nLastFrameTimestamp;
 } LinkSession;
 
+void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
 
 #define LINK_STREAM_UPLOAD 1
 

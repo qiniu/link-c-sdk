@@ -206,7 +206,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl)
+int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl, const char *pToken, int nTokenLen)
 {
         
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
@@ -214,11 +214,11 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl
         char httpResp[1024+256]={0};
         int nHttpRespLen = sizeof(httpResp);
         int nRespLen = 0;
-        int ret = LinkSimpleHttpGet(pUrl, httpResp, nHttpRespLen, &nRespLen);
+        int ret = LinkSimpleHttpGetWithToken(pUrl, httpResp, nHttpRespLen, &nRespLen, pToken, nTokenLen);
         
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
-                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRespLen);
+                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRespLen, nTokenLen);
                 }
                 return ret;
         }
