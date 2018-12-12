@@ -322,7 +322,8 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
-        printf("%s\n", body);
+        LinkLogDebug("%s\n", body);
+        return LINK_SUCCESS; //TODO delete
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
