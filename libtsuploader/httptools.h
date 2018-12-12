@@ -37,6 +37,10 @@ int LinkSimpleHttpGetWithToken(IN const char * pUrl, OUT char* pBuf, IN int nBuf
 int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                        IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType);
 
+int LinkSimpleHttpPostWithToken(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
+                                IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType,
+                                IN const char *pToken, IN int nTokenLen);
+
 int LinkGetUserConfig(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                       IN const char *pToken, IN int nTokenLen);
 

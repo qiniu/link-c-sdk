@@ -7,6 +7,8 @@
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
+#include "fixjson.h"
+#include "security.h"
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
@@ -30,7 +32,6 @@ typedef struct {
         void *pUploadStatArg;
         int64_t nNextUpdateSegTimeInSecond;
         int64_t nLastUpdateTime;
-        int64_t nUpdateInterval;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
 }Seg;
 
@@ -271,7 +272,7 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
                 pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
                 return 0;
         }
-        pSeg->nNextUpdateSegTimeInSecond += pSeg->nUpdateInterval;
+
         pSeg->nLastUpdateTime = pSeg->nNextUpdateSegTimeInSecond; // or nNow
         if (pSeg->tmpSession.nVideoGapFromLastReport > 0)
                 pCurSession->nVideoGapFromLastReport += pSeg->tmpSession.nVideoGapFromLastReport;
@@ -297,9 +298,11 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  }
  */
 static int reportSegInfo(SegInfo *pSegInfo, int idx) {
-        char body[512];
+        char buffer[1024];
+        char *body = buffer + 512;
+        int nReportHostLen = 512;
         LinkSession *s = &pSegInfo->session;
-        memset(body, 0, sizeof(body));
+        memset(buffer, 0, sizeof(buffer));
         if (s->nSessionEndResonCode != 0) {
                 const char * reason = "timeout";
                 if (s->nSessionEndResonCode == 1)
@@ -319,29 +322,62 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
+        printf("%s\n", body);
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
-        char app[LINK_MAX_APP_LEN+1];
-        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1];
-        char reportHost[256];
+        char *reportHost = buffer;
+        char ak[41];
+        char sk[41];
         
-        param.pDeviceName = deviceName;
-        param.nDeviceNameLen = sizeof(deviceName);
-        param.pApp = app;
-        param.nAppLen = sizeof(app);
         param.pSegUrl = reportHost;
-        param.nSegUrlLen = sizeof(reportHost);
+        param.nSegUrlLen = nReportHostLen;
+        param.pAk = ak;
+        param.nAkLen = sizeof(ak);
+        param.pSk = sk;
+        param.nSkLen = sizeof(sk);
 
         int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
                                                                  &param, LINK_UPLOAD_CB_GETPARAM);
         
+        
+        const char *pInput = strchr(reportHost+8, '/');
+        if (pInput == NULL) {
+                pInput = reportHost + param.nSegUrlLen;
+        }
+        reportHost[param.nSegUrlLen] = '\n';
+        char *pOutput = reportHost + param.nSegUrlLen + 2;
+        int nOutputLen = nReportHostLen - param.nSegUrlLen  - 2;
+        
+        ret = HmacSha1(sk, param.nSkLen, pInput, strlen(pInput), pOutput, &nOutputLen);
+        if (ret != LINK_SUCCESS) {
+                return ret;
+        }
+        reportHost[param.nSegUrlLen] = 0;
+        
+        char *pToken = pOutput + nOutputLen;
+        int nTokenOffset = snprintf(pToken, 42, "%s:", ak);
+        int nB64Len = urlsafe_b64_encode(pOutput, nOutputLen, pToken + nTokenOffset, 30);
+        
+        
+        
         char resp[256];
         memset(resp, 0, sizeof(resp));
         int respLen = sizeof(resp);
-        //TODO url get from uploadparamcallback
-        //LinkSimpleHttpPost(url, resp, sizeof(resp), &respLen, body, strlen(body), "application/json");
-        printf("%s\n", body);
+
+        ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, strlen(body), "application/json",
+                                    pToken, nTokenOffset+nB64Len);
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("report session info fail:%d", ret);
+                return ret;
+        }
+        
+        int nextReportTime = LinkGetJsonIntByKey(resp, "\"ttl\"");
+        if (nextReportTime > 0) {
+                segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime;
+        }
+        
+        
         return LINK_SUCCESS;
 }
 

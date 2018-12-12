@@ -1057,6 +1057,30 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->pApp[nAppLen] = 0;
         }
         
+        if (pParam->pAk != NULL) {
+                int nAkLen = strlen(pFFTsMuxUploader->ak);
+                if (pParam->nAkLen - 1 < nAkLen) {
+                        LinkLogError("get ak buffer is small:%d %d", pFFTsMuxUploader->ak, nAkLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pAk, pFFTsMuxUploader->ak, nAkLen);
+                pParam->nAkLen = nAkLen;
+                pParam->pAk[nAkLen] = 0;
+        }
+        
+        if (pParam->pSk != NULL) {
+                int nSkLen = strlen(pFFTsMuxUploader->sk);
+                if (pParam->nSkLen - 1 < nSkLen) {
+                        LinkLogError("get ak buffer is small:%d %d", pFFTsMuxUploader->sk, nSkLen);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pSk, pFFTsMuxUploader->sk, nSkLen);
+                pParam->nSkLen = nSkLen;
+                pParam->pSk[nSkLen] = 0;
+        }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
         return LINK_SUCCESS;

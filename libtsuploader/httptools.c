@@ -98,6 +98,13 @@ int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT
         return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType, NULL, 0);
 }
 
+int LinkSimpleHttpPostWithToken(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
+                       IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType,
+                                IN const char *pToken, IN int nTokenLen) {
+        
+        return linkSimpleHttpRequest(1, pUrl, pBuf, nBufLen, pRespLen, pReqBody, nReqBodyLen, pContentType, pToken, nTokenLen);
+}
+
 //https://developer.qiniu.com/kodo/manual/1201/access-token
 int LinkGetUserConfig(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                               IN const char *pToken, IN int nTokenLen) {
