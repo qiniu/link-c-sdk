@@ -22,6 +22,7 @@
 #define LINK_MAX_APP_LEN 200
 #define LINK_MAX_BUCKET_LEN 63
 #define LINK_MAX_DEVICE_NAME_LEN 200
+#define LINK_MAX_SESSION_ID_LEN 20
 
 #define LINK_USE_OLD_NAME
 
@@ -46,9 +47,17 @@ typedef struct {
         IN OUT int nDeviceNameLen;
         IN char* pApp;
         IN OUT int nAppLen;
+        int64_t nSeqNum;
+        int nTokenDeadline;
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
 }LinkUploadParam;
 
-typedef int (*LinkGetUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+typedef enum {
+        LINK_UPLOAD_CB_GETPARAM = 1,
+        LINK_UPLOAD_CB_UPTOKEN = 2
+} LinkUploadCbType;
+
+typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);
 
 typedef enum {
         LINK_UPLOAD_TS = 1,
@@ -129,6 +138,33 @@ typedef struct _LinkUploadArg {
         void * reserved2;                       /**< 预留2 */
 }LinkUploadArg;
 
+
+typedef struct _LinkSession { // seg report info
+        // session scope
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+        int64_t nSessionStartTime;
+        int64_t nTsSequenceNumber;
+        int nSessionEndResonCode;
+        
+        int64_t nAccSessionDuration;
+        int64_t nAccSessionAudioDuration; // tad
+        int64_t nAccSessionVideoDuration; // tvd
+        
+        // report scope
+        int64_t nAudioGapFromLastReport; // ad
+        int64_t nVideoGapFromLastReport; // vd
+        int64_t nLastReportAccSessionAudioDuration;
+        int64_t nLastReportAccSessionVideoDuration;
+        
+        // current ts scope
+        int64_t nTsStartTime;
+        int64_t nFirstAudioFrameTimestamp;
+        int64_t nLastAudioFrameTimestamp;
+        int64_t nFirstVideoFrameTimestamp;
+        int64_t nLastVideoFrameTimestamp;
+        int64_t nFirstFrameTimestamp;
+        int64_t nLastFrameTimestamp;
+} LinkSession;
 
 
 #define LINK_STREAM_UPLOAD 1

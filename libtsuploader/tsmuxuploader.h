@@ -1,7 +1,7 @@
 #ifndef __TS_MUX_UPLOADER_H__
 #define __TS_MUX_UPLOADER_H__
 #include "base.h"
-#include "uploader.h"
+#include "tsuploader.h"
 #include "resource.h"
 #include "picuploader.h"
 

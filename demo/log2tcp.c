@@ -15,7 +15,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <errno.h>
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "log2tcp.h"
 #include "queue.h"
 #include "dbg.h"

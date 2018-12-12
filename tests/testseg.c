@@ -9,7 +9,7 @@
 static char segStoreToken[1024];
 static char *gpMgrTokenRequestUrl;
 static int gnMgrTokenRequestUrlLen;
-static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam) {
+static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype) {
         LinkLogDebug("in segGetTokenCallback");
         memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
         memcpy(pParam->pSegUrl, gpMgrTokenRequestUrl, gnMgrTokenRequestUrlLen);
@@ -54,11 +54,14 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         struct timespec tp;
         
         clock_gettime(CLOCK_MONOTONIC, &tp);
-        int64_t nStart = tp.tv_sec * 1000;
-        int64_t nEnd = nStart+5320;
+        LinkSession session;
+        memset(&session, 0, sizeof(session));
+        session.nSessionStartTime = tp.tv_sec * 1000;
+        session.nFirstFrameTimestamp = 0;
+        session.nLastFrameTimestamp = session.nFirstFrameTimestamp+5320;
         while(count) {
-                LinkUpdateSegment(segHandle, nStart, nEnd, 0);
-                nEnd+=5222;
+                LinkUpdateSegment(segHandle, &session);
+                session.nLastFrameTimestamp+=5222;
                 count--;
                 sleep(8);
         }

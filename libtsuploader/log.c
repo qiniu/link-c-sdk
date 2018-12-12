@@ -23,7 +23,7 @@ void LinkLog(int nLevel, char * pFmt, ...)
                 if (logFunc == NULL) {
                         vprintf(pFmt, ap);
                 } else {
-                        char logStr[257] = {0};
+                        char logStr[513] = {0};
                         vsnprintf(logStr, sizeof(logStr), pFmt, ap);
                         logFunc(nLevel, logStr);
                 }

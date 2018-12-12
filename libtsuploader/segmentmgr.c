@@ -1,7 +1,7 @@
 #include "segmentmgr.h"
 #include "resource.h"
 #include "queue.h"
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "fixjson.h"
 #include "servertime.h"
 #include "b64/urlsafe_b64.h"
@@ -10,28 +10,27 @@
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
-#define SEGMENT_INTERVAL 3
+#define SEGMENT_QUIT 3
 typedef struct {
-        int64_t nStart;
-        int64_t nEndOrInt;
         SegmentHandle handle;
-        uint8_t isRestart;
         uint8_t nOperation;
+        LinkSession session;
 }SegInfo;
 
 typedef struct {
         int64_t nStart;
         int64_t nEnd;
         SegmentHandle handle;
-        int isRestart;
         int segUploadOk;
         char bucket[LINK_MAX_BUCKET_LEN+1];
-        LinkGetUploadParamCallback getUploadParamCallback;
+        LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
-        int64_t nUpdateIntervalSeconds;
+        int64_t nNextUpdateSegTimeInSecond;
         int64_t nLastUpdateTime;
+        int64_t nUpdateInterval;
+        LinkSession session; //TODO backup report info when next report time is not arrival
 }Seg;
 
 typedef struct {
@@ -122,33 +121,24 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
 }
 
 
-static int checkShouldUpdate(Seg* pSeg) {
-        int64_t nNow = LinkGetCurrentNanosecond();
-        if (nNow - pSeg->nLastUpdateTime <= pSeg->nUpdateIntervalSeconds) {
+static int checkShouldUpdate(Seg* pSeg, LinkSession *pCurSession) {
+        int64_t nNow = LinkGetCurrentNanosecond() / 1000000000LL;
+        if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
+                pSeg->session.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
+                pSeg->session.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
                 return 0;
         }
-        pSeg->nLastUpdateTime = nNow;
+        pSeg->nNextUpdateSegTimeInSecond += pSeg->nUpdateInterval;
+        pSeg->nLastUpdateTime = pSeg->nNextUpdateSegTimeInSecond; // or nNow
+        if (pSeg->session.nVideoGapFromLastReport > 0)
+                pCurSession->nVideoGapFromLastReport += pSeg->session.nVideoGapFromLastReport;
+        if (pSeg->session.nAudioGapFromLastReport > 0)
+                pCurSession->nAudioGapFromLastReport += pSeg->session.nAudioGapFromLastReport;
+        memset(&pSeg->session, 0, sizeof(LinkSession));
         return 1;
 }
 
-static void setSegmentInt(SegInfo segInfo) {
-        // seg/ua/segment_start_timestamp/segment_end_timestamp
-        int i, idx = -1;
-        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
-                if (segmentMgr.handles[i].handle == segInfo.handle) {
-                        idx = i;
-                        break;
-                }
-        }
-        if (idx < 0) {
-                LinkLogWarn("wrong segment handle:%d", segInfo.handle);
-                return;
-        }
-        
-        segmentMgr.handles[idx].nUpdateIntervalSeconds = segInfo.nEndOrInt;
-}
-
-static void upadateSegmentFile(SegInfo segInfo) {
+static void updateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
         int i, idx = -1;
@@ -163,7 +153,7 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 return;
         }
         if (segmentMgr.handles[idx].segUploadOk) {
-                if (!checkShouldUpdate(&segmentMgr.handles[idx])) {
+                if (!checkShouldUpdate(&segmentMgr.handles[idx], &segInfo.session)) {
                         return;
                 }
         }
@@ -197,35 +187,36 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 param.nSegUrlLen = sizeof(upHost);
         }
         int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
-                                                                 &param);
+                                                                 &param, LINK_UPLOAD_CB_GETPARAM);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("fail to getUploadParamCallback:%d ", ret);
                 return;
         }
-        
+        int64_t segStartTime = segInfo.session.nSessionStartTime / 1000000;
+        int64_t endTs = segStartTime + segInfo.session.nAccSessionVideoDuration;
         if (segmentMgr.handles[idx].segUploadOk == 0) {
 #ifdef LINK_USE_OLD_NAME
-                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", param.pDeviceName, segInfo.nStart, segInfo.nEndOrInt);
+                snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", param.pDeviceName, segStartTime, endTs);
 #else
-                snprintf(key, sizeof(key), "%s/%s/seg/%"PRId64"/%"PRId64"", app, param.pDeviceName, segInfo.nStart, segInfo.nEndOrInt);
+                snprintf(key, sizeof(key), "%s/%s/seg/%"PRId64"/%"PRId64"", app, param.pDeviceName, segStartTime, endTs);
 #endif
-                segmentMgr.handles[idx].nStart = segInfo.nStart;
-                segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
+                segmentMgr.handles[idx].nStart = segStartTime;
+                segmentMgr.handles[idx].nEnd = endTs;
         } else {
-                if (segInfo.nEndOrInt < segmentMgr.handles[idx].nEnd) {
-                        LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, segInfo.nEndOrInt);
+                if (endTs < segmentMgr.handles[idx].nEnd) {
+                        LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, endTs);
                         return;
                 }
 #ifdef LINK_USE_OLD_NAME
                 snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
                 snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
-                         segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
+                         segmentMgr.handles[idx].nStart, endTs);
 #else
                 snprintf(oldKey, sizeof(oldKey), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
                 snprintf(key, sizeof(key), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
-                         segmentMgr.handles[idx].nStart, segInfo.nEndOrInt);
+                         segmentMgr.handles[idx].nStart, endTs);
 #endif
                 isNewSeg = 0;
         }
@@ -250,8 +241,8 @@ static void upadateSegmentFile(SegInfo segInfo) {
                 } else {//http error
                         if (putret.code / 100 == 2) {
                                 uploadResult = LINK_UPLOAD_RESULT_OK;
-                                segmentMgr.handles[idx].nEnd = segInfo.nEndOrInt;
-                                LinkLogDebug("move seg: %s to %s success", oldKey, key);
+                                segmentMgr.handles[idx].nEnd = endTs;
+                                LinkLogDebug("move seg:%s to %s success", oldKey, key);
                         } else {
                                 if (putret.body != NULL) {
                                         LinkLogError("move seg:%s to %s httpcode=%d reqid:%s errmsg=%s",
@@ -310,13 +301,12 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].handle = -1;
                 segmentMgr.handles[seg].nStart = 0;
                 segmentMgr.handles[seg].nEnd = 0;
-                segmentMgr.handles[seg].isRestart = 0;
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].bucket[0] = 0;
                 segmentMgr.handles[seg].segUploadOk = 0;
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
-                segmentMgr.handles[seg].nUpdateIntervalSeconds = 30 * 1000000000LL;
+                segmentMgr.handles[seg].nNextUpdateSegTimeInSecond = 0;
         }
         pthread_mutex_unlock(&segMgrMutex);
         return;
@@ -337,16 +327,16 @@ static void * segmetMgrRun(void *_pOpaque) {
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
-                        LinkLogInfo("pop segment info:%d %"PRId64" %"PRId64"\n", segInfo.handle, segInfo.nStart, segInfo.nEndOrInt);
+                        LinkLogDebug("pop segment info:%d\n", segInfo.handle);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
                                 if (segInfo.nOperation == SEGMENT_RELEASE) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
-                                        upadateSegmentFile(segInfo);
-                                } else if (segInfo.nOperation == SEGMENT_INTERVAL) {
-                                        setSegmentInt(segInfo);
+                                        updateSegmentFile(segInfo);
+                                } else if (segInfo.nOperation == SEGMENT_QUIT) {
+                                        continue;
                                 }
                         }
                 }
@@ -368,7 +358,7 @@ int LinkInitSegmentMgr() {
         }
         
         LinkCircleQueue *pQueue;
-        int ret = LinkNewCircleQueue(&pQueue, 0, TSQ_FIX_LENGTH, sizeof(SegInfo), 256);
+        int ret = LinkNewCircleQueue(&pQueue, 0, TSQ_FIX_LENGTH, sizeof(SegInfo), 32);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&segMgrMutex);
                 return ret;
@@ -402,10 +392,8 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         
                         segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
-                        segmentMgr.handles[i].nUpdateIntervalSeconds = pArg->nUpdateIntervalSeconds;
-                        if (pArg->nUpdateIntervalSeconds <= 0) {
-                                segmentMgr.handles[i].nUpdateIntervalSeconds = 30 * 1000000000LL;
-                        }
+                        segmentMgr.handles[i].nNextUpdateSegTimeInSecond = 0;
+                        memset(&segmentMgr.handles[i].session, 0, sizeof(LinkSession));
                         pthread_mutex_unlock(&segMgrMutex);
                         return LINK_SUCCESS;
                 }
@@ -414,44 +402,22 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
         return LINK_MAX_SEG;
 }
 
-void LinkSetSegmentUpdateInt(SegmentHandle seg, int64_t nSeconds) {
-        if (!segMgrStarted) {
-                return;
-        }
-        
-        SegInfo segInfo;
-        segInfo.handle = seg;
-        segInfo.nStart = 0;
-        segInfo.nEndOrInt = nSeconds * 1000000000;
-        segInfo.isRestart = 0;
-        segInfo.nOperation = SEGMENT_INTERVAL;
-        
-        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
-        
-        return;
-}
-
 void LinkReleaseSegmentHandle(SegmentHandle *pSeg) {
         if (*pSeg < 0 || !segMgrStarted) {
                 return;
         }
         SegInfo segInfo;
         segInfo.handle = *pSeg;
-        segInfo.nStart = 0;
-        segInfo.nEndOrInt = 0;
-        segInfo.isRestart = 0;
         segInfo.nOperation = SEGMENT_RELEASE;
         *pSeg = -1;
         
         segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
 
-int LinkUpdateSegment(SegmentHandle seg, int64_t nStart, int64_t nEnd, int isRestart) {
+int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         SegInfo segInfo;
         segInfo.handle = seg;
-        segInfo.nStart = nStart;
-        segInfo.nEndOrInt = nEnd;
-        segInfo.isRestart = isRestart;
+        segInfo.session = *pSession;
         segInfo.nOperation = SEGMENT_UPDATE;
         return segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
 }
@@ -464,6 +430,11 @@ void LinkUninitSegmentMgr() {
         }
         segmentMgr.nQuit_ = 1;
         pthread_mutex_unlock(&segMgrMutex);
+        
+        SegInfo segInfo;
+        segInfo.nOperation = SEGMENT_QUIT;
+        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        
         pthread_join(segmentMgr.segMgrThread_, NULL);
         return;
 }

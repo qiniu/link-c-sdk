@@ -10,7 +10,7 @@
 #ifndef SOCKET_LOGGING_H
 #define SOCKET_LOGGING_H
 
-#include "tsuploaderapi.h"
+#include "uploader.h"
 typedef struct {
     int connected;
     int logStop;

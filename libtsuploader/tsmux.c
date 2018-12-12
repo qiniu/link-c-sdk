@@ -15,6 +15,7 @@ typedef struct PIDCounter {
 
 typedef struct _LinkTsMuxerContext{
         LinkTsMuxerArg arg;
+        pthread_mutex_t tsMutex_;
         LinkPES pes;
         int nMillisecondPatPeriod;
         uint8_t tsPacket[188];
@@ -22,7 +23,6 @@ typedef struct _LinkTsMuxerContext{
         int nPidCounterMapLen;
         PIDCounter pidCounterMap[5];
         uint64_t nLastPts;
-        pthread_mutex_t tsMutex_;
         int isTableWrited;
         
         uint8_t nPcrFlag; //分析ffmpeg，pcr只在pes中出现一次在最开头
@@ -116,6 +116,27 @@ int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **_pTsMuxerCt
                 return LINK_MUTEX_ERROR;
         }
         *_pTsMuxerCtx = pTsMuxerCtx;
+        return 0;
+}
+
+int LinkResetTsMuxerContext(LinkTsMuxerContext *pTsMuxerCtx) {
+        int i;
+        LinkTsMuxerArg arg = pTsMuxerCtx->arg;
+        pthread_mutex_destroy(&pTsMuxerCtx->tsMutex_);
+        
+        memset(pTsMuxerCtx, 0, sizeof(LinkTsMuxerContext));
+        pTsMuxerCtx->arg = arg;
+        pTsMuxerCtx->nPidCounterMapLen = 5;
+        for ( i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
+                pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
+                pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
+        }
+        int ret = pthread_mutex_init(&pTsMuxerCtx->tsMutex_, NULL);
+        if (ret != 0){
+                free(pTsMuxerCtx);
+                return LINK_MUTEX_ERROR;
+        }
+        
         return 0;
 }
 

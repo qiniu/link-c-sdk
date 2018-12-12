@@ -37,7 +37,7 @@ static void getPicCallback (void *pOpaque,  const char *pFileName, int nFilename
 }
 
 static char gtestToken[1024] = {0};
-static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam) {
+static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype) {
         if (pParam->nTokenBufLen < strlen(gtestToken)) {
                 return LINK_BUFFER_IS_SMALL;
         }

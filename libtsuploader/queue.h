@@ -16,7 +16,7 @@ typedef struct _LinkCircleQueue LinkCircleQueue;
 
 
 typedef int(*LinkCircleQueuePush)(LinkCircleQueue *pQueue, char * pData, int nDataLen);
-typedef int(*LinkCircleQueuePopWithTimeoutNoOverwrite)(LinkCircleQueue *pQueue, char * pBuf, int nBufLen, int64_t nUsec);
+typedef int(*LinkCircleQueuePopWithTimeoutNoOverwrite)(LinkCircleQueue *pQueue, char * pBuf, int nBufLen, int64_t nSec);
 typedef int(*LinkCircleQueuePopWithNoOverwrite)(LinkCircleQueue *pQueue, char * pBuf, int nBufLen);
 typedef void(*LinkCircleQueueStopPush)(LinkCircleQueue *pQueue);
 

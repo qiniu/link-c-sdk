@@ -124,6 +124,9 @@ ghttp_set_type(ghttp_request *a_request, ghttp_type a_type);
 
 int
 ghttp_set_body(ghttp_request *a_request, const char *a_body, int a_len);
+        
+int ghttp_set_body3(ghttp_request *a_request, const char *a_body, int a_len,
+                    const char *a1_body, int a1_len, const char *a2_body, int a2_len);
 
 /* Set whether or not you want to use sync or async mode.
  */

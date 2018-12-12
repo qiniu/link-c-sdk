@@ -11,7 +11,7 @@
 #define IPC_TEST_H
 
 #include "queue.h"
-#include "tsuploaderapi.h"
+#include "uploader.h"
 #include "dev_core.h"
 #include "cfg.h"
 

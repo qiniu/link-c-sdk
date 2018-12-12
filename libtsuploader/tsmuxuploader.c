@@ -15,12 +15,7 @@
 #include "security.h"
 #include "cJSON/cJSON.h"
 #include "b64/urlsafe_b64.h"
-
-#ifdef USE_OWN_TSMUX
 #include "tsmux.h"
-#else
-#include <libavformat/avformat.h>
-#endif
 
 #define FF_OUT_LEN 4096
 #define QUEUE_INIT_LEN 150
@@ -33,13 +28,9 @@
 typedef struct _FFTsMuxContext{
         LinkAsyncInterface asyncWait;
         LinkTsUploader *pTsUploader_;
-#ifdef USE_OWN_TSMUX
+
         LinkTsMuxerContext *pFmtCtx_;
-#else
-        AVFormatContext *pFmtCtx_;
-#endif
-        int nOutVideoindex_;
-        int nOutAudioindex_;
+
         int64_t nPrevAudioTimestamp;
         int64_t nPrevVideoTimestamp;
         LinkTsMuxUploader * pTsMuxUploader;
@@ -65,6 +56,12 @@ typedef struct  {
         int   nUpdateIntervalSeconds;
 }RemoteConfig;
 
+typedef struct _SessionUpdateParam {
+        int nType; //1 for token update
+        int64_t nSeqNum;
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+}SessionUpdateParam;
+
 typedef struct _FFTsMuxUploader{
         LinkTsMuxUploader tsMuxUploader_;
         pthread_mutex_t muxUploaderMutex_;
@@ -73,8 +70,7 @@ typedef struct _FFTsMuxUploader{
         int nAACBufLen;
         FFTsMuxContext *pTsMuxCtx;
         
-        int64_t nLastTimestamp;
-        int64_t nFirstTimestamp; //initial to -1
+        int64_t nFirstTimestamp; //determinate if to cut ts file
         int64_t nLastPicCallbackSystime; //upload picture need
         int nKeyFrameCount;
         int nFrameCount;
@@ -86,14 +82,13 @@ typedef struct _FFTsMuxUploader{
         char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
         char app_[LINK_MAX_APP_LEN+1];
         Token token_;
-        LinkTsUploadArg uploadArg;
+        LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
         int8_t isPause;
         int8_t isTypeOneshot;
         int8_t isQuit;
-        int8_t isReady;
         char tsType[16];
         
         pthread_t tokenThread;
@@ -103,15 +98,15 @@ typedef struct _FFTsMuxUploader{
         
         char ak[41];
         char sk[41];
-        uint8_t isMaxThreadLimited;
-        int nMaxUploadThreadNum;
-        int nUploadThreadNum;
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
+        
+        LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
+        char sessionId[LINK_MAX_SESSION_ID_LEN+1];
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
-static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam);
+static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype);
 static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp);
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader);
 static void freeRemoteConfig(RemoteConfig *pRc);
@@ -205,14 +200,26 @@ static int getAacFreqIndex(int _nFreq)
         }
 }
 
+static void switchTs(FFTsMuxUploader *_pFFTsMuxUploader)
+{
+        if (_pFFTsMuxUploader) {
+                
+                if (_pFFTsMuxUploader->pTsMuxCtx) {
+                        
+                        if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
+                                _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+                        LinkResetTsMuxerContext( _pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
+                }
+        }
+        return;
+}
+
 static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
 {
         if (_pFFTsMuxUploader) {
                 
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
-#ifndef USE_OWN_TSMUX
-                        av_write_trailer(_pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
-#endif
+
                         if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
                                 _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
                         LinkLogError("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
@@ -248,12 +255,6 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
 
 static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag,
                 int _nIsKeyframe, int64_t nSysNanotime){
-#ifndef USE_OWN_TSMUX
-        AVPacket pkt;
-        av_init_packet(&pkt);
-        pkt.data = (uint8_t *)_pData;
-        pkt.size = _nDataLen;
-#endif
         
         //LinkLogTrace("push thread id:%d\n", (int)pthread_self());
         
@@ -274,20 +275,17 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         }
         
         int ret = 0;
-        
+        enum LinkUploaderTimeInfoType tmtype = LINK_VIDEO_TIMESTAMP;
         if (_nFlag == LINK_STREAM_TYPE_AUDIO){
+                tmtype = LINK_AUDIO_TIMESTAMP;
                 //fprintf(stderr, "audio frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevAudioTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevAudioTimestamp <= 0) {
                         LinkLogWarn("audio pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevAudioTimestamp, _nTimestamp);
                         return 0;
                 }
-#ifndef USE_OWN_TSMUX
-                int isAdtsAdded = 0;
-                pkt.pts = _nTimestamp * 90;
-                pkt.stream_index = pTsMuxCtx->nOutAudioindex_;
-                pkt.dts = pkt.pts;
+
                 pTsMuxCtx->nPrevAudioTimestamp = _nTimestamp;
-#endif
+                
                 unsigned char * pAData = (unsigned char * )_pData;
                 if (pFFTsMuxUploader->avArg.nAudioFormat ==  LINK_AUDIO_AAC && (pAData[0] != 0xff || (pAData[1] & 0xf0) != 0xf0)) {
                         LinkADTSFixheader fixHeader;
@@ -320,52 +318,34 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         int nHeaderLen = varHeader.aac_frame_length - _nDataLen;
                         memcpy(pFFTsMuxUploader->pAACBuf + nHeaderLen, _pData, _nDataLen);
 
-#ifdef USE_OWN_TSMUX
                         LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t *)pFFTsMuxUploader->pAACBuf, varHeader.aac_frame_length, _nTimestamp);
-#else
-                        pkt.data = (uint8_t *)pFFTsMuxUploader->pAACBuf;
-                        pkt.size = varHeader.aac_frame_length;
-                        isAdtsAdded = 1;
-#endif
+
                 } 
-#ifdef USE_OWN_TSMUX
+
                 else {
                         ret = LinkMuxerAudio(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp);
                 }
-#endif
+
         }else{
                 //fprintf(stderr, "video frame: len:%d pts:%"PRId64"\n", _nDataLen, _nTimestamp);
                 if (pTsMuxCtx->nPrevVideoTimestamp != 0 && _nTimestamp - pTsMuxCtx->nPrevVideoTimestamp <= 0) {
                         LinkLogWarn("video pts not monotonically: prev:%"PRId64" now:%"PRId64"", pTsMuxCtx->nPrevVideoTimestamp, _nTimestamp);
                         return 0;
                 }
-#ifdef USE_OWN_TSMUX
                 ret = LinkMuxerVideo(pTsMuxCtx->pFmtCtx_, (uint8_t*)_pData, _nDataLen, _nTimestamp, _nIsKeyframe);
-#else
-                pkt.pts = _nTimestamp * 90;
-                pkt.stream_index = pTsMuxCtx->nOutVideoindex_;
-                pkt.dts = pkt.pts;
+
                 pTsMuxCtx->nPrevVideoTimestamp = _nTimestamp;
-#endif
         }
         
         
-#ifndef USE_OWN_TSMUX
-        ret = av_interleaved_write_frame(pTsMuxCtx->pFmtCtx_, &pkt);
-#endif
         if (ret == 0) {
-                pTsMuxCtx->pTsUploader_->RecordTimestamp(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime);
+                pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime, tmtype);
         } else {
                 if (pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL)
                         LinkLogError("Error muxing packet:%d", ret);
                 pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_FAIL;
         }
-        
-#ifndef USE_OWN_TSMUX
-        if (isAdtsAdded) {
-                free(pkt.data);
-        }
-#endif
+
         return ret;
 }
 
@@ -455,19 +435,10 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                 pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
         }
         if (pFFTsMuxUploader->pTsMuxCtx) {
-                LinkUploadState ustate = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-                //if (pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(pTsMuxCtx->pTsUploader_) == LINK_UPLOAD_FAIL) {
-                if ( ustate != LINK_UPLOAD_INIT) {
-                        if (ustate == LINK_UPLOAD_FAIL && pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL) {
-                                LinkLogDebug("upload fail. drop the data");
-                        }
-                        pFFTsMuxUploader->ffMuxSatte = ustate;
-                        shouldSwitch = 1;
-                }
-        } else {
-                shouldSwitch = 1;
-                //assert(pFFTsMuxUploader->nUploadThreadNum == 0);
+                pFFTsMuxUploader->ffMuxSatte = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(
+                                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         }
+        
         int isVideoKeyframe = 0;
         int isSameAsBefore = 0;
         if (_isVideo && nIsKeyFrame) {
@@ -495,7 +466,8 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
                         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
-                        pushRecycle(pFFTsMuxUploader);
+                        fprintf(stderr, "normal switchts\n");
+                        switchTs(pFFTsMuxUploader);
                         int64_t nDiff = (nSysNanotime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
                         if (nIsKeyFrame) {
                                 if (nDiff < 1000) {
@@ -504,19 +476,9 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                                 pFFTsMuxUploader->nLastPicCallbackSystime = nSysNanotime;
                         }
                         if (_nIsSegStart) {
-                                pFFTsMuxUploader->uploadArg.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
+                                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pFFTsMuxUploader->nLastPicCallbackSystime;
                         }
-                        if (pFFTsMuxUploader->nUploadThreadNum >= pFFTsMuxUploader->nMaxUploadThreadNum) {
-                                pFFTsMuxUploader->isMaxThreadLimited = 1;
-                                LinkLogWarn("reach max thread limit:%d", pFFTsMuxUploader->nUploadThreadNum);
-                        } else {
-                                ret = LinkTsMuxUploaderStart(_pTsMuxUploader);
-                                if (ret != LINK_SUCCESS) {
-                                        return ret;
-                                }else {
-                                        pFFTsMuxUploader->nUploadThreadNum++;
-                                }
-                        }
+
                 }
                 if (isVideoKeyframe) {
                         pFFTsMuxUploader->nKeyFrameCount++;
@@ -529,10 +491,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (!pFFTsMuxUploader->isReady) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return LINK_NOT_INITED;
-        }
+        
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return LINK_PAUSED;
@@ -566,8 +525,8 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                if (pFFTsMuxUploader->pTsMuxCtx)
-                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+                fprintf(stderr, "video nomem switchts\n");
+                switchTs(pFFTsMuxUploader);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
@@ -577,10 +536,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (!pFFTsMuxUploader->isReady) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                return LINK_NOT_INITED;
-        }
+
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return LINK_PAUSED;
@@ -600,8 +556,8 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                if (pFFTsMuxUploader->pTsMuxCtx)
-                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+                 fprintf(stderr, "audio nomem switchts\n");
+                switchTs(pFFTsMuxUploader);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return ret;
@@ -620,40 +576,24 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         FFTsMuxContext *pTsMuxCtx = (FFTsMuxContext*)_pOpaque;
         
         if (pTsMuxCtx) {
-#ifndef USE_OWN_TSMUX
-                if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_->pb) {
-                                avio_flush(pTsMuxCtx->pFmtCtx_->pb);
-                        }
-                }
-#endif
-                pTsMuxCtx->pTsUploader_->UploadStop(pTsMuxCtx->pTsUploader_);
-                
                 LinkUploaderStatInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
                 LinkLogDebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
                          statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
                 LinkDestroyTsUploader(&pTsMuxCtx->pTsUploader_);
-#ifdef USE_OWN_TSMUX
+
                 LinkDestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
-#else
-                if (pTsMuxCtx->pFmtCtx_->pb && pTsMuxCtx->pFmtCtx_->pb->buffer)  {
-                        av_free(pTsMuxCtx->pFmtCtx_->pb->buffer);
-                }
-                if (!(pTsMuxCtx->pFmtCtx_->oformat->flags & AVFMT_NOFILE))
-                        avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                if (pTsMuxCtx->pFmtCtx_->pb) {
-                        avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
-                }
-                avformat_free_context(pTsMuxCtx->pFmtCtx_);
-#endif
+
                 FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxCtx->pTsMuxUploader);
                 if (pFFTsMuxUploader) {
-                        pthread_cancel(pFFTsMuxUploader->tokenThread);
+                        SessionUpdateParam upparam;
+                        upparam.nType = 3;
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
                         pthread_join(pFFTsMuxUploader->tokenThread, NULL);
                         if (pFFTsMuxUploader->pVideoMeta) {
                                 free(pFFTsMuxUploader->pVideoMeta);
                         }
+                        LinkDestroyQueue(&pFFTsMuxUploader->pUpdateQueue_);
                         LinkReleaseSegmentHandle(&pFFTsMuxUploader->segmentHandle);
                         LinkDestroyPictureUploader(&pFFTsMuxUploader->pPicUploader);
                         if (pFFTsMuxUploader->pAACBuf) {
@@ -740,7 +680,6 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
                            int nQBufSize, enum CircleQueuePolicy queueType)
-#ifdef USE_OWN_TSMUX
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
         if (pTsMuxCtx == NULL) {
@@ -777,130 +716,6 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         * _pTsMuxCtx = pTsMuxCtx;
         return LINK_SUCCESS;
 }
-#else
-{
-        FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
-        if (pTsMuxCtx == NULL) {
-                return LINK_NO_MEMORY;
-        }
-        memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
-        
-        int nBufsize = getBufferSize();
-        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, FF_OUT_LEN, nBufsize / FF_OUT_LEN);
-        if (ret != 0) {
-                free(pTsMuxCtx);
-                return ret;
-        }
-        
-        uint8_t *pOutBuffer = NULL;
-        //Output
-        ret = avformat_alloc_output_context2(&pTsMuxCtx->pFmtCtx_, NULL, "mpegts", NULL);
-        if (ret < 0) {
-                getFFmpegErrorMsg(ret);
-                LinkLogError("Could not create output context:%d(%s)", ret, msg);
-                ret = LINK_NO_MEMORY;
-                goto end;
-        }
-        AVOutputFormat *pOutFmt = pTsMuxCtx->pFmtCtx_->oformat;
-        pOutBuffer = (unsigned char*)av_malloc(4096);
-        AVIOContext *avio_out = avio_alloc_context(pOutBuffer, 4096, 1, pTsMuxCtx, NULL, writeTsPacketToMem, NULL);
-        pTsMuxCtx->pFmtCtx_->pb = avio_out;
-        pTsMuxCtx->pFmtCtx_->flags = AVFMT_FLAG_CUSTOM_IO;
-        pOutFmt->flags |= AVFMT_NOFILE;
-        pOutFmt->flags |= AVFMT_NODIMENSIONS;
-        //ofmt->video_codec //是否指定为ifmt_ctx_v的视频的codec_type.同理音频也一样
-        //测试下来即使video_codec和ifmt_ctx_v的视频的codec_type不一样也是没有问题的
-        
-        //add video
-        AVStream *pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
-        if (!pOutStream) {
-                getFFmpegErrorMsg(ret);
-                LinkLogError("Failed allocating output stream:%d(%s)", ret, msg);
-                ret = LINK_NO_MEMORY;
-                goto end;
-        }
-        pOutStream->time_base.num = 1;
-        pOutStream->time_base.den = 90000;
-        pTsMuxCtx->nOutVideoindex_ = pOutStream->index;
-        pOutStream->codecpar->codec_tag = 0;
-        pOutStream->codecpar->codec_type = AVMEDIA_TYPE_VIDEO;
-        if (_pAvArg->nVideoFormat == LINK_VIDEO_H264)
-                pOutStream->codecpar->codec_id = AV_CODEC_ID_H264;
-                else
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_H265;
-                        //end add video
-                        
-                        //add audio
-                        pOutStream = avformat_new_stream(pTsMuxCtx->pFmtCtx_, NULL);
-                        if (!pOutStream) {
-                                getFFmpegErrorMsg(ret);
-                                LinkLogError("Failed allocating output stream:%d(%s)", ret, msg);
-                                ret = LINK_NO_MEMORY;
-                                goto end;
-                        }
-        pOutStream->time_base.num = 1;
-        pOutStream->time_base.den = 90000;
-        pTsMuxCtx->nOutAudioindex_ = pOutStream->index;
-        pOutStream->codecpar->codec_tag = 0;
-        pOutStream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
-        switch(_pAvArg->nAudioFormat){
-                case LINK_AUDIO_PCMU:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_MULAW;
-                        break;
-                case LINK_AUDIO_PCMA:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_PCM_ALAW;
-                        break;
-                case LINK_AUDIO_AAC:
-                        pOutStream->codecpar->codec_id = AV_CODEC_ID_AAC;
-                        break;
-        }
-        pOutStream->codecpar->sample_rate = _pAvArg->nSamplerate;
-        pOutStream->codecpar->channels = _pAvArg->nChannels;
-        pOutStream->codecpar->channel_layout = av_get_default_channel_layout(pOutStream->codecpar->channels);
-        //end add audio
-        
-        //printf("==========Output Information==========\n");
-        //av_dump_format(pTsMuxCtx->pFmtCtx_, 0, "xx.ts", 1);
-        //printf("======================================\n");
-        
-        //Open output file
-        if (!(pOutFmt->flags & AVFMT_NOFILE)) {
-                if ((ret = avio_open(&pTsMuxCtx->pFmtCtx_->pb, "xx.ts", AVIO_FLAG_WRITE)) < 0) {
-                        getFFmpegErrorMsg(ret);
-                        LinkLogError("Could not open output:%d(%s)", ret, msg);
-                        ret = LINK_OPEN_TS_ERR;
-                        goto end;
-                }
-        }
-        //Write file header
-        int erno = 0;
-        if ((erno = avformat_write_header(pTsMuxCtx->pFmtCtx_, NULL)) < 0) {
-                getFFmpegErrorMsg(erno);
-                LinkLogError("fail to write ts header:%d(%s)", erno, msg);
-                ret = LINK_WRITE_TS_ERR;
-                goto end;
-        }
-        
-        pTsMuxCtx->asyncWait.function = waitToCompleUploadAndDestroyTsMuxContext;
-        *_pTsMuxCtx = pTsMuxCtx;
-        return LINK_SUCCESS;
-end:
-        if (pOutBuffer) {
-                av_free(pOutBuffer);
-        }
-        if (pTsMuxCtx->pFmtCtx_->pb)
-                avio_context_free(&pTsMuxCtx->pFmtCtx_->pb);
-                if (pTsMuxCtx->pFmtCtx_) {
-                        if (pTsMuxCtx->pFmtCtx_ && !(pOutFmt->flags & AVFMT_NOFILE))
-                                avio_close(pTsMuxCtx->pFmtCtx_->pb);
-                        avformat_free_context(pTsMuxCtx->pFmtCtx_);
-                }
-        if (pTsMuxCtx->pTsUploader_)
-                DestroyUploader(&pTsMuxCtx->pTsUploader_);
-                
-                return ret;
-}
-#endif
 
 static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen)
 {
@@ -917,38 +732,44 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
         return ;
 }
 
-static void upadateSegmentId(void *_pOpaque, void* pArg, int64_t nNow, int64_t nEnd)
+static void updateSegmentId(void *_pOpaque, void* pArg, LinkSession* pSession,int64_t nNow, int64_t nEnd)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         LinkTsUploadArg *_pUploadArg = (LinkTsUploadArg *)pArg;
 
-        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, nNow/1000000, nEnd/1000000, 0);
+        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         
-        if (pFFTsMuxUploader->uploadArg.nSegmentId_ == 0) {
-                pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
-                pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
-                pFFTsMuxUploader->uploadArg.nSegmentId_ = _pUploadArg->nSegmentId_;
-                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
-                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
+        if (pFFTsMuxUploader->uploadArgBak.nSegmentId_ == 0) {
+                pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
+                pFFTsMuxUploader->uploadArgBak.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = _pUploadArg->nSegmentId_;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
+                _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
                 return;
         }
         
-        int64_t nDuration = pFFTsMuxUploader->uploadArg.nLastEndTsTime - pFFTsMuxUploader->uploadArg.nSegmentId_;
+        int isSegIdChange = 0;
+        int64_t nDuration = pFFTsMuxUploader->uploadArgBak.nLastEndTsTime - pFFTsMuxUploader->uploadArgBak.nSegmentId_;
         if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
-                //TODO report seg info
+                isSegIdChange = 1;
         }
 
         int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
-        if (nNow - pFFTsMuxUploader->uploadArg.nLastEndTsTime >= nDiff) {
-                pFFTsMuxUploader->uploadArg.nSegmentId_ = nNow;
-                _pUploadArg->nSegmentId_ = nNow;
-                pFFTsMuxUploader->uploadArg.nSegSeqNum = 0;
+        if (nNow - pFFTsMuxUploader->uploadArgBak.nLastEndTsTime >= nDiff) {
+                 isSegIdChange = 1;
         } else {
-                pFFTsMuxUploader->uploadArg.nSegSeqNum++;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum++;
         }
-        pFFTsMuxUploader->uploadArg.nLastEndTsTime = nEnd;
-        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArg.nSegSeqNum;
-        pFFTsMuxUploader->uploadArg.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+        pFFTsMuxUploader->uploadArgBak.nLastEndTsTime = nEnd;
+        _pUploadArg->nSegSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
+        pFFTsMuxUploader->uploadArgBak.nLastStartTime_ = _pUploadArg->nLastStartTime_;
+        if (isSegIdChange) {
+                pFFTsMuxUploader->uploadArgBak.nSegmentId_ = nNow;
+                _pUploadArg->nSegmentId_ = nNow;
+                pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
+                //TODO update remote config
+        }
+        //TODO report seg info
         return;
 }
 
@@ -1018,23 +839,20 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
         memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
-        pFFTsMuxUploader->nMaxUploadThreadNum = _pUserUploadArg->nMaxUploadThreadNum;
-        if (pFFTsMuxUploader->nMaxUploadThreadNum <= 0 || pFFTsMuxUploader->nMaxUploadThreadNum > 100)
-                pFFTsMuxUploader->nMaxUploadThreadNum = 3;
         
         if (isWithPicAndSeg) {
-                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = pFFTsMuxUploader;
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = upadateSegmentId;
+                pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = pFFTsMuxUploader;
+                pFFTsMuxUploader->uploadArgBak.UploadUpdateSegmentId = updateSegmentId;
         } else {
-                pFFTsMuxUploader->uploadArg.UploadSegmentIdUpadate = NULL;
-                pFFTsMuxUploader->uploadArg.pUploadArgKeeper_ = NULL;
+                pFFTsMuxUploader->uploadArgBak.UploadUpdateSegmentId = NULL;
+                pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = NULL;
         }
         
         //pFFTsMuxUploader->uploadArg.uploadZone = _pUserUploadArg->uploadZone_; //TODO
-        pFFTsMuxUploader->uploadArg.getUploadParamCallback = getUploadParamCallback;
-        pFFTsMuxUploader->uploadArg.pGetUploadParamCallbackArg = pFFTsMuxUploader;
-        pFFTsMuxUploader->uploadArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
-        pFFTsMuxUploader->uploadArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
+        pFFTsMuxUploader->uploadArgBak.uploadParamCallback = uploadParamCallback;
+        pFFTsMuxUploader->uploadArgBak.pGetUploadParamCallbackArg = pFFTsMuxUploader;
+        pFFTsMuxUploader->uploadArgBak.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
+        pFFTsMuxUploader->uploadArgBak.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         pFFTsMuxUploader->pConfigRequestUrl = (char *)(pFFTsMuxUploader) + sizeof(FFTsMuxUploader);
         if (pFFTsMuxUploader->pConfigRequestUrl) {
                 memcpy(pFFTsMuxUploader->pConfigRequestUrl, _pUserUploadArg->pConfigRequestUrl, _pUserUploadArg->nConfigRequestUrlLen);
@@ -1064,6 +882,14 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
+        ret = LinkTsMuxUploaderStart((LinkTsMuxUploader *)pFFTsMuxUploader);
+        if (ret != LINK_SUCCESS) {
+                LinkTsMuxUploader * pTmp = (LinkTsMuxUploader *)pFFTsMuxUploader;
+                LinkDestroyTsMuxUploader(&pTmp);
+                LinkLogError("LinkTsMuxUploaderStart fail:%d", ret);
+                return ret;
+        }
+        
         ret = linkTsMuxUploaderTokenThreadStart(pFFTsMuxUploader);
         if (ret != LINK_SUCCESS){
                 pthread_mutex_destroy(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -1081,9 +907,37 @@ int LinkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         return linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 0);
 }
 
-static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam) {
+static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        
+        
+        SessionUpdateParam upparam;
+        upparam.nSeqNum = pParam->nSeqNum;
+        if (pParam->sessionId[0] != 0) {
+                strcpy(upparam.sessionId, pParam->sessionId);
+                
+                if (pFFTsMuxUploader->sessionId[0] == 0 || strcmp(pParam->sessionId, pFFTsMuxUploader->sessionId) != 0) {
+                        //update remote config
+                        upparam.nType = 2;
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+                        strcpy(pFFTsMuxUploader->sessionId, pParam->sessionId);
+                }
+        }
+        
+        upparam.nType = 1;
+        if (pParam->nTokenDeadline > 1544421373) {
+                int shouldUpdateToken = pParam->nTokenDeadline - (int)(LinkGetCurrentNanosecond() / 1000000000);
+                if (shouldUpdateToken <= 20) {
+                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+                }
+        }
+        
+        if (cbtype == LINK_UPLOAD_CB_UPTOKEN) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_SUCCESS;
+        }
+        
         if (pFFTsMuxUploader->token_.pToken_ == NULL) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
@@ -1198,7 +1052,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         SegmentHandle segHandle;
         SegmentArg arg;
         memset(&arg, 0, sizeof(arg));
-        arg.getUploadParamCallback = getUploadParamCallback;
+        arg.getUploadParamCallback = uploadParamCallback;
         arg.pGetUploadParamCallbackArg = *_pTsMuxUploader;
         arg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
@@ -1213,7 +1067,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
         fullArg.pGetPicCallbackOpaque = _pPicArg->pGetPicCallbackOpaque;
-        fullArg.getUploadParamCallback = getUploadParamCallback;
+        fullArg.getUploadParamCallback = uploadParamCallback;
         fullArg.pGetUploadParamCallbackOpaque = *_pTsMuxUploader;
         fullArg.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         fullArg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
@@ -1227,16 +1081,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         
         pFFTsMuxUploader->pPicUploader = pPicUploader;
         return ret;
-}
-
-void LinkSetSegmentUpdateInterval(IN LinkTsMuxUploader *_pTsMuxUploader, int64_t _nSeconds) {
-        if (_pTsMuxUploader == NULL || _nSeconds <= 0) {
-                return;
-        }
-        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-        
-        LinkSetSegmentUpdateInt(pFFTsMuxUploader->segmentHandle, _nSeconds);
-        return;
 }
 
 int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
@@ -1300,7 +1144,8 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pFFTsMuxUploader->nFrameCount = 0;
         pFFTsMuxUploader->nFirstTimestamp = 0;
         pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
-        pushRecycle(pFFTsMuxUploader);
+        fprintf(stderr, "pause switchts\n");
+        switchTs(pFFTsMuxUploader);
         
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 
@@ -1327,13 +1172,11 @@ static void linkCapturePictureCallback(void *pOpaque, int64_t nTimestamp) {
                 LinkSendItIsTimeToCaptureSignal(pFFTsMuxUploader->pPicUploader, nTimestamp);
 }
 
+//TODO 可能需要其它回调
 static void uploadThreadNumDec(void *pOpaque, int64_t nTimestamp) {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (pFFTsMuxUploader->isMaxThreadLimited)
-                pFFTsMuxUploader->isMaxThreadLimited = 0;
-        pFFTsMuxUploader->nUploadThreadNum--;
-        LinkLogDebug("threadnum:%d", pFFTsMuxUploader->nUploadThreadNum);
+      
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 }
 
@@ -1345,15 +1188,13 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         
         int nBufsize = getBufferSize(pFFTsMuxUploader);
         int ret = newTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg,
-                                  &pFFTsMuxUploader->uploadArg, nBufsize, pFFTsMuxUploader->queueType_);
+                                  &pFFTsMuxUploader->uploadArgBak, nBufsize, pFFTsMuxUploader->queueType_);
         if (ret != 0) {
-                free(pFFTsMuxUploader);
                 return ret;
         }
         
         LinkTsUploaderSetTsEndUploadCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, uploadThreadNumDec, pFFTsMuxUploader);
         
-        ret = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->UploadStart(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
         return ret;
 }
 
@@ -1364,8 +1205,8 @@ void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         }
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        if (pFFTsMuxUploader->pTsMuxCtx)
-                pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        fprintf(stderr, "LinkFlushUploader switchts\n");
+        switchTs(pFFTsMuxUploader);
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return;
 }
@@ -1396,15 +1237,18 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         int nRespLen = 0, ret = 0;
         
         int nOffsetHost = snprintf(buf, sizeof(buf), "%s", pFFTsMuxUploader->pConfigRequestUrl);
-        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s", gSn);
-        const char *pInput = (const char *)buf + nOffsetHost;
+        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s\n", gSn);
+        const char *pInput = strchr(buf+8, '/');
+        
+        //const char *pInput = (const char *)buf + nOffsetHost;
         char *pOutput = buf + nOffsetHost + nOffset + 1;
         int nOutputLen = sizeof(buf) - nOffset - nOffsetHost - 1;
-
-        ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, nOffset, pOutput, &nOutputLen);
+        
+        ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, strlen(pInput), pOutput, &nOutputLen);
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
+        buf[nOffsetHost + nOffset - 1] = 0;
 
         char *pToken = pOutput + nOutputLen;
         int nTokenOffset = snprintf(pToken, 42, "%s:", pFFTsMuxUploader->ak);
@@ -1435,45 +1279,43 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 return LINK_JSON_FORMAT;
         }
         
+        int nCpyLen = 0;
         pNode = cJSON_GetObjectItem(pSeg, "uploadUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pUpHostUrl = malloc(nCpyLen + 1);
+                if (pRc->pUpHostUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pUpHostUrl, pNode->valuestring, nCpyLen);
+                pRc->pUpHostUrl[nCpyLen] = 0;
         }
-        int nCpyLen = strlen(pNode->valuestring);
-        pRc->pUpHostUrl = malloc(nCpyLen + 1);
-        if (pRc->pUpHostUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pUpHostUrl, pNode->valuestring, nCpyLen);
-        pRc->pUpHostUrl[nCpyLen] = 0;
-        
         
         pNode = cJSON_GetObjectItem(pSeg, "tokenRequestUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pUpTokenRequestUrl = malloc(nCpyLen + 1);
+                if (pRc->pUpTokenRequestUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
+                pRc->pUpTokenRequestUrl[nCpyLen] = 0;
+                LinkLogInfo("tokenurl:%s", pRc->pUpTokenRequestUrl);
         }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pUpTokenRequestUrl = malloc(nCpyLen + 1);
-        if (pRc->pUpTokenRequestUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
-        pRc->pUpTokenRequestUrl[nCpyLen] = 0;
+        
         
         pNode = cJSON_GetObjectItem(pSeg, "segReportUrl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                pRc->pMgrTokenRequestUrl = malloc(nCpyLen + 1);
+                if (pRc->pMgrTokenRequestUrl == NULL) {
+                        goto END;
+                }
+                memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
+                pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
+                LinkLogInfo("segReportUrl:%s", pRc->pMgrTokenRequestUrl);
         }
-        nCpyLen = strlen(pNode->valuestring);
-        pRc->pMgrTokenRequestUrl = malloc(nCpyLen + 1);
-        if (pRc->pMgrTokenRequestUrl == NULL) {
-                goto END;
-        }
-        memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
-        pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
+        
         
         pNode = cJSON_GetObjectItem(pSeg, "tsDuration");
         if (pNode != NULL) {
@@ -1481,6 +1323,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         }
         if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
                 pRc->nTsDuration = 5000;
+        LinkLogInfo("tsDuration:%d", pRc->nTsDuration);
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
         if (pNode != NULL) {
@@ -1489,6 +1332,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nSessionDuration < 600 * 1000) {
                 pRc->nSessionDuration = 600 * 1000;
         }
+        LinkLogInfo("nSessionDuration:%d", pRc->nSessionDuration);
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionTimeout");
         if (pNode != NULL) {
@@ -1497,6 +1341,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nSessionTimeout < 1000) {
                 pRc->nSessionTimeout = 3000;
         }
+        LinkLogInfo("nSessionTimeout:%d", pRc->nSessionTimeout);
         
         cJSON_Delete(pJsonRoot);
         
@@ -1510,13 +1355,13 @@ END:
         return LINK_NO_MEMORY;
 }
 
-static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
+static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, SessionUpdateParam *pSParam) {
         char *pBuf = (char *)malloc(1024);
         memset(pBuf, 0, 1024);
-        int nOffset = snprintf(pBuf, 1024, "%s", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+        snprintf(pBuf, 1024, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
+                 pSParam->sessionId, pSParam->nSeqNum);
         
-        ///v1/device/uploadtoken?session=<session>&sequence=<sequence>&start=<startTimestamp>&now=<nowTimestamp>
-        //TODO add query arg
+        // /v1/device/uploadtoken?session=<session>&sequence=<sequence>
         
         int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf);
         if (ret != LINK_SUCCESS) {
@@ -1525,73 +1370,99 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline) {
                 return ret;
         }
         setToken(pFFTsMuxUploader, pBuf, strlen(pBuf));
+        LinkLogInfo("gettoken:%s", pBuf);
         return LINK_SUCCESS;
 }
 
-static void *linkTokenThread(void * pOpaque) {
+static void *linkTokenAndConfigThread(void * pOpaque) {
         FFTsMuxUploader* pFFTsMuxUploader = (FFTsMuxUploader*) pOpaque;
         
-        int rcSleepTime = 0x7FFFFFFF;
+        int rcSleepUntilTime = 0x7FFFFFFF;
         int nNextTryRcTime = 1;
+        int shouldUpdateRc = 0;
         
-        int tokenSleepTime = 0x7FFFFFFF;
+        int tokenSleepUntilTime = 0x7FFFFFFF;
         int nNextTryTokenTime = 1;
+        int shouldUpdateToken = 0;
         
-        int shouldUpdateRemoteCofig = 1;
-        int shouldUpdateToken = 1;
         RemoteConfig rc;
         int now;
-        while(!pFFTsMuxUploader->isQuit) {
+        LinkUploaderStatInfo info;
+        while(!pFFTsMuxUploader->isQuit || info.nLen_ != 0) {
 
                 int ret = 0;
-                if (shouldUpdateRemoteCofig) {
+                
+                SessionUpdateParam param;
+                param.nType = 0;
+                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
+                
+                int nWaitRc = rcSleepUntilTime - now;
+                int nWaitToken = tokenSleepUntilTime - now;
+                int nWait = nWaitRc;
+                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
+                        nWait = nWaitToken;
+                }
+                ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
+                                                                      sizeof(SessionUpdateParam), nWait);
+                
+                if (ret < 0 && (ret != LINK_SUCCESS && ret != LINK_TIMEOUT)) {
+                        LinkLogError("updatequeue fail:%d", ret);
+                        continue;
+                }
+                
+                if (param.nType == 3) {
+                        continue;
+                }
+
+                memset(&info, 0, sizeof(info));
+                pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                
+                int getRcOk = 0; // after getRemoteConfig success,must update token
+                if (param.nType == 2 || shouldUpdateRc || ret == LINK_TIMEOUT) {
+                        getRcOk = 0;
                         ret = getRemoteConfig(pFFTsMuxUploader, &rc);
+                        now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
-                                
-                                sleep(nNextTryRcTime);
+                                LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime);
+                                rcSleepUntilTime = now + nNextTryRcTime;
                                 nNextTryRcTime *= 2;
+                                shouldUpdateRc = 1;
+                                
+                                shouldUpdateToken = 0; //rc is Higher priority than token
+                                nNextTryTokenTime = 1;
+                                continue;
                         }
-                        nNextTryRcTime = 1;
-                        shouldUpdateRemoteCofig = 0;
-                        rcSleepTime = (int)(LinkGetCurrentNanosecond() / 1000000000) + rc.updateConfigInterval;
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
+                        nNextTryRcTime = 1;
+                        shouldUpdateRc = 0;
+                        shouldUpdateToken = 0; //rc is Higher priority than token
+                        nNextTryTokenTime = 1;
+                        rcSleepUntilTime = now + rc.updateConfigInterval;
+                        getRcOk = 1;
+
                 }
                 
-                if (shouldUpdateToken) {
-                        ret = updateToken(pFFTsMuxUploader, &tokenSleepTime);
+                if (shouldUpdateRc) {
+                        LinkLogWarn("before update token, must update remote config");
+                        continue;
+                }
+                
+                if (param.nType == 1 || shouldUpdateToken || getRcOk) { //update token
+                        ret = updateToken(pFFTsMuxUploader, &tokenSleepUntilTime, &param);
+                        now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
                                 if (nNextTryTokenTime > 16) {
                                         nNextTryTokenTime = 16;
                                 }
-                                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                                if (now >= rcSleepTime) {
-                                        shouldUpdateRemoteCofig = 1;
-                                        nNextTryRcTime = 1;
-                                        nNextTryTokenTime = 1;
-                                        continue;
-                                }
-                                sleep(nNextTryTokenTime);
+                                tokenSleepUntilTime = now + nNextTryTokenTime;
+                                shouldUpdateToken = 1;
                                 nNextTryTokenTime *= 2;
                                 continue;
                         }
                         nNextTryTokenTime = 1;
                         shouldUpdateToken = 0;
-                        pFFTsMuxUploader->isReady = 1;
-                }
-                
-                now = (int)(LinkGetCurrentNanosecond() / 1000000000);
-                int stime = 0;
-                if (rcSleepTime > tokenSleepTime) {
-                        shouldUpdateToken = 1;
-                        stime = tokenSleepTime - now - 10;
-                } else {
-                        shouldUpdateRemoteCofig = 1;
-                        stime = rcSleepTime - now - 10;
-                }
-                if (stime > 0) {
-                        sleep(stime);
                 }
         }
         
@@ -1600,8 +1471,14 @@ static void *linkTokenThread(void * pOpaque) {
 
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) {
         
-        int ret = pthread_create(&pFFTsMuxUploader->tokenThread, NULL, linkTokenThread, pFFTsMuxUploader);
+        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, 0, TSQ_FIX_LENGTH, sizeof(SessionUpdateParam), 50);
         if (ret != 0) {
+                return ret;
+        }
+        
+        ret = pthread_create(&pFFTsMuxUploader->tokenThread, NULL, linkTokenAndConfigThread, pFFTsMuxUploader);
+        if (ret != 0) {
+                LinkDestroyQueue(&pFFTsMuxUploader->pUpdateQueue_);
                 return LINK_THREAD_ERROR;
         }
 
