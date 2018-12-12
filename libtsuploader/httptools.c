@@ -86,6 +86,11 @@ int LinkSimpleHttpGet(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT 
         return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL, NULL, 0);
 }
 
+int LinkSimpleHttpGetWithToken(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
+                               IN const char *pToken, IN int nTokenLen) {
+        
+        return linkSimpleHttpRequest(0, pUrl, pBuf, nBufLen, pRespLen, NULL, 0, NULL, pToken, nTokenLen);
+}
 
 int LinkSimpleHttpPost(IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                        IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType) {

@@ -736,8 +736,8 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         
         // update session
         upparam.nSeqNum = 0;
-        strcpy(upparam.sessionId, pSession->sessionId);
         LinkUpdateSessionId(pSession, nNewSessionId);
+        strcpy(upparam.sessionId, pSession->sessionId);
         
         // update remote config
         fprintf(stderr, "force: update remote config\n");
@@ -765,8 +765,8 @@ static void updateSegmentId(void *_pOpaque, void* pArg, LinkSession* pSession,in
                 
                
                 upparam.nSeqNum = 0;
-                strcpy(upparam.sessionId, pSession->sessionId);
                 LinkUpdateSessionId(pSession, nTsStartSystime);
+                strcpy(upparam.sessionId, pSession->sessionId);
                 fprintf(stderr, "start: update remote config\n");
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
                 
@@ -1394,14 +1394,31 @@ END:
 }
 
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, SessionUpdateParam *pSParam) {
-        char *pBuf = (char *)malloc(1024);
-        memset(pBuf, 0, 1024);
-        snprintf(pBuf, 1024, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
+        int nBufLen = 1024;
+        char *pBuf = (char *)malloc(nBufLen);
+        memset(pBuf, 0, nBufLen);
+        int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"\n", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
                  pSParam->sessionId, pSParam->nSeqNum);
         
-        // /v1/device/uploadtoken?session=<session>&sequence=<sequence>
+        // /v1/device/uploadtoken?session=<session>&sequence=<sequence>memset(pRc, 0, sizeof(RemoteConfig));
+
+        const char *pInput = strchr(pBuf+8, '/');
+        char *pOutput = pBuf + nUrlLen + 1;
+        int nOutputLen = nBufLen - nUrlLen - 1;
         
-        int ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf);
+        int ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, strlen(pInput), pOutput, &nOutputLen);
+        if (ret != LINK_SUCCESS) {
+                return ret;
+        }
+        pBuf[nUrlLen-1] = 0;
+        
+        char *pToken = pOutput + nOutputLen;
+        int nTokenOffset = snprintf(pToken, 42, "%s:", pFFTsMuxUploader->ak);
+        int nB64Len = urlsafe_b64_encode(pOutput, nOutputLen, pToken + nTokenOffset, 30);
+        
+        
+        
+        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf, pToken, nTokenOffset+nB64Len);
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
@@ -1430,6 +1447,8 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
 
                 int ret = 0;
                 
+                char sessionIdBak[LINK_MAX_SESSION_ID_LEN+1] = {0};
+                
                 SessionUpdateParam param;
                 param.nType = 0;
                 now = (int)(LinkGetCurrentNanosecond() / 1000000000);
@@ -1450,6 +1469,9 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 
                 if (param.nType == 3) {
                         continue;
+                }
+                if (param.sessionId[0] != 0) {
+                        memcpy(sessionIdBak, param.sessionId, sizeof(sessionIdBak));
                 }
 
                 memset(&info, 0, sizeof(info));
@@ -1488,6 +1510,10 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 }
                 
                 if (param.nType == 1 || shouldUpdateToken || getRcOk) { //update token
+                        if (param.sessionId[0] == 0) {
+                                 memcpy(param.sessionId, sessionIdBak, sizeof(sessionIdBak));
+                        }
+                        param.nSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
                         ret = updateToken(pFFTsMuxUploader, &tokenSleepUntilTime, &param);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {

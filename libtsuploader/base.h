@@ -50,6 +50,10 @@ typedef struct {
         int64_t nSeqNum;
         int nTokenDeadline;
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
+        char *pAk;
+        int nAkLen;
+        char *pSk;
+        int nSkLen;
 }LinkUploadParam;
 
 typedef enum {

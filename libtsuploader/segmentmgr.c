@@ -296,7 +296,7 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  "endReason": <endReason> // 切片会话结束的原因，如果会话没结束不需要本字段
  }
  */
-static int reportSegInfo(SegInfo *pSegInfo) {
+static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         char body[512];
         LinkSession *s = &pSegInfo->session;
         memset(body, 0, sizeof(body));
@@ -319,6 +319,23 @@ static int reportSegInfo(SegInfo *pSegInfo) {
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
+        
+        LinkUploadParam param;
+        memset(&param, 0, sizeof(param));
+        char app[LINK_MAX_APP_LEN+1];
+        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1];
+        char reportHost[256];
+        
+        param.pDeviceName = deviceName;
+        param.nDeviceNameLen = sizeof(deviceName);
+        param.pApp = app;
+        param.nAppLen = sizeof(app);
+        param.pSegUrl = reportHost;
+        param.nSegUrlLen = sizeof(reportHost);
+
+        int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
+                                                                 &param, LINK_UPLOAD_CB_GETPARAM);
+        
         char resp[256];
         memset(resp, 0, sizeof(resp));
         int respLen = sizeof(resp);
@@ -342,7 +359,7 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
         }
         int ret;
         if (pSegInfo->session.isNewSessionStarted || pSegInfo->session.nSessionEndResonCode != 0) {
-                ret = reportSegInfo(pSegInfo);
+                ret = reportSegInfo(pSegInfo, idx);
                 if (ret == LINK_SUCCESS)
                         segmentMgr.handles[idx].segReportOk = 1;
                 return;
@@ -353,7 +370,7 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
                 }
         }
         
-        ret = reportSegInfo(pSegInfo);
+        ret = reportSegInfo(pSegInfo, idx);
         if (ret == LINK_SUCCESS)
                 segmentMgr.handles[idx].segReportOk = 1;
         
