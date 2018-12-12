@@ -22,6 +22,7 @@ typedef struct {
         int64_t nEnd;
         SegmentHandle handle;
         int segUploadOk;
+        int segReportOk;
         char bucket[LINK_MAX_BUCKET_LEN+1];
         LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
@@ -30,7 +31,7 @@ typedef struct {
         int64_t nNextUpdateSegTimeInSecond;
         int64_t nLastUpdateTime;
         int64_t nUpdateInterval;
-        LinkSession session; //TODO backup report info when next report time is not arrival
+        LinkSession tmpSession; //TODO backup report info when next report time is not arrival
 }Seg;
 
 typedef struct {
@@ -120,24 +121,6 @@ int getMoveToken(char *pBuf, int nBufLen, char *pUrl, char *oldkey, char *key, s
         return LINK_SUCCESS;
 }
 
-
-static int checkShouldUpdate(Seg* pSeg, LinkSession *pCurSession) {
-        int64_t nNow = LinkGetCurrentNanosecond() / 1000000000LL;
-        if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
-                pSeg->session.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
-                pSeg->session.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
-                return 0;
-        }
-        pSeg->nNextUpdateSegTimeInSecond += pSeg->nUpdateInterval;
-        pSeg->nLastUpdateTime = pSeg->nNextUpdateSegTimeInSecond; // or nNow
-        if (pSeg->session.nVideoGapFromLastReport > 0)
-                pCurSession->nVideoGapFromLastReport += pSeg->session.nVideoGapFromLastReport;
-        if (pSeg->session.nAudioGapFromLastReport > 0)
-                pCurSession->nAudioGapFromLastReport += pSeg->session.nAudioGapFromLastReport;
-        memset(&pSeg->session, 0, sizeof(LinkSession));
-        return 1;
-}
-
 static void updateSegmentFile(SegInfo segInfo) {
         
         // seg/ua/segment_start_timestamp/segment_end_timestamp
@@ -151,11 +134,6 @@ static void updateSegmentFile(SegInfo segInfo) {
         if (idx < 0) {
                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                 return;
-        }
-        if (segmentMgr.handles[idx].segUploadOk) {
-                if (!checkShouldUpdate(&segmentMgr.handles[idx], &segInfo.session)) {
-                        return;
-                }
         }
         
         char key[128] = {0};
@@ -195,11 +173,8 @@ static void updateSegmentFile(SegInfo segInfo) {
         int64_t segStartTime = segInfo.session.nSessionStartTime / 1000000;
         int64_t endTs = segStartTime + segInfo.session.nAccSessionVideoDuration;
         if (segmentMgr.handles[idx].segUploadOk == 0) {
-#ifdef LINK_USE_OLD_NAME
                 snprintf(key, sizeof(key), "seg/%s/%"PRId64"/%"PRId64"", param.pDeviceName, segStartTime, endTs);
-#else
-                snprintf(key, sizeof(key), "%s/%s/seg/%"PRId64"/%"PRId64"", app, param.pDeviceName, segStartTime, endTs);
-#endif
+
                 segmentMgr.handles[idx].nStart = segStartTime;
                 segmentMgr.handles[idx].nEnd = endTs;
         } else {
@@ -207,17 +182,11 @@ static void updateSegmentFile(SegInfo segInfo) {
                         LinkLogDebug("not update segment:%"PRId64" %"PRId64"", segmentMgr.handles[idx].nEnd, endTs);
                         return;
                 }
-#ifdef LINK_USE_OLD_NAME
                 snprintf(oldKey, sizeof(oldKey), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
                 snprintf(key, sizeof(key), "%s:seg/%s/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, param.pDeviceName,
                          segmentMgr.handles[idx].nStart, endTs);
-#else
-                snprintf(oldKey, sizeof(oldKey), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
-                         segmentMgr.handles[idx].nStart, segmentMgr.handles[idx].nEnd);
-                snprintf(key, sizeof(key), "%s:%s/%s/seg/%"PRId64"/%"PRId64"", segmentMgr.handles[idx].bucket, app, param.pDeviceName,
-                         segmentMgr.handles[idx].nStart, endTs);
-#endif
+
                 isNewSeg = 0;
         }
         
@@ -295,6 +264,102 @@ static void updateSegmentFile(SegInfo segInfo) {
         return;
 }
 
+static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
+        int64_t nNow = LinkGetCurrentNanosecond() / 1000000000LL;
+        if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
+                pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
+                pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
+                return 0;
+        }
+        pSeg->nNextUpdateSegTimeInSecond += pSeg->nUpdateInterval;
+        pSeg->nLastUpdateTime = pSeg->nNextUpdateSegTimeInSecond; // or nNow
+        if (pSeg->tmpSession.nVideoGapFromLastReport > 0)
+                pCurSession->nVideoGapFromLastReport += pSeg->tmpSession.nVideoGapFromLastReport;
+        if (pSeg->tmpSession.nAudioGapFromLastReport > 0)
+                pCurSession->nAudioGapFromLastReport += pSeg->tmpSession.nAudioGapFromLastReport;
+        pSeg->tmpSession.nVideoGapFromLastReport = 0;
+        pSeg->tmpSession.nAudioGapFromLastReport = 0;
+        return 1;
+}
+
+/*
+ {
+ "session": "<session>", // 切片会话
+ "start": <startTimestamp>, // 切片会话的开始时间戳，毫秒
+ "current": <currentTimestamp>, // 当前时间戳, 毫秒
+ "sequence": <sequence>, // 最新的切片序列号
+ "vd": <videoDurationMS>, // 距离前一次上报的切片视频内容时长, 毫秒
+ "ad": <audioDurationMS>, // 距离前一次上报的切片音频内容时长, 毫秒
+ "tvd": <totalVideoDuration>, // 本次切片会话的视频总时长，毫秒
+ "tad": <totalAudioDuration>, // 本次切片会话的音频总时长，毫秒
+ "end": "<endTimestamp>", // 切片会话结束时间戳,毫秒，如果会话没结束不需要本字段
+ "endReason": <endReason> // 切片会话结束的原因，如果会话没结束不需要本字段
+ }
+ */
+static int reportSegInfo(SegInfo *pSegInfo) {
+        char body[512];
+        LinkSession *s = &pSegInfo->session;
+        memset(body, 0, sizeof(body));
+        if (s->nSessionEndResonCode != 0) {
+                const char * reason = "timeout";
+                if (s->nSessionEndResonCode == 1)
+                        reason = "normal";
+                else if (s->nSessionEndResonCode == 3)
+                        reason = "force";
+                sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
+                        " %"PRId64", \"endReason\": \"%s\" }",
+                        s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
+        } else {
+                sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"}",
+                        s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
+        }
+        char resp[256];
+        memset(resp, 0, sizeof(resp));
+        int respLen = sizeof(resp);
+        //TODO url get from uploadparamcallback
+        //LinkSimpleHttpPost(url, resp, sizeof(resp), &respLen, body, strlen(body), "application/json");
+        printf("%s\n", body);
+        return LINK_SUCCESS;
+}
+
+static void handleReportSegInfo(SegInfo *pSegInfo) {
+        int i, idx = -1;
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
+                if (segmentMgr.handles[i].handle == pSegInfo->handle) {
+                        idx = i;
+                        break;
+                }
+        }
+        if (idx < 0) {
+                LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
+                return;
+        }
+        int ret;
+        if (pSegInfo->session.isNewSessionStarted || pSegInfo->session.nSessionEndResonCode != 0) {
+                ret = reportSegInfo(pSegInfo);
+                if (ret == LINK_SUCCESS)
+                        segmentMgr.handles[idx].segReportOk = 1;
+                return;
+        }
+        if (segmentMgr.handles[idx].segReportOk) {
+                if (!checkShouldReport(&segmentMgr.handles[idx], &pSegInfo->session)) {
+                        return;
+                }
+        }
+        
+        ret = reportSegInfo(pSegInfo);
+        if (ret == LINK_SUCCESS)
+                segmentMgr.handles[idx].segReportOk = 1;
+        
+        return;
+}
+
 static void linkReleaseSegmentHandle(SegmentHandle seg) {
         pthread_mutex_lock(&segMgrMutex);
         if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
@@ -335,6 +400,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
                                         updateSegmentFile(segInfo);
+                                        handleReportSegInfo(&segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_QUIT) {
                                         continue;
                                 }
@@ -393,7 +459,7 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         segmentMgr.handles[i].pUploadStatisticCb = pArg->pUploadStatisticCb;
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
                         segmentMgr.handles[i].nNextUpdateSegTimeInSecond = 0;
-                        memset(&segmentMgr.handles[i].session, 0, sizeof(LinkSession));
+                        memset(&segmentMgr.handles[i].tmpSession, 0, sizeof(LinkSession));
                         pthread_mutex_unlock(&segMgrMutex);
                         return LINK_SUCCESS;
                 }

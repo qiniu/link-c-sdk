@@ -14,12 +14,11 @@ typedef struct _LinkTsUploadArg {
         void *pGetUploadParamCallbackArg;
         void    *pUploadArgKeeper_;
         int64_t nSegmentId_;
-        int64_t nLastStartTime_;
         LinkTsUploadArgUpadater UploadUpdateSegmentId;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int64_t nSegSeqNum;
-        int64_t nLastEndTsTime;
+        int64_t nLastCheckTime;
 }LinkTsUploadArg;
 
 typedef struct _LinkTsUploader LinkTsUploader;
