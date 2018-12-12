@@ -76,7 +76,6 @@ typedef struct _FFTsMuxUploader{
         int nKeyFrameCount;
         int nFrameCount;
         LinkMediaArg avArg;
-        LinkUploadState ffMuxSatte;
         
         int nUploadBufferSize;
         
@@ -342,10 +341,6 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                 if (nIsForceNewSeg)
                         pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime, LINK_SEG_TIMESTAMP);
                 pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, _nTimestamp, nSysNanotime, tmtype);
-        } else {
-                if (pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_FAIL)
-                        LinkLogError("Error muxing packet:%d", ret);
-                pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_FAIL;
         }
 
         return ret;
@@ -436,10 +431,6 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         if (pFFTsMuxUploader->nFirstTimestamp == -1) {
                 pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
         }
-        if (pFFTsMuxUploader->pTsMuxCtx) {
-                pFFTsMuxUploader->ffMuxSatte = pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetUploaderState(
-                                        pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        }
         
         int isVideoKeyframe = 0;
         int isSameAsBefore = 0;
@@ -462,15 +453,12 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                    //at least 1 keyframe and aoubt last 5 second
                    || shouldSwitch
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0) ){// new segment is specified
-                   //||  pFFTsMuxUploader->ffMuxSatte != LINK_UPLOAD_INIT){   // upload finished
-                        fprintf(stderr, "normal switchts:%"PRId64" %d %d-%d %d %d\n", _nTimestamp - pFFTsMuxUploader->nFirstTimestamp,
-                                pFFTsMuxUploader->remoteConfig.nTsDuration, _nIsSegStart, pFFTsMuxUploader->nFrameCount, shouldSwitch,
-                                pFFTsMuxUploader->ffMuxSatte);
+                        fprintf(stderr, "normal switchts:%"PRId64" %d %d-%d %d\n", _nTimestamp - pFFTsMuxUploader->nFirstTimestamp,
+                                pFFTsMuxUploader->remoteConfig.nTsDuration, _nIsSegStart, pFFTsMuxUploader->nFrameCount, shouldSwitch);
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
                         pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
-                        pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
                         
                         switchTs(pFFTsMuxUploader);
                         int64_t nDiff = (nSysNanotime - pFFTsMuxUploader->nLastPicCallbackSystime)/1000000;
@@ -1194,7 +1182,6 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pFFTsMuxUploader->nKeyFrameCount = 0;
         pFFTsMuxUploader->nFrameCount = 0;
         pFFTsMuxUploader->nFirstTimestamp = 0;
-        pFFTsMuxUploader->ffMuxSatte = LINK_UPLOAD_INIT;
         fprintf(stderr, "pause switchts\n");
         switchTs(pFFTsMuxUploader);
         
