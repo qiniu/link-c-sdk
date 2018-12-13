@@ -504,6 +504,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 streamUpload(&cmd);
                                 break;
                         case LINK_TSU_QUIT:
+                                LinkLogInfo("tsuploader required to quit");
                                 return NULL;
                         case LINK_TSU_AUDIO_TIME:
                                 handleAudioTimeReport(pKodoUploader, &cmd.time);

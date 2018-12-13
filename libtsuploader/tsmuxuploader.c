@@ -49,6 +49,8 @@ typedef struct  {
         char *pMgrTokenRequestUrl;
         char *pUpTokenRequestUrl;
         char *pUpHostUrl;
+        char *pAppId;
+        char *pDeviceName;
         int isValid;
         
         //not use now
@@ -1033,6 +1035,7 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 }
         }
         
+        // TODO should from remote config
         if (pParam->pDeviceName != NULL) {
                 int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceName_);
                 if (pParam->nDeviceNameLen - 1 < nDeviceNameLen) {
@@ -1045,6 +1048,7 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->pDeviceName[nDeviceNameLen] = 0;
         }
         
+         // TODO should from remote config
         if (pParam->pApp != NULL) {
                 int nAppLen = strlen(pFFTsMuxUploader->app_);
                 if (pParam->nAppLen - 1 < nAppLen) {
@@ -1290,6 +1294,26 @@ void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
         return;
 }
 
+static int getJsonString(char **p, const char *pFieldname, cJSON *pJsonRoot) {
+        int nCpyLen = 0;
+        cJSON * pNode = cJSON_GetObjectItem(pJsonRoot, pFieldname);
+        if (pNode != NULL) {
+                nCpyLen = strlen(pNode->valuestring);
+                char *tmp = malloc(nCpyLen + 1);
+                if (tmp == NULL) {
+                        LinkLogError("no memory for json:%s", pFieldname);
+                        *p = NULL;
+                        return LINK_NO_MEMORY;
+                }
+                memcpy(tmp, pNode->valuestring, nCpyLen);
+                tmp[nCpyLen] = 0;
+                *p = tmp;
+                return LINK_SUCCESS;
+        }
+        LinkLogInfo("not found %s in json", pFieldname);
+        *p = NULL;
+        return LINK_JSON_FORMAT;
+}
 
 static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc) {
 
@@ -1321,7 +1345,6 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 return ret;
         }
         
-        //TODO parse result
         cJSON * pJsonRoot = cJSON_Parse(buf);
         if (pJsonRoot == NULL) {
                 return LINK_JSON_FORMAT;
@@ -1335,49 +1358,43 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         pRc->updateConfigInterval = pNode->valueint;
         
         
+        ret = getJsonString(&pRc->pAppId, "appId", pJsonRoot);
+        if (ret != LINK_SUCCESS) {
+                        goto END;
+        }
+        
+        ret = getJsonString(&pRc->pDeviceName, "deviceName", pJsonRoot);
+        if (ret != LINK_SUCCESS) {
+                goto END;
+        }
+        
+        
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
         if (pSeg == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
         }
         
-        int nCpyLen = 0;
-        pNode = cJSON_GetObjectItem(pSeg, "uploadUrl");
-        if (pNode != NULL) {
-                nCpyLen = strlen(pNode->valuestring);
-                pRc->pUpHostUrl = malloc(nCpyLen + 1);
-                if (pRc->pUpHostUrl == NULL) {
-                        goto END;
-                }
-                memcpy(pRc->pUpHostUrl, pNode->valuestring, nCpyLen);
-                pRc->pUpHostUrl[nCpyLen] = 0;
+        ret = getJsonString(&pRc->pUpHostUrl, "uploadUrl", pSeg);
+        if (ret == LINK_SUCCESS) {
+                LinkLogInfo("uploadUrl:%s", pRc->pUpHostUrl);
+        } else if (ret == LINK_NO_MEMORY) {
+                goto END;
         }
         
-        pNode = cJSON_GetObjectItem(pSeg, "tokenRequestUrl");
-        if (pNode != NULL) {
-                nCpyLen = strlen(pNode->valuestring);
-                pRc->pUpTokenRequestUrl = malloc(nCpyLen + 1);
-                if (pRc->pUpTokenRequestUrl == NULL) {
-                        goto END;
-                }
-                memcpy(pRc->pUpTokenRequestUrl, pNode->valuestring, nCpyLen);
-                pRc->pUpTokenRequestUrl[nCpyLen] = 0;
-                LinkLogInfo("tokenurl:%s", pRc->pUpTokenRequestUrl);
+        ret = getJsonString(&pRc->pUpTokenRequestUrl, "tokenRequestUrl", pSeg);
+        if (ret == LINK_SUCCESS) {
+                LinkLogInfo("tokenRequestUrl:%s", pRc->pUpTokenRequestUrl);
+        } else if (ret == LINK_NO_MEMORY) {
+                goto END;
         }
         
-        
-        pNode = cJSON_GetObjectItem(pSeg, "segReportUrl");
-        if (pNode != NULL) {
-                nCpyLen = strlen(pNode->valuestring);
-                pRc->pMgrTokenRequestUrl = malloc(nCpyLen + 1);
-                if (pRc->pMgrTokenRequestUrl == NULL) {
-                        goto END;
-                }
-                memcpy(pRc->pMgrTokenRequestUrl, pNode->valuestring, nCpyLen);
-                pRc->pMgrTokenRequestUrl[nCpyLen] = 0;
+        ret = getJsonString(&pRc->pMgrTokenRequestUrl, "segReportUrl", pSeg);
+        if (ret == LINK_SUCCESS) {
                 LinkLogInfo("segReportUrl:%s", pRc->pMgrTokenRequestUrl);
+        } else if (ret == LINK_NO_MEMORY) {
+                goto END;
         }
-        
         
         pNode = cJSON_GetObjectItem(pSeg, "tsDuration");
         if (pNode != NULL) {
@@ -1483,15 +1500,19 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
                         nWait = nWaitToken;
                 }
+                //fprintf(stderr, "sleep:%d\n", nWait);
+                memset(&param, 0, sizeof(param));
                 ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
-                                                                      sizeof(SessionUpdateParam), nWait);
+                                                                      sizeof(SessionUpdateParam), nWait);//nWait * 1000000LL);
                 
                 if (ret < 0 && (ret != LINK_SUCCESS && ret != LINK_TIMEOUT)) {
-                        LinkLogError("updatequeue fail:%d", ret);
+                        LinkLogError("popqueue fail:%d", ret);
                         continue;
                 }
+                //fprintf(stderr, "pop cmd:%d %d\n", param.nType, ret);
+
                 
-                if (param.nType == 3) {
+                if (param.nType == 3) { //quit
                         continue;
                 }
                 if (param.sessionId[0] != 0) {
@@ -1504,18 +1525,21 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 int getRcOk = 0; // after getRemoteConfig success,must update token
                 if (param.nType == 2 || shouldUpdateRc || ret == LINK_TIMEOUT) {
                         getRcOk = 0;
+                        memset(&rc, 0, sizeof(rc));
                         ret = getRemoteConfig(pFFTsMuxUploader, &rc);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
+                          
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
-                                LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime);
+                                LinkLogInfo("sleep %d time to get remote config", nNextTryRcTime);
                                 rcSleepUntilTime = now + nNextTryRcTime;
                                 nNextTryRcTime *= 2;
                                 shouldUpdateRc = 1;
                                 
                                 shouldUpdateToken = 0; //rc is Higher priority than token
                                 nNextTryTokenTime = 1;
+    
                                 continue;
                         }
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
