@@ -54,6 +54,8 @@ typedef struct {
         int nAkLen;
         char *pSk;
         int nSkLen;
+        char *pFilePrefix;
+        int nFilePrefix;
 }LinkUploadParam;
 
 typedef enum {

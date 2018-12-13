@@ -1006,6 +1006,17 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
         }
         
+        if (pParam->pFilePrefix != NULL) {
+                if (pParam->nFilePrefix - 1 < pFFTsMuxUploader->token_.nFnamePrefixLen_) {
+                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nFnamePrefixLen_, pParam->nFilePrefix);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_BUFFER_IS_SMALL;
+                }
+                memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pFnamePrefix_, pFFTsMuxUploader->token_.nFnamePrefixLen_);
+                pParam->nFilePrefix = pFFTsMuxUploader->token_.nFnamePrefixLen_;
+                pParam->pTokenBuf[pFFTsMuxUploader->token_.nFnamePrefixLen_] = 0;
+        }
+        
         
         if (pParam->pUpHost != NULL) {
                 int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
@@ -1046,31 +1057,38 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 }
         }
         
-        // TODO should from remote config
+#ifdef LINK_USE_OLD_NAME
+        char *pDeviceName = pFFTsMuxUploader->deviceName_;
+        char *pApp = pFFTsMuxUploader->app_;
+#else
+        char *pDeviceName = pFFTsMuxUploader->remoteConfig.pDeviceName;
+        char *pApp = pFFTsMuxUploader->remoteConfig.pAppId
+#endif
+        
         if (pParam->pDeviceName != NULL) {
-                int nDeviceNameLen = strlen(pFFTsMuxUploader->deviceName_);
+                int nDeviceNameLen = strlen(pDeviceName);
                 if (pParam->nDeviceNameLen - 1 < nDeviceNameLen) {
-                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->deviceName_, nDeviceNameLen);
+                        LinkLogError("get segurl buffer is small:%d %d", pDeviceName, nDeviceNameLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pDeviceName, pFFTsMuxUploader->deviceName_, nDeviceNameLen);
+                memcpy(pParam->pDeviceName, pDeviceName, nDeviceNameLen);
                 pParam->nDeviceNameLen = nDeviceNameLen;
                 pParam->pDeviceName[nDeviceNameLen] = 0;
         }
         
-         // TODO should from remote config
         if (pParam->pApp != NULL) {
-                int nAppLen = strlen(pFFTsMuxUploader->app_);
+                int nAppLen = strlen(pApp);
                 if (pParam->nAppLen - 1 < nAppLen) {
-                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->app_, nAppLen);
+                        LinkLogError("get segurl buffer is small:%d %d", pApp, nAppLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pApp, pFFTsMuxUploader->app_, nAppLen);
+                memcpy(pParam->pApp, pApp, nAppLen);
                 pParam->nAppLen = nAppLen;
                 pParam->pApp[nAppLen] = 0;
         }
+        
         
         if (pParam->pAk != NULL) {
                 int nAkLen = strlen(pFFTsMuxUploader->ak);

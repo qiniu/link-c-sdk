@@ -109,12 +109,18 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
+#ifdef LINK_USE_OLD_NAME
                                                 char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
                                                 char app[LINK_MAX_APP_LEN+1] = {0};
                                                 param.pDeviceName = deviceName;
                                                 param.nDeviceNameLen = sizeof(deviceName);
                                                 param.pApp = app;
                                                 param.nAppLen = sizeof(app);
+#else
+                                                char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
+                                                param.pFilePrefix = fprefix;
+                                                param.nFilePrefix = sizeof(fprefix);
+#endif
                                                 int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
@@ -126,7 +132,7 @@ static void * listenPicUpload(void *_pOpaque)
 #ifdef LINK_USE_OLD_NAME
                                                 snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
 #else
-                                                snprintf(key, sizeof(key), "%s_%s_frame_%"PRId64"_0.jpg", app, deviceName, sig.nTimestamp);
+                                                snprintf(key, sizeof(key), "%s_frame_%"PRId64"-0.jpg", param.pFilePrefix, sig.nTimestamp);
 #endif
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,

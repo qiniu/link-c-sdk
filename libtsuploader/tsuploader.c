@@ -152,8 +152,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char uptoken[1024] = {0};
         char upHost[192] = {0};
         char suffix[16] = {0};
-        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
-        char app[LINK_MAX_APP_LEN+1] = {0};
         int ret = 0;
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
         KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
@@ -168,10 +166,19 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.nTypeBufLen = sizeof(suffix);
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
+        
+#ifdef LINK_USE_OLD_NAME
+        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
+        char app[LINK_MAX_APP_LEN+1] = {0};
         param.pDeviceName = deviceName;
         param.nDeviceNameLen = sizeof(deviceName);
         param.pApp = app;
         param.nAppLen = sizeof(app);
+#else
+        char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
+        param.pFilePrefix = fprefix;
+        param.nFilePrefix = sizeof(fprefix);
+#endif
         param.nTokenDeadline = pKodoUploader->nTokenDeadline;
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
         param.nSeqNum = pKodoUploader->session.nTsSequenceNumber++;
@@ -234,10 +241,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 #else
                 // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
-                        sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pApp, param.pDeviceName,
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d/%s.ts", param.pFilePrefix,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
                 } else {
-                        sprintf(key, "%s/%s/ts/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pApp, param.pDeviceName,
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d.ts", param.pFilePrefix,
                                 tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                 }
 #endif
