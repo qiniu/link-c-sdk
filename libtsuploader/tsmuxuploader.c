@@ -601,6 +601,10 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                                 free(pFFTsMuxUploader->token_.pToken_);
                                 pFFTsMuxUploader->token_.pToken_ = NULL;
                         }
+                        if (pFFTsMuxUploader->token_.pFnamePrefix_) {
+                                free(pFFTsMuxUploader->token_.pFnamePrefix_);
+                                pFFTsMuxUploader->token_.pFnamePrefix_ = NULL;
+                        }
                         freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
                         free(pFFTsMuxUploader);
                 }
@@ -741,7 +745,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
 
 static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSession, int64_t nNewSessionId, int lastSessionEndReasonCode) {
         SessionUpdateParam upparam;
-        upparam.nType = 2;
+        upparam.nType = 1;
         
         // report current session end
         pSession->nSessionEndResonCode = lastSessionEndReasonCode;
@@ -754,7 +758,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         strcpy(upparam.sessionId, pSession->sessionId);
         snprintf(pFFTsMuxUploader->sessionId, LINK_MAX_SESSION_ID_LEN+1, "%s", pSession->sessionId);
         
-        // update remote config
+        // update upload token
         fprintf(stderr, "force: update remote config\n");
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
@@ -883,6 +887,16 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
         if (pRc->pUpTokenRequestUrl) {
                 free(pRc->pUpTokenRequestUrl);
                 pRc->pUpTokenRequestUrl = NULL;
+        }
+        
+        if (pRc->pAppId) {
+                free(pRc->pAppId);
+                pRc->pAppId = NULL;
+        }
+        
+        if (pRc->pDeviceName) {
+                free(pRc->pDeviceName);
+                pRc->pDeviceName = NULL;
         }
         
         return;
