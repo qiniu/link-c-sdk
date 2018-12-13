@@ -401,7 +401,11 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
 void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         char str[15] = {0};
         sprintf(str, "%"PRId64"", nTsStartSystime/1000000);
-        urlsafe_b64_encode(str, strlen(str), pSession->sessionId, sizeof(pSession->sessionId));
+        int nId = urlsafe_b64_encode(str, strlen(str), pSession->sessionId, sizeof(pSession->sessionId));
+        while (pSession->sessionId[nId - 1] == '=') {
+                nId--;
+                pSession->sessionId[nId] = '0';
+        }
         
         pSession->nSessionStartTime =  nTsStartSystime;
         pSession->nSessionEndResonCode = 0;
