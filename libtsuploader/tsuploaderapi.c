@@ -206,12 +206,17 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         }
         pToken->nFnamePrefixLen = len;
         
+        int nDeadline = LinkGetJsonIntByKey((const char *)pTokenStr, "\"tts\"");
+        
         int nDeleteAfterDays = 0;
         ret = LinkGetPolicyFromUptoken(pToken->pToken, &nDeleteAfterDays, &pToken->nDeadline);
         if (ret != LINK_SUCCESS || pToken->nDeadline < 1543397800) {
                 pToken->nHttpRet = LINK_JSON_FORMAT;
                 return 0;
         }
+        
+        if (nDeadline > 0)
+                pToken->nDeadline = nDeadline;
 
         return size * nmemb;
 }
