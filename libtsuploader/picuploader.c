@@ -132,6 +132,12 @@ static void * listenPicUpload(void *_pOpaque)
 #ifdef LINK_USE_OLD_NAME
                                                 snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
 #else
+                                                char *tmp = param.pFilePrefix;
+                                                while(*tmp != 0) {
+                                                        if (*tmp == '/')
+                                                            *tmp = '_';
+                                                        tmp++;
+                                                }
                                                 snprintf(key, sizeof(key), "%s_frame_%"PRId64"-0.jpg", param.pFilePrefix, sig.nTimestamp);
 #endif
                                                 pPicUploader->picUpSettings_.getPicCallback(

@@ -453,7 +453,9 @@ static void * segmetMgrRun(void *_pOpaque) {
                                 if (segInfo.nOperation == SEGMENT_RELEASE) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
+#ifdef LINK_USE_OLD_NAME
                                         updateSegmentFile(segInfo);
+#endif
                                         handleReportSegInfo(&segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_QUIT) {
                                         continue;

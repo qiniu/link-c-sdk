@@ -1012,9 +1012,9 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pFnamePrefix_, pFFTsMuxUploader->token_.nFnamePrefixLen_);
+                memcpy(pParam->pFilePrefix, pFFTsMuxUploader->token_.pFnamePrefix_, pFFTsMuxUploader->token_.nFnamePrefixLen_);
                 pParam->nFilePrefix = pFFTsMuxUploader->token_.nFnamePrefixLen_;
-                pParam->pTokenBuf[pFFTsMuxUploader->token_.nFnamePrefixLen_] = 0;
+                pParam->pFilePrefix[pFFTsMuxUploader->token_.nFnamePrefixLen_] = 0;
         }
         
         
@@ -1062,7 +1062,7 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         char *pApp = pFFTsMuxUploader->app_;
 #else
         char *pDeviceName = pFFTsMuxUploader->remoteConfig.pDeviceName;
-        char *pApp = pFFTsMuxUploader->remoteConfig.pAppId
+        char *pApp = pFFTsMuxUploader->remoteConfig.pAppId;
 #endif
         
         if (pParam->pDeviceName != NULL) {
@@ -1506,6 +1506,10 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
                 free(pBuf);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
+        }
+        int nPreLen = strlen(pPrefix);
+        if (pPrefix[nPreLen-1] == '/') {
+                pPrefix[nPreLen-1] = 0;
         }
         setToken(pFFTsMuxUploader, pBuf, strlen(pBuf), pPrefix, strlen(pPrefix));
         LinkLogInfo("gettoken:%s", pBuf);
