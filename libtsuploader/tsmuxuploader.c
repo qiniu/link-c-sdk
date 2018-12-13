@@ -1626,7 +1626,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
 
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) {
         
-        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, 0, TSQ_FIX_LENGTH, sizeof(SessionUpdateParam), 50);
+        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, 1, TSQ_FIX_LENGTH, sizeof(SessionUpdateParam), 50);
         if (ret != 0) {
                 return ret;
         }
