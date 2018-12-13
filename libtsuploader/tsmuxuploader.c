@@ -106,6 +106,7 @@ typedef struct _FFTsMuxUploader{
         RemoteConfig remoteConfig;
         
         LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
+        char sessionId[LINK_MAX_SESSION_ID_LEN + 1];
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -751,6 +752,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         upparam.nSeqNum = 0;
         LinkUpdateSessionId(pSession, nNewSessionId);
         strcpy(upparam.sessionId, pSession->sessionId);
+        snprintf(pFFTsMuxUploader->sessionId, LINK_MAX_SESSION_ID_LEN+1, "%s", pSession->sessionId);
         
         // update remote config
         fprintf(stderr, "force: update remote config\n");
@@ -779,6 +781,7 @@ static void updateSegmentId(void *_pOpaque, void* pArg, LinkSession* pSession,in
                
                 upparam.nSeqNum = 0;
                 LinkUpdateSessionId(pSession, nTsStartSystime);
+                snprintf(pFFTsMuxUploader->sessionId, LINK_MAX_SESSION_ID_LEN+1, "%s", pSession->sessionId);
                 strcpy(upparam.sessionId, pSession->sessionId);
                 fprintf(stderr, "start: update remote config\n");
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
@@ -979,15 +982,8 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         
-        
-        SessionUpdateParam upparam;
-        
-        upparam.nType = 1;
-        if (pParam->nTokenDeadline > 1544421373) {
-                int shouldUpdateToken = pParam->nTokenDeadline - (int)(LinkGetCurrentNanosecond() / 1000000000);
-                if (shouldUpdateToken <= 20) {
-                        pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
-                }
+        if (pParam->sessionId[0] == 0) {
+                snprintf(pParam->sessionId, LINK_MAX_SESSION_ID_LEN+1, "%s",pFFTsMuxUploader->sessionId);
         }
         
         if (pFFTsMuxUploader->token_.pToken_ == NULL) {

@@ -138,7 +138,8 @@ static void * listenPicUpload(void *_pOpaque)
                                                             *tmp = '_';
                                                         tmp++;
                                                 }
-                                                snprintf(key, sizeof(key), "%s_frame_%"PRId64"-0.jpg", param.pFilePrefix, sig.nTimestamp);
+                                                snprintf(key, sizeof(key), "%s_frame_%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
+                                                         param.sessionId);
 #endif
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,

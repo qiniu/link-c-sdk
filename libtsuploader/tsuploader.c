@@ -242,10 +242,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
                         sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d/%s.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_, suffix);
                 } else {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%d.ts", param.pFilePrefix,
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_);
                 }
 #endif
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
@@ -404,7 +404,7 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         int nId = urlsafe_b64_encode(str, strlen(str), pSession->sessionId, sizeof(pSession->sessionId));
         while (pSession->sessionId[nId - 1] == '=') {
                 nId--;
-                pSession->sessionId[nId] = '0';
+                pSession->sessionId[nId] = 0;
         }
         
         pSession->nSessionStartTime =  nTsStartSystime;
