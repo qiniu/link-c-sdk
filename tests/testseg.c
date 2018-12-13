@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 static char segStoreToken[1024];
+static char segStoreFnamePrefix[256];
 static char *gpMgrTokenRequestUrl;
 static int gnMgrTokenRequestUrlLen;
 static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pParam, LinkUploadCbType cbtype) {
@@ -23,7 +24,8 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         int ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
         int nDeadline;
-        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), &nDeadline, pUpToken, NULL, 0);
+        ret = LinkGetUploadToken(segStoreToken, sizeof(segStoreToken), &nDeadline,
+                                 segStoreFnamePrefix, sizeof(segStoreFnamePrefix), pUpToken, NULL, 0);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("LinkGetUploadToken fail:%d", ret);
                 return;

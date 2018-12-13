@@ -179,8 +179,10 @@ void LinkCleanup()
 }
 
 struct HttpToken {
-        char * pData;
-        int nDataLen;
+        char * pToken;
+        int nTokenLen;
+        char *pFnamePrefix;
+        int nFnamePrefixLen;
         int nDeadline;
         int nHttpRet; //use with curl not ghttp
 };
@@ -188,16 +190,24 @@ struct HttpToken {
 size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
         struct HttpToken *pToken = (struct HttpToken *)pUserData;
         
-        int len = pToken->nDataLen;
-        int ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"token\"", pToken->pData, &len);
+        int len = pToken->nTokenLen;
+        int ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"token\"", pToken->pToken, &len);
         if (ret != LINK_SUCCESS) {
                 pToken->nHttpRet = ret;
                 return 0;
         }
-        pToken->nDataLen = len;
+        pToken->nTokenLen = len;
+        
+        len = pToken->nFnamePrefixLen;
+        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"fnamePreifx\"", pToken->pFnamePrefix, &len);
+        if (ret != LINK_SUCCESS) {
+                pToken->nHttpRet = ret;
+                return 0;
+        }
+        pToken->nFnamePrefixLen = len;
         
         int nDeleteAfterDays = 0;
-        ret = LinkGetPolicyFromUptoken(pToken->pData, &nDeleteAfterDays, &pToken->nDeadline);
+        ret = LinkGetPolicyFromUptoken(pToken->pToken, &nDeleteAfterDays, &pToken->nDeadline);
         if (ret != LINK_SUCCESS || pToken->nDeadline < 1543397800) {
                 pToken->nHttpRet = LINK_JSON_FORMAT;
                 return 0;
@@ -206,7 +216,8 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         return size * nmemb;
 }
 
-int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl, const char *pToken, int nTokenLen)
+int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, OUT char *pFnamePrefix, IN int nFnamePrefixLen,
+                       const char *pUrl, const char *pToken, int nTokenLen)
 {
         
         if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
@@ -226,16 +237,18 @@ int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, const char *pUrl
         memset(pBuf, 0, nBufLen);
 
         struct HttpToken token;
-        token.pData = pBuf;
-        token.nDataLen = nBufLen;
+        token.pToken = pBuf;
+        token.nTokenLen = nBufLen;
         token.nDeadline = 0;
         token.nHttpRet = 0;
+        token.nFnamePrefixLen = nFnamePrefixLen;
+        token.pFnamePrefix = pFnamePrefix;
         
         if (writeData(httpResp, nRespLen,  1,  &token) == 0){
                 LinkLogError("maybe response format error:%s[%d]", httpResp, token.nHttpRet);
                 return LINK_JSON_FORMAT;
         }
-        token.pData[token.nDataLen] = 0;
+        token.pToken[token.nTokenLen] = 0;
         if (pDeadline) {
                 *pDeadline = token.nDeadline;
         }

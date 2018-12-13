@@ -39,6 +39,8 @@ typedef struct _FFTsMuxContext{
 typedef struct _Token {
         char * pToken_;
         int nTokenLen_;
+        char *pFnamePrefix_;
+        int nFnamePrefixLen_;
 }Token;
 
 typedef struct  {
@@ -712,7 +714,8 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         return LINK_SUCCESS;
 }
 
-static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen)
+static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen,
+                     char *_pFnamePrefix, int nFnamePrefix)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
@@ -722,6 +725,14 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nToke
         }
         pFFTsMuxUploader->token_.pToken_ = _pToken;
         pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
+        
+        
+        if (pFFTsMuxUploader->token_.pFnamePrefix_ != NULL) {
+                
+                free(pFFTsMuxUploader->token_.pFnamePrefix_);
+        }
+        pFFTsMuxUploader->token_.pFnamePrefix_ = _pFnamePrefix;
+        pFFTsMuxUploader->token_.nFnamePrefixLen_ = nFnamePrefix;
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         return ;
@@ -1437,7 +1448,20 @@ END:
 static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, SessionUpdateParam *pSParam) {
         int nBufLen = 1024;
         char *pBuf = (char *)malloc(nBufLen);
+        if (pBuf == NULL) {
+                return LINK_NO_MEMORY;
+        }
         memset(pBuf, 0, nBufLen);
+        
+        int nPrefixLen = 256;
+        char *pPrefix = (char *)malloc(nPrefixLen);
+        memset(pPrefix, 0, nPrefixLen);
+        if (pPrefix == NULL) {
+                free(pBuf);
+                return LINK_NO_MEMORY;
+        }
+        
+        
         int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"\n", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
                  pSParam->sessionId, pSParam->nSeqNum);
         
@@ -1459,14 +1483,15 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         
         
         
-        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pBuf, pToken, nTokenOffset+nB64Len);
+        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pPrefix, nPrefixLen, pBuf, pToken, nTokenOffset+nB64Len);
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
                 return ret;
         }
-        setToken(pFFTsMuxUploader, pBuf, strlen(pBuf));
+        setToken(pFFTsMuxUploader, pBuf, strlen(pBuf), pPrefix, strlen(pPrefix));
         LinkLogInfo("gettoken:%s", pBuf);
+        LinkLogInfo("fnameprefix:%s", pPrefix);
         return LINK_SUCCESS;
 }
 
