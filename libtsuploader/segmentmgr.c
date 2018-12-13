@@ -323,7 +323,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
         LinkLogDebug("%s\n", body);
-        return LINK_SUCCESS; //TODO delete
+#ifndef LINK_USE_OLD_NAME
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
@@ -377,7 +377,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         if (nextReportTime > 0) {
                 segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime;
         }
-        
+#endif
         
         return LINK_SUCCESS;
 }
@@ -453,7 +453,9 @@ static void * segmetMgrRun(void *_pOpaque) {
                                 if (segInfo.nOperation == SEGMENT_RELEASE) {
                                         linkReleaseSegmentHandle(segInfo.handle);
                                 } else if (segInfo.nOperation == SEGMENT_UPDATE) {
+#ifdef LINK_USE_OLD_NAME
                                         updateSegmentFile(segInfo);
+#endif
                                         handleReportSegInfo(&segInfo);
                                 } else if (segInfo.nOperation == SEGMENT_QUIT) {
                                         continue;
