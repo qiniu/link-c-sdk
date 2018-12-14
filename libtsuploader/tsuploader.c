@@ -203,16 +203,13 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nLastFrameTimestamp - pSession->nFirstFrameTimestamp;
-        if (pKodoUploader->uploadArg.nSegmentId_ == 0) {
-                pKodoUploader->uploadArg.nSegmentId_ = pSession->nSessionStartTime;
-        }
         
         handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
         
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
         
-        uint64_t nSegmentId = pKodoUploader->uploadArg.nSegmentId_;
+        uint64_t nSegmentId = pSession->nSessionStartTime;
         
         int nDeleteAfterDays_ = 0;
         int nDeadline = 0;
@@ -434,11 +431,10 @@ static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimesta
         if (pKodoUploader->uploadArg.UploadUpdateSegmentId) {
                 if (isForceNewSession)
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                       &pKodoUploader->uploadArg, &pKodoUploader->session,
-                                                                       nSysTimestamp, 0);
+                                                                       &pKodoUploader->session, nSysTimestamp, 0);
                 else
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                       &pKodoUploader->uploadArg, &pKodoUploader->session,
+                                                                       &pKodoUploader->session,
                                                                        pKodoUploader->session.nTsStartTime, nSysTimestamp);
         }
 }
@@ -483,8 +479,6 @@ static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
         
         if (pKodoUploader->session.nTsStartTime <= 0)
                 pKodoUploader->session.nTsStartTime = pTi->nSysTimestamp;
-        if (pKodoUploader->uploadArg.nSegmentId_ <= 0)
-                pKodoUploader->uploadArg.nSegmentId_ = pTi->nSysTimestamp;
         
         int64_t nDiffVideo = pTi->nAvTimestamp - pKodoUploader->session.nLastVideoFrameTimestamp;
         
@@ -514,8 +508,12 @@ static void * listenTsUpload(void *_pOpaque)
                 TsUploaderCommand cmd;
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
                                                                       sizeof(TsUploaderCommand), 24 * 60 * 60);
-                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-                if (ret == LINK_TIMEOUT) {
+                pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
+                LinkLogDebug("ts queue:%d", info.nLen_);
+                if (ret <= 0) {
+                        if (ret != LINK_TIMEOUT) {
+                                LinkLogError("seg queue error. pop:%d", ret);
+                        }
                         continue;
                 }
                 

@@ -436,14 +436,16 @@ static void * segmetMgrRun(void *_pOpaque) {
         
         LinkUploaderStatInfo info = {0};
         while(!segmentMgr.nQuit_ || info.nLen_ != 0) {
-                SegInfo segInfo;
+                SegInfo segInfo = {0};
                 segInfo.handle = -1;
                 int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60);
                 
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
-                
                 LinkLogDebug("segment queue:%d", info.nLen_);
-                if (ret == LINK_TIMEOUT) {
+                if (ret <= 0) {
+                        if (ret != LINK_TIMEOUT) {
+                                LinkLogError("seg queue error. pop:%d", ret);
+                        }
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
@@ -463,7 +465,6 @@ static void * segmetMgrRun(void *_pOpaque) {
                                 }
                         }
                 }
-                segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
         }
         
         return NULL;
