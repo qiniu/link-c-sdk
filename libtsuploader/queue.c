@@ -90,6 +90,8 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
         
         if (pQueueImp->nLen_ == pQueueImp->nCap_) {
                 if (pQueueImp->policy == TSQ_FIX_LENGTH) {
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        pthread_cond_signal(&pQueueImp->condition_);
                         return LINK_Q_OVERFLOW;
                 } else if (pQueueImp->policy == TSQ_FIX_LENGTH_CAN_OVERWRITE) {
                         if(pQueueImp->nEnd_ + 1 == pQueueImp->nCap_){

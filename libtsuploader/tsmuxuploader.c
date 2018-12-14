@@ -1117,9 +1117,9 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->nSkLen = nSkLen;
                 pParam->pSk[nSkLen] = 0;
         }
-        
-        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        
         return LINK_SUCCESS;
 }
 
@@ -1191,6 +1191,7 @@ int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pTy
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_ARG_TOO_LONG;
         }
         pFFTsMuxUploader->isTypeOneshot = 1;
@@ -1208,6 +1209,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN 
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_ARG_TOO_LONG;
         }
         pFFTsMuxUploader->isTypeOneshot = 0;
