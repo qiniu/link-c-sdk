@@ -24,7 +24,7 @@
 #define LINK_MAX_DEVICE_NAME_LEN 200
 #define LINK_MAX_SESSION_ID_LEN 20
 
-//#define LINK_USE_OLD_NAME
+#define LINK_USE_OLD_NAME
 
 typedef struct {
         int64_t nTimestamp90Khz;

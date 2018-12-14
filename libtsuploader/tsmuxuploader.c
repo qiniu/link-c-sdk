@@ -759,7 +759,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         snprintf(pFFTsMuxUploader->sessionId, LINK_MAX_SESSION_ID_LEN+1, "%s", pSession->sessionId);
         
         // update upload token
-        fprintf(stderr, "force: update remote config\n");
+        fprintf(stderr, "force: update remote token\n");
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         pSession->isNewSessionStarted = 0;

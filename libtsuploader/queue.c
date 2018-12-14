@@ -26,14 +26,12 @@ static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (nDataLen + pQueueImp->nLen_  > pQueueImp->nCap_) {
                 int newLen = pQueueImp->nCap_ * 3 / 2;
-                char *pTmp = (char *)malloc(newLen);
+                char *pTmp = (char *)realloc(pQueueImp->pData_, newLen);
                 if (pTmp == NULL) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         return LINK_NO_MEMORY;
                 }
-                
-                memcpy(pTmp, pQueueImp->pData_, pQueueImp->nLen_);
-                free(pQueueImp->pData_);
+
                 pQueueImp->pData_ = pTmp;
                 pQueueImp->nCap_ = newLen;
                 pQueueImp->nLenInByte_ = newLen;
@@ -84,9 +82,9 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                 memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_, &nDataLen, sizeof(int));
                 memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_ + sizeof(int), pData_, nDataLen);
                 pQueueImp->nLen_++;
+                pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 pthread_cond_signal(&pQueueImp->condition_);
-                pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
                 return nDataLen;
         }
         
