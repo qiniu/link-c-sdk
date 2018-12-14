@@ -196,6 +196,7 @@ void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
 #define LINK_Q_WRONGSTATE    -5002
 #define LINK_MAX_SEG         -5103
 #define LINK_NOT_INITED      -5104
+#define LINK_Q_OVERFLOW      -5005
 #define LINK_PAUSED          -6000
 #define LINK_GHTTP_FAIL      -7000
 #define LINK_SUCCESS         0

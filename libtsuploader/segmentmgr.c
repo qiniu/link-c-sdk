@@ -9,6 +9,7 @@
 #include "httptools.h"
 #include "fixjson.h"
 #include "security.h"
+#include <unistd.h>
 
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
@@ -480,7 +481,7 @@ int LinkInitSegmentMgr() {
         }
         
         LinkCircleQueue *pQueue;
-        int ret = LinkNewCircleQueue(&pQueue, 0, TSQ_FIX_LENGTH, sizeof(SegInfo), 32);
+        int ret = LinkNewCircleQueue(&pQueue, 1, TSQ_FIX_LENGTH, sizeof(SegInfo), 32);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&segMgrMutex);
                 return ret;
@@ -533,7 +534,14 @@ void LinkReleaseSegmentHandle(SegmentHandle *pSeg) {
         segInfo.nOperation = SEGMENT_RELEASE;
         *pSeg = -1;
         
-        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        int ret = 0;
+        while(ret <= 0) {
+                ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+                if (ret <= 0) {
+                        LinkLogError("seg queue error. release:%d sleep 1 sec to retry", ret);
+                        sleep(1);
+                }
+        }
 }
 
 int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
@@ -541,7 +549,12 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         segInfo.handle = seg;
         segInfo.session = *pSession;
         segInfo.nOperation = SEGMENT_UPDATE;
-        return segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        if (ret <= 0) {
+                LinkLogError("seg queue error. push update:%d", ret);
+                return ret;
+        }
+        return LINK_SUCCESS;
 }
 
 void LinkUninitSegmentMgr() {
@@ -555,7 +568,15 @@ void LinkUninitSegmentMgr() {
         
         SegInfo segInfo;
         segInfo.nOperation = SEGMENT_QUIT;
-        segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        
+        int ret = 0;
+        while(ret <= 0) {
+                ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+                if (ret <= 0) {
+                        LinkLogError("seg queue error. notify quit:%d sleep 1 sec to retry", ret);
+                        sleep(1);
+                }
+        }
         
         pthread_join(segmentMgr.segMgrThread_, NULL);
         return;

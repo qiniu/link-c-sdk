@@ -240,7 +240,9 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
         
         int ret = pTsMuxCtx->pTsUploader_->Push(pTsMuxCtx->pTsUploader_, (char *)buf, buf_size);
         if (ret < 0){
-                if (ret == LINK_Q_OVERWRIT) {
+                if (ret == LINK_Q_OVERFLOW) {
+                        LinkLogWarn("write ts to queue overflow:%d", ret);
+		} else if (ret == LINK_Q_OVERWRIT) {
                         LinkLogWarn("write ts to queue overwrite:%d", ret);
                 } else if (ret == LINK_NO_MEMORY){
                         LinkLogWarn("write ts to queue no memory:%d", ret);
@@ -628,6 +630,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
         if (pFFTsMuxUploader->nUploadBufferSize != 0) {
                 return pFFTsMuxUploader->nUploadBufferSize;
         }
+	return 128 * 1024;
         int nSize = 256*1024;
         int64_t nTotalMemSize = 0;
         int nRet = 0;

@@ -67,6 +67,10 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
         sig.pData = sig.pFileName + nFileNameLen + 1;
         memcpy(sig.pData, pBuf, nBuflen);
         int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+        if (ret <= 0) {
+                free(sig.pFileName);
+                LinkLogError("pic push queue error:%d", ret);
+        }
 
         return ret;
 }
@@ -79,13 +83,14 @@ static void * listenPicUpload(void *_pOpaque)
                 LinkPicUploadSignal sig;
                 int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60);
-                fprintf(stderr, "----->pu receive a signal:%d\n", sig.signalType_);
-                memset(&info, 0, sizeof(info));
-                pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
-                LinkLogDebug("signal queue:%d", info.nLen_);
+                fprintf(stderr, "----->pu receive a signal:%d %d\n", sig.signalType_, ret);
                 if (ret == LINK_TIMEOUT) {
                         continue;
                 }
+                memset(&info, 0, sizeof(info));
+                pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
+                LinkLogDebug("signal queue:%d", info.nLen_);
+                
                 LinkPicUploadSignal *pUpInfo;
                 if (ret == sizeof(LinkPicUploadSignal)) {
 
@@ -161,7 +166,15 @@ static int waitUploadMgrThread(void * _pOpaque) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(sig));
         sig.signalType_ = LinkPicUploadSignalStop;
-        p->pSignalQueue_->Push(p->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+        
+        int ret = 0;
+        while(ret <= 0) {
+                ret = p->pSignalQueue_->Push(p->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+                if (ret <= 0) {
+                        LinkLogError("pic queue error. notify quit:%d sleep 1 sec to retry", ret);
+                        sleep(1);
+                }
+        }
         
         pthread_join(p->workerId_, NULL);
         LinkDestroyQueue(&p->pSignalQueue_);
@@ -176,7 +189,7 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         }
         memset(pPicUploader, 0, sizeof(PicUploader));
         
-        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 0, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 50);
+        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 50);
         if (ret != 0) {
                 free(pPicUploader);
                 return ret;
