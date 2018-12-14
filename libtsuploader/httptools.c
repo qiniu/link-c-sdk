@@ -48,11 +48,15 @@ static int linkSimpleHttpRequest(IN int isPost,
         status = ghttp_process(pRequest);
         if (status == ghttp_error) {
                 if (ghttp_is_timeout(pRequest)) {
-                        LinkLogError("ghttp_process timeout [%s]", ghttp_get_error(pRequest));
+                        LinkLogError("ghttp_process timeout[%s] url[%s]", ghttp_get_error(pRequest), pUrl);
                         ghttp_request_destroy(pRequest);
                         return LINK_TIMEOUT;
                 } else {
-                        LinkLogError("ghttp_process fail [%s] resp[%s]", ghttp_get_error(pRequest), ghttp_get_body(pRequest));
+                        char *pBody = ghttp_get_body(pRequest);
+                        if (pBody == NULL)
+                                LinkLogError("ghttp_process fail[%s] url[%s]", ghttp_get_error(pRequest), pUrl);
+                        else
+                                LinkLogError("ghttp_process fail[%s] resp[%s]", ghttp_get_error(pRequest), ghttp_get_body(pRequest));
                         ghttp_request_destroy(pRequest);
                         return LINK_GHTTP_FAIL;
                 }

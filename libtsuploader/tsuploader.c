@@ -11,6 +11,7 @@
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
+#include <unistd.h>
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
@@ -202,16 +203,13 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nLastFrameTimestamp - pSession->nFirstFrameTimestamp;
-        if (pKodoUploader->uploadArg.nSegmentId_ == 0) {
-                pKodoUploader->uploadArg.nSegmentId_ = pSession->nSessionStartTime;
-        }
         
         handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
         
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
         
-        uint64_t nSegmentId = pKodoUploader->uploadArg.nSegmentId_;
+        uint64_t nSegmentId = pSession->nSessionStartTime;
         
         int nDeleteAfterDays_ = 0;
         int nDeadline = 0;
@@ -297,7 +295,7 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         
         if (pKodoUploader->pUpMeta != NULL) {
                 pKodoUploader->pQueue_ = NULL;
-                int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 0, pKodoUploader->policy,
+                int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 1, pKodoUploader->policy,
                                              pKodoUploader->nMaxItemLen, pKodoUploader->nInitItemCount);
                 if (ret != 0) {
                         free(pKodoUploader->pUpMeta);
@@ -351,8 +349,12 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         } else {
                 LinkLogDebug("-------->push a queue\n", nCurCacheNum);
                 int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
-                if (ret == LINK_SUCCESS)
+                if (ret > 0)
                         pKodoUploader->nTsCacheNum++;
+                else {
+                        LinkLogError("ts queue error. push ts to upload:%d", ret);
+                        LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
+                }
         }
         allocDataQueueAndUploadMeta(pKodoUploader);
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
@@ -387,7 +389,11 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, int64_t _nTimestamp, int64_t n
         tmcmd.time.nAvTimestamp = _nTimestamp;
         tmcmd.time.nSysTimestamp = nSysNanotime;
         
-        pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
+        int ret;
+        ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
+        if (ret <= 0) {
+                LinkLogError("ts queue error. push report time:%d", ret);
+        }
         
         return;
 }
@@ -425,11 +431,10 @@ static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimesta
         if (pKodoUploader->uploadArg.UploadUpdateSegmentId) {
                 if (isForceNewSession)
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                       &pKodoUploader->uploadArg, &pKodoUploader->session,
-                                                                       nSysTimestamp, 0);
+                                                                       &pKodoUploader->session, nSysTimestamp, 0);
                 else
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                       &pKodoUploader->uploadArg, &pKodoUploader->session,
+                                                                       &pKodoUploader->session,
                                                                        pKodoUploader->session.nTsStartTime, nSysTimestamp);
         }
 }
@@ -474,8 +479,6 @@ static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
         
         if (pKodoUploader->session.nTsStartTime <= 0)
                 pKodoUploader->session.nTsStartTime = pTi->nSysTimestamp;
-        if (pKodoUploader->uploadArg.nSegmentId_ <= 0)
-                pKodoUploader->uploadArg.nSegmentId_ = pTi->nSysTimestamp;
         
         int64_t nDiffVideo = pTi->nAvTimestamp - pKodoUploader->session.nLastVideoFrameTimestamp;
         
@@ -505,8 +508,12 @@ static void * listenTsUpload(void *_pOpaque)
                 TsUploaderCommand cmd;
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
                                                                       sizeof(TsUploaderCommand), 24 * 60 * 60);
-                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-                if (ret == LINK_TIMEOUT) {
+                pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
+                //LinkLogDebug("ts queue:%d", info.nLen_);
+                if (ret <= 0) {
+                        if (ret != LINK_TIMEOUT) {
+                                LinkLogError("seg queue error. pop:%d", ret);
+                        }
                         continue;
                 }
                 
@@ -562,7 +569,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return ret;
         }
         
-        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 0, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 512);
+        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 1, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 512);
         if (ret != 0) {
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 free(pKodoUploader);
@@ -607,7 +614,15 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         
         TsUploaderCommand uploadCommand;
         uploadCommand.nCommandType = LINK_TSU_QUIT;
-        pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+        
+        int ret = 0;
+        while(ret <= 0) {
+                ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+                if (ret <= 0) {
+                        LinkLogError("ts queue error. notify quit:%d sleep 1 sec to retry", ret);
+                        sleep(1);
+                }
+        }
         
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);

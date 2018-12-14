@@ -8,6 +8,7 @@
 
 enum CircleQueuePolicy{
         TSQ_FIX_LENGTH,
+        TSQ_FIX_LENGTH_CAN_OVERWRITE,
         TSQ_VAR_LENGTH,
         TSQ_APPEND
 };
