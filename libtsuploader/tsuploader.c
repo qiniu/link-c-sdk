@@ -509,7 +509,7 @@ static void * listenTsUpload(void *_pOpaque)
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
                                                                       sizeof(TsUploaderCommand), 24 * 60 * 60);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-                LinkLogDebug("ts queue:%d", info.nLen_);
+                //LinkLogDebug("ts queue:%d", info.nLen_);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("seg queue error. pop:%d", ret);
