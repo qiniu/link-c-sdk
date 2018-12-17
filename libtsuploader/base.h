@@ -24,7 +24,7 @@
 #define LINK_MAX_DEVICE_NAME_LEN 200
 #define LINK_MAX_SESSION_ID_LEN 20
 
-#define LINK_USE_OLD_NAME
+//#define LINK_USE_OLD_NAME
 
 typedef struct {
         int64_t nTimestamp90Khz;
@@ -45,8 +45,7 @@ typedef struct {
         IN OUT int nSegUrlLen;
         IN char* pDeviceName;
         IN OUT int nDeviceNameLen;
-        IN char* pApp;
-        IN OUT int nAppLen;
+
         int64_t nSeqNum;
         int nTokenDeadline;
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
@@ -107,8 +106,6 @@ typedef struct _LinkMediaArg{
 typedef struct _LinkUserUploadArg{
         const char *pDeviceName;
         int   nDeviceNameLen;
-        const char * pApp;
-        size_t nAppLen;
         const char * pConfigRequestUrl;
         size_t nConfigRequestUrlLen;
         const char *pDeviceAk;
@@ -129,8 +126,6 @@ typedef struct _LinkUploadArg {
         LinkVideoFormat nVideoFormat;           /**< 视频格式 */
         const char * pDeviceName;               /**< 设备名 */
         size_t nDeviceNameLen;                  /**< 设备名长度 */
-        const char * pApp;                      /**< 命名空间 */
-        size_t nAppLen;                         /**< 命名空间长度 */
         const char * pConfigRequestUrl;         /**< 获取业务配置的请求地址 */
         size_t nConfigRequestUrlLen;            /**< 业务配置的请求地址长度 */
         const char *pDeviceAk;                  /**< 设备 APP KEY */

@@ -51,8 +51,6 @@ typedef struct  {
         char *pMgrTokenRequestUrl;
         char *pUpTokenRequestUrl;
         char *pUpHostUrl;
-        char *pAppId;
-        char *pDeviceName;
         int isValid;
         
         //not use now
@@ -84,7 +82,6 @@ typedef struct _FFTsMuxUploader{
         int nUploadBufferSize;
         
         char deviceName_[LINK_MAX_DEVICE_NAME_LEN+1];
-        char app_[LINK_MAX_APP_LEN+1];
         Token token_;
         LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
@@ -883,16 +880,6 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
                 pRc->pUpTokenRequestUrl = NULL;
         }
         
-        if (pRc->pAppId) {
-                free(pRc->pAppId);
-                pRc->pAppId = NULL;
-        }
-        
-        if (pRc->pDeviceName) {
-                free(pRc->pDeviceName);
-                pRc->pDeviceName = NULL;
-        }
-        
         return;
 }
 
@@ -917,7 +904,6 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         int ret = 0;
         
         memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
-        memcpy(pFFTsMuxUploader->app_, _pUserUploadArg->pApp, _pUserUploadArg->nAppLen);
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = pFFTsMuxUploader;
@@ -1060,14 +1046,9 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                         memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
                 }
         }
-        
+
 #ifdef LINK_USE_OLD_NAME
         char *pDeviceName = pFFTsMuxUploader->deviceName_;
-        char *pApp = pFFTsMuxUploader->app_;
-#else
-        char *pDeviceName = pFFTsMuxUploader->remoteConfig.pDeviceName;
-        char *pApp = pFFTsMuxUploader->remoteConfig.pAppId;
-#endif
         
         if (pParam->pDeviceName != NULL) {
                 int nDeviceNameLen = strlen(pDeviceName);
@@ -1080,18 +1061,7 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->nDeviceNameLen = nDeviceNameLen;
                 pParam->pDeviceName[nDeviceNameLen] = 0;
         }
-        
-        if (pParam->pApp != NULL) {
-                int nAppLen = strlen(pApp);
-                if (pParam->nAppLen - 1 < nAppLen) {
-                        LinkLogError("get segurl buffer is small:%d %d", pApp, nAppLen);
-                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                        return LINK_BUFFER_IS_SMALL;
-                }
-                memcpy(pParam->pApp, pApp, nAppLen);
-                pParam->nAppLen = nAppLen;
-                pParam->pApp[nAppLen] = 0;
-        }
+#endif
         
         
         if (pParam->pAk != NULL) {
@@ -1125,13 +1095,26 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
 
 int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg *_pAvArg,
                                             const LinkUserUploadArg *_pUserUploadArg, const LinkPicUploadArg *_pPicArg) {
+
         if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN
-            || _pUserUploadArg->nAppLen > 32 || _pUserUploadArg->nDeviceNameLen > 32) {
+#ifdef LINK_USE_OLD_NAME
+            || _pUserUploadArg->nDeviceNameLen > LINK_MAX_DEVICE_NAME_LEN
+#endif
+            ) {
                 LinkLogError("ak or sk or app or devicename is too long");
                 return LINK_ARG_TOO_LONG;
         }
+
+        if (_pUserUploadArg->nDeviceAkLen > DEVICE_AK_LEN || _pUserUploadArg->nDeviceSkLen > DEVICE_SK_LEN) {
+                LinkLogError("ak or sk or app or devicename is too long");
+                return LINK_ARG_TOO_LONG;
+        }
+
         if (_pUserUploadArg->nDeviceAkLen <= 0 || _pUserUploadArg->nDeviceSkLen <= 0
-            || _pUserUploadArg->nAppLen <= 0 || _pUserUploadArg->nDeviceNameLen <= 0) {
+#ifdef LINK_USE_OLD_NAME
+             || _pUserUploadArg->nDeviceNameLen <= 0
+#endif
+            ) {
                 LinkLogError("ak or sk or app or devicename is not exits");
                 return LINK_ARG_ERROR;
         }
@@ -1393,17 +1376,6 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         pRc->updateConfigInterval = pNode->valueint;
         
         
-        ret = getJsonString(&pRc->pAppId, "appId", pJsonRoot);
-        if (ret != LINK_SUCCESS) {
-                        goto END;
-        }
-        
-        ret = getJsonString(&pRc->pDeviceName, "deviceName", pJsonRoot);
-        if (ret != LINK_SUCCESS) {
-                goto END;
-        }
-        
-        
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
         if (pSeg == NULL) {
                 cJSON_Delete(pJsonRoot);
@@ -1589,7 +1561,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                           
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
-                                LinkLogInfo("sleep %d time to get remote config", nNextTryRcTime);
+                                LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime, ret);
                                 rcSleepUntilTime = now + nNextTryRcTime;
                                 nNextTryRcTime *= 2;
                                 shouldUpdateRc = 1;
