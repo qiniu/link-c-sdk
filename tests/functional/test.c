@@ -1041,9 +1041,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pAk);
         avuploader.userUploadArg.pDeviceSk = cmdArg.pSk;
         avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pSk);
-        avuploader.userUploadArg.pApp = cmdArg.pApp1;
-        avuploader.userUploadArg.nAppLen = strlen(cmdArg.pApp1);
-        
+
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
@@ -1065,27 +1063,9 @@ int main(int argc, const char** argv)
                 }
                 printf("two file upload: threadid:%x\n", secondUploadThread);
                 do_start_file_test(&avuploader);
-#ifdef TEST_WITH_FFMPEG
-	} else if (cmdArg.IsTwoUpload) {
-                ret = pthread_create(&secondUploadThread, NULL, second_test, NULL);
-                if (ret != 0) {
-                        printf("create update token thread fail\n");
-                        return ret;
-                }
-                
-                do_start_file_test(&avuploader);
-#endif
+
         } else {
-#ifdef TEST_WITH_FFMPEG
-                if (cmdArg.IsInputFromFFmpeg) {
-                        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
-                        //start_ffmpeg_test("rtmp://live.hkstv.hk.lxdns.com/live/hks", dataCallback, NULL);
-                } else {
-                        do_start_file_test(&avuploader);
-                }
-#else
                 do_start_file_test(&avuploader);
-#endif
         }
         
         sleep(1);

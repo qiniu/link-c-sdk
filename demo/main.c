@@ -245,10 +245,6 @@ int _TsUploaderSdkInit( StreamChannel ch )
     userUploadArg.nVideoFormat = LINK_VIDEO_H264;
     userUploadArg.pDeviceName = gIpc.stream[ch].devId;
     userUploadArg.nDeviceNameLen = strlen(gIpc.stream[ch].devId);
-    if ( gIpc.config.appName ) {
-        userUploadArg.pApp = gIpc.config.appName;
-        userUploadArg.nAppLen = strlen(gIpc.config.appName);
-    }
     userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
     userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
     if ( gIpc.config.ak ) {
