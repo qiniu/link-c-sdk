@@ -4,9 +4,6 @@
 #include "log.h"
 #include <pthread.h>
 #include "servertime.h"
-#ifndef USE_OWN_TSMUX
-#include <libavformat/avformat.h>
-#endif
 #include "fixjson.h"
 #include "segmentmgr.h"
 #include "httptools.h"
@@ -18,11 +15,6 @@ int LinkInit()
         if (nProcStatus) {
                 return LINK_SUCCESS;
         }
-#ifndef USE_OWN_TSMUX
-    #if LIBAVFORMAT_VERSION_MAJOR < 58
-        av_register_all();
-    #endif
-#endif
         LinkInitSn();
         
         setenv("TZ", "GMT-8", 1);
