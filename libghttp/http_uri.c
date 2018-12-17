@@ -88,11 +88,15 @@ http_uri_parse(const char *a_string,
 	      /* only do this if a uri was passed in */
 	      if (a_uri)
 		{
-		  a_uri->host = (char *)malloc(l_end_string - l_start_string + 1);
+                  char *tmp = l_end_string;
+                  while(*tmp != '/' && *tmp != 0) {
+                          tmp++;
+                  }
+		  a_uri->host = (char *)malloc(tmp - l_start_string + 1);
 		  /* copy the data */
-		  memcpy(a_uri->host, l_start_string, (l_end_string - l_start_string));
+		  memcpy(a_uri->host, l_start_string, (tmp - l_start_string));
 		  /* terminate */
-		  a_uri->host[l_end_string - l_start_string] = '\0';
+		  a_uri->host[tmp - l_start_string] = '\0';
 		}
 	      /* reset the counters */
 	      l_end_string++;

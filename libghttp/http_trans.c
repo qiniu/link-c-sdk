@@ -101,22 +101,32 @@ http_trans_connect(http_trans_conn *a_conn)
       /* look up the name of the proxy if it's there. */
       if (a_conn->proxy_host)
 	{
+          char *tmp = strrchr(a_conn->host, ':');
+          if (tmp) 
+            *tmp = 0;
 	  if ((dnserr = get_host_by_name(a_conn->proxy_host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
+              *tmp = ':';
 	      goto ec;
 	    }
+            *tmp = ':';
 	}
       else
 	{
 	  /* look up the name */
+          char *tmp = strrchr(a_conn->host, ':');
+          if (tmp) 
+            *tmp = 0;
 	  if ((dnserr = get_host_by_name(a_conn->host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
+                *tmp = ':';
 	      goto ec;
 	    }
+            *tmp = ':';
 	}
       /* set up the saddr */
       a_conn->saddr.sin_family = AF_INET;
