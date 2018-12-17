@@ -49,8 +49,6 @@ typedef struct {
         const char *pConfigUrl;
         const char *pUa1;
         const char *pUa2;
-        const char *pApp1;
-        const char *pApp2;
         const char *pAk;
         const char *pSk;
         bool IsFileLoop;
@@ -759,9 +757,6 @@ static void checkCmdArg(const char * name)
                 if (cmdArg.pUa1 == NULL) {
                         cmdArg.pUa1 = "ipc99a";
                 }
-                if (cmdArg.pApp1 == NULL) {
-                        cmdArg.pApp1 = "app99";
-                }
         }
         
         if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture || cmdArg.IsJustTestSegment) {
@@ -918,7 +913,6 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-        printf("cmdArg.pApp1=%s\n", cmdArg.pApp1);
         printf("cmdArg.pUa1=%s\n", cmdArg.pUa1);
         printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
@@ -1041,7 +1035,7 @@ int main(int argc, const char** argv)
         avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pAk);
         avuploader.userUploadArg.pDeviceSk = cmdArg.pSk;
         avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pSk);
-
+        
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {
                 fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
