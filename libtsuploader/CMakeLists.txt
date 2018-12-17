@@ -19,13 +19,6 @@ else()
     add_definitions(-DDISABLE_OPENSSL)
 endif()
 
-if (WITH_FFMPEG)
-    message("WITH_FFMPEG")
-else()
-    message("WITHOUT_FFMPEG")
-    add_definitions(-DUSE_OWN_TSMUX)
-endif()
-
 add_library(tsuploader STATIC
     resource.c
     resource.h
