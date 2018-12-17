@@ -69,18 +69,21 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 // LinkMediaArg *_pAvArg, IN LinkPicUploadArg *_pPicArg
 int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
-        if ( _pUserUploadArg == NULL ||_pUserUploadArg->pDeviceName == NULL || _pUserUploadArg->nDeviceNameLen == 0
-            ||_pUserUploadArg->pApp == NULL || _pUserUploadArg->nAppLen == 0
+        if ( _pUserUploadArg == NULL
+#ifdef LINK_USE_OLD_NAME
+            ||_pUserUploadArg->pDeviceName == NULL || _pUserUploadArg->nDeviceNameLen == 0
+#endif
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
                 LinkLogError("app or deviceName or ak or sk argument is null");
                 return LINK_ARG_ERROR;
         }
-        if (_pUserUploadArg->nAppLen > LINK_MAX_APP_LEN || _pUserUploadArg->nDeviceNameLen > LINK_MAX_DEVICE_NAME_LEN) {
-                LinkLogError("app or deviceName is too long:%d %d", _pUserUploadArg->nAppLen,
-                             _pUserUploadArg->nDeviceNameLen);
+#ifdef LINK_USE_OLD_NAME
+        if (_pUserUploadArg->nDeviceNameLen > LINK_MAX_DEVICE_NAME_LEN) {
+                LinkLogError("app or deviceName is too long: %d", _pUserUploadArg->nDeviceNameLen);
                 return LINK_ARG_ERROR;
         }
+#endif
         
         LinkMediaArg avArg;
         avArg.nAudioFormat = _pUserUploadArg->nAudioFormat;
@@ -94,8 +97,6 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         LinkUserUploadArg userUploadArg;
         memset(&userUploadArg, 0, sizeof(userUploadArg));
-        userUploadArg.nAppLen = _pUserUploadArg->nAppLen;
-        userUploadArg.pApp = _pUserUploadArg->pApp;
         userUploadArg.pDeviceName = _pUserUploadArg->pDeviceName;
         userUploadArg.nDeviceNameLen = _pUserUploadArg->nDeviceNameLen;
         userUploadArg.pConfigRequestUrl = _pUserUploadArg->pConfigRequestUrl;

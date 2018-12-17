@@ -149,14 +149,11 @@ static void updateSegmentFile(SegInfo segInfo) {
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         char upHost[192] = {0};
-        char app[LINK_MAX_APP_LEN+1];
         char deviceName[LINK_MAX_DEVICE_NAME_LEN+1];
         char uptoken[1536] = {0};
         
         param.pDeviceName = deviceName;
         param.nDeviceNameLen = sizeof(deviceName);
-        param.pApp = app;
-        param.nAppLen = sizeof(app);
         if (isNewSeg) {
                 param.pTokenBuf = uptoken;
                 param.nTokenBufLen = sizeof(uptoken);
