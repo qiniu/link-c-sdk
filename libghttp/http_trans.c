@@ -108,10 +108,12 @@ http_trans_connect(http_trans_conn *a_conn)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
-              *tmp = ':';
+              if (tmp) 
+                *tmp = ':';
 	      goto ec;
 	    }
-            *tmp = ':';
+            if (tmp) 
+              *tmp = ':';
 	}
       else
 	{
@@ -123,10 +125,12 @@ http_trans_connect(http_trans_conn *a_conn)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
+              if (tmp) 
                 *tmp = ':';
 	      goto ec;
 	    }
-            *tmp = ':';
+            if (tmp) 
+              *tmp = ':';
 	}
       /* set up the saddr */
       a_conn->saddr.sin_family = AF_INET;

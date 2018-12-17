@@ -902,8 +902,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         memcpy(pFFTsMuxUploader->sk, _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
         
         int ret = 0;
-        
+#ifdef LINK_USE_OLD_NAME
         memcpy(pFFTsMuxUploader->deviceName_, _pUserUploadArg->pDeviceName, _pUserUploadArg->nDeviceNameLen);
+#endif
         
         if (isWithPicAndSeg) {
                 pFFTsMuxUploader->uploadArgBak.pUploadArgKeeper_ = pFFTsMuxUploader;
@@ -1341,24 +1342,24 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         int nRespLen = 0, ret = 0;
         
         int nOffsetHost = snprintf(buf, sizeof(buf), "%s", pFFTsMuxUploader->pConfigRequestUrl);
-        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s\n", gSn);
-        const char *pInput = strchr(buf+8, '/');
+        int nOffset = snprintf(buf+nOffsetHost, sizeof(buf)-nOffsetHost, "?sn=%s", gSn);
         
-        //const char *pInput = (const char *)buf + nOffsetHost;
-        char *pOutput = buf + nOffsetHost + nOffset + 1;
-        int nOutputLen = sizeof(buf) - nOffset - nOffsetHost - 1;
+        int nUrlLen = nOffsetHost + nOffset;
+        buf[nUrlLen] = 0;
+        char * pToken = buf + nUrlLen + 1;
+        int nTokenOffset = snprintf(pToken, sizeof(buf)-nUrlLen-1, "%s:", pFFTsMuxUploader->ak);
+        int nOutputLen = 30;
         
-        ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, strlen(pInput), pOutput, &nOutputLen);
+        //static int getHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlWithPathAndQuery, char *pContentType,
+        //char *pData, int nDataLen, char *pOutput, int *pOutputLen)
+        ret = GetHttpRequestSign(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), "GET", buf, NULL, NULL,
+                                        0, pToken+nTokenOffset, &nOutputLen);
         if (ret != LINK_SUCCESS) {
+                LinkLogError("getHttpRequestSign error:%d", ret);
                 return ret;
         }
-        buf[nOffsetHost + nOffset - 1] = 0;
-
-        char *pToken = pOutput + nOutputLen;
-        int nTokenOffset = snprintf(pToken, 42, "%s:", pFFTsMuxUploader->ak);
-        int nB64Len = urlsafe_b64_encode(pOutput, nOutputLen, pToken + nTokenOffset, 30);
         
-        ret = LinkGetUserConfig(buf, buf, nBufLen, &nRespLen, pToken, nTokenOffset+nB64Len);
+        ret = LinkGetUserConfig(buf, buf, nBufLen, &nRespLen, pToken, nTokenOffset+nOutputLen);
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
@@ -1389,14 +1390,14 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 goto END;
         }
         
-        ret = getJsonString(&pRc->pUpTokenRequestUrl, "tokenRequestUrl", pSeg);
+        ret = getJsonString(&pRc->pUpTokenRequestUrl, "uploadTokenRequestUrl", pSeg);
         if (ret == LINK_SUCCESS) {
                 LinkLogInfo("tokenRequestUrl:%s", pRc->pUpTokenRequestUrl);
         } else if (ret == LINK_NO_MEMORY) {
                 goto END;
         }
         
-        ret = getJsonString(&pRc->pMgrTokenRequestUrl, "segReportUrl", pSeg);
+        ret = getJsonString(&pRc->pMgrTokenRequestUrl, "segmentReportUrl", pSeg);
         if (ret == LINK_SUCCESS) {
                 LinkLogInfo("segReportUrl:%s", pRc->pMgrTokenRequestUrl);
         } else if (ret == LINK_NO_MEMORY) {
@@ -1458,30 +1459,23 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         }
         
         
-        int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"\n", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
-                 pSParam->sessionId, pSParam->nSeqNum);
-        
-        // /v1/device/uploadtoken?session=<session>&sequence=<sequence>memset(pRc, 0, sizeof(RemoteConfig));
-
-        const char *pInput = strchr(pBuf+8, '/');
-        char *pOutput = pBuf + nUrlLen + 1;
-        int nOutputLen = nBufLen - nUrlLen - 1;
-        
-        int ret = HmacSha1(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), pInput, strlen(pInput), pOutput, &nOutputLen);
+        int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
+                                             pSParam->sessionId, pSParam->nSeqNum);
+        pBuf[nUrlLen] = 0;
+        char * pToken = pBuf + nUrlLen + 1;
+        int nTokenOffset = snprintf(pToken, sizeof(pBuf)-nUrlLen-1, "%s:", pFFTsMuxUploader->ak);
+        int nOutputLen = 30;
+        int ret = GetHttpRequestSign(pFFTsMuxUploader->sk, strlen(pFFTsMuxUploader->sk), "GET", pBuf, NULL, NULL,
+                                 0, pToken+nTokenOffset, &nOutputLen);
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 free(pPrefix);
+                LinkLogError("getHttpRequestSign error:%d", ret);
                 return ret;
         }
-        pBuf[nUrlLen-1] = 0;
-        
-        char *pToken = pOutput + nOutputLen;
-        int nTokenOffset = snprintf(pToken, 42, "%s:", pFFTsMuxUploader->ak);
-        int nB64Len = urlsafe_b64_encode(pOutput, nOutputLen, pToken + nTokenOffset, 30);
         
         
-        
-        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pPrefix, nPrefixLen, pBuf, pToken, nTokenOffset+nB64Len);
+        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pPrefix, nPrefixLen, pBuf, pToken, nTokenOffset+nOutputLen);
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 free(pPrefix);
@@ -1522,7 +1516,9 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 int nWaitRc = rcSleepUntilTime - now;
                 int nWaitToken = tokenSleepUntilTime - now;
                 int nWait = nWaitRc;
+                int nRcTimeout = 1;
                 if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
+                        nRcTimeout = 0;
                         nWait = nWaitToken;
                 }
                 //fprintf(stderr, "sleep:%d\n", nWait);
@@ -1552,7 +1548,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 }
                 
                 int getRcOk = 0; // after getRemoteConfig success,must update token
-                if (param.nType == 2 || shouldUpdateRc || ret == LINK_TIMEOUT) {
+                if (param.nType == 2 || shouldUpdateRc || (ret == LINK_TIMEOUT && nRcTimeout)) {
                         getRcOk = 0;
                         memset(&rc, 0, sizeof(rc));
                         ret = getRemoteConfig(pFFTsMuxUploader, &rc);

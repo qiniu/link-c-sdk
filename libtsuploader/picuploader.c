@@ -138,15 +138,15 @@ static void * listenPicUpload(void *_pOpaque)
                                                 char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
                                                 memset(key, 0, sizeof(key));
 #ifdef LINK_USE_OLD_NAME
-                                                snprintf(key, sizeof(key), "frame_%s_%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
+                                                snprintf(key, sizeof(key), "frame,%s,%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
 #else
                                                 char *tmp = param.pFilePrefix;
                                                 while(*tmp != 0) {
                                                         if (*tmp == '/')
-                                                            *tmp = '_';
+                                                            *tmp = ',';
                                                         tmp++;
                                                 }
-                                                snprintf(key, sizeof(key), "%s_frame_%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
+                                                snprintf(key, sizeof(key), "%s,frame,%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
                                                          param.sessionId);
 #endif
                                                 pPicUploader->picUpSettings_.getPicCallback(
@@ -238,7 +238,7 @@ static void * uploadPicture(void *_pOpaque) {
                         n = pSig->pFileName;
                 }
                 while(*r != 0) {
-                        if (*r == '_') {
+                        if (*r == ',') {
                                 *r = '/';
                         }
                         r++;
