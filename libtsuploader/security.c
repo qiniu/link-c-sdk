@@ -2,6 +2,56 @@
 #include <openssl/hmac.h>
 #include "base.h"
 #include "wolfssl/wolfcrypt/sha.h"
+#include "b64/urlsafe_b64.h"
+
+int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlWithPathAndQuery, char *pContentType,
+                              char *pData, int nDataLen, char *pOutput, int *pOutputLen) {
+        int isHttps = 0;
+        if (memcmp(pUrlWithPathAndQuery, "http", 4) == 0) {
+                if (pUrlWithPathAndQuery[4] == 's')
+                        isHttps = 1;
+        }
+        char *hostStart = pUrlWithPathAndQuery+7+isHttps;
+        char *hostEnd = strchr(hostStart, '/');
+        if (hostEnd == NULL) {
+                LinkLogError("no path in url:", pUrlWithPathAndQuery);
+                return LINK_ARG_ERROR;
+        }
+        
+        int nBufLen = strlen(pUrlWithPathAndQuery) + nDataLen + 256;
+        char *buf = malloc(nBufLen);
+        if (buf == NULL) {
+                return LINK_NO_MEMORY;
+        }
+        
+        int nOffset = snprintf(buf, nBufLen, "%s ", method);
+
+        nOffset+= snprintf(buf+nOffset, nBufLen - nOffset, "%s", hostEnd);
+        
+        int nHostLen = hostEnd - hostStart;
+        nOffset+= snprintf(buf+nOffset, nBufLen - nOffset, "\nHost: ");
+        memcpy(buf + nOffset, hostStart, nHostLen);
+        nOffset += nHostLen;
+
+        if (pContentType) {
+                nOffset+= snprintf(buf+nOffset, nBufLen - nOffset, "\nContent-Type: %s", pContentType);
+        }
+        
+        buf[nOffset++] = '\n';
+        buf[nOffset++] = '\n';
+        if (nDataLen > 0) {
+                memcpy(buf + nOffset, pData, nDataLen);
+                nOffset += nDataLen;
+        }
+        
+        char sha1[20];
+        int nSha1 = 20;
+        int ret = HmacSha1(pKey, nKeyLen, buf, nOffset, sha1, &nSha1);
+        free(buf);
+        
+        urlsafe_b64_encode(sha1, 20, pOutput, pOutputLen);
+        return ret;
+}
 
 /*hmac-sha1 output is 160bit(20 byte)*/
 int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,

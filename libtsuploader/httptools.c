@@ -23,14 +23,16 @@ static int linkSimpleHttpRequest(IN int isPost,
                 ghttp_set_type(pRequest, ghttp_type_post);
                 if (pContentType == NULL) {
                         ghttp_set_header(pRequest, http_hdr_Content_Type, "application/x-www-form-urlencoded");
-                } else {
-                        ghttp_set_header(pRequest, http_hdr_Content_Type, pContentType);
                 }
                 if (nReqBodyLen > 0 && pReqBody != NULL)
                         ghttp_set_body(pRequest, pReqBody, nReqBodyLen);
         }
+        if (pContentType != NULL) {
+                ghttp_set_header(pRequest, http_hdr_Content_Type, pContentType);
+        }
+
         if (pToken) {
-                const char * prefix = " QiniuLinkingDevice ";
+                const char * prefix = "QiniuLinkingDevice ";
                 memcpy(tokenbuf, prefix, strlen(prefix));
                 memcpy(tokenbuf+strlen(prefix), pToken, nTokenLen);
                 tokenbuf[strlen(prefix) + nTokenLen] = 0;

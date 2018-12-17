@@ -297,8 +297,10 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  */
 static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         char buffer[1024];
-        char *body = buffer + 512;
-        int nReportHostLen = 512;
+        int nNotForBodyLen = 512;
+        char *body = buffer + nNotForBodyLen;
+        int nReportHostLen = sizeof(buffer) - nNotForBodyLen;
+        int nBodyLen = 0;
         LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
         if (s->nSessionEndResonCode != 0) {
@@ -307,14 +309,14 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         reason = "normal";
                 else if (s->nSessionEndResonCode == 3)
                         reason = "force";
-                sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
+                nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
                         " %"PRId64", \"endReason\": \"%s\" }",
                         s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
         } else {
-                sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
+                nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"}",
                         s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
@@ -340,32 +342,24 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                                                                  &param, LINK_UPLOAD_CB_GETPARAM);
         
         
-        const char *pInput = strchr(reportHost+8, '/');
-        if (pInput == NULL) {
-                pInput = reportHost + param.nSegUrlLen;
-        }
-        reportHost[param.nSegUrlLen] = '\n';
-        char *pOutput = reportHost + param.nSegUrlLen + 2;
-        int nOutputLen = nReportHostLen - param.nSegUrlLen  - 2;
-        
-        ret = HmacSha1(sk, param.nSkLen, pInput, strlen(pInput), pOutput, &nOutputLen);
+        int nUrlLen = param.nSegUrlLen;
+        reportHost[nUrlLen] = 0;
+        char * pToken = reportHost + nUrlLen + 1;
+        int nTokenOffset = snprintf(pToken, nNotForBodyLen-nUrlLen-1, "%s:", param.pAk);
+        int nOutputLen = 30;
+        ret = GetHttpRequestSign(param.pSk, param.nSkLen, "POST", reportHost, "application/json", body,
+                                     nBodyLen, pToken+nTokenOffset, &nOutputLen);
         if (ret != LINK_SUCCESS) {
+                LinkLogError("getHttpRequestSign error:%d", ret);
                 return ret;
         }
-        reportHost[param.nSegUrlLen] = 0;
-        
-        char *pToken = pOutput + nOutputLen;
-        int nTokenOffset = snprintf(pToken, 42, "%s:", ak);
-        int nB64Len = urlsafe_b64_encode(pOutput, nOutputLen, pToken + nTokenOffset, 30);
-        
-        
         
         char resp[256];
         memset(resp, 0, sizeof(resp));
         int respLen = sizeof(resp);
 
-        ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, strlen(body), "application/json",
-                                    pToken, nTokenOffset+nB64Len);
+        ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, nBodyLen, "application/json",
+                                    pToken, nTokenOffset+nOutputLen);
         if (ret != LINK_SUCCESS) {
                 LinkLogError("report session info fail:%d", ret);
                 return ret;

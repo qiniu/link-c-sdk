@@ -192,7 +192,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         pToken->nTokenLen = len;
         
         len = pToken->nFnamePrefixLen;
-        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"fnamePreifx\"", pToken->pFnamePrefix, &len);
+        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"fnamePrefix\"", pToken->pFnamePrefix, &len);
         if (ret != LINK_SUCCESS) {
                 pToken->nHttpRet = ret;
                 return 0;
