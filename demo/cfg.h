@@ -44,6 +44,7 @@ typedef struct {
     char *h264_file;
     char *aac_file;
     char *ota_url;
+    char *appName;
     int ota_check_interval;
     int ota_enable;
 } Config;

@@ -378,6 +378,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
     { CFG_MEMBER(ota_url), "OTA_URL", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
+    { CFG_MEMBER(appName), "APP_NAME", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },
     { CFG_MEMBER(multiChannel), "MULTI_CHANNEL", 0 },
