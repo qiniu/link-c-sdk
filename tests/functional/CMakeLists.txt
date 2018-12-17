@@ -3,7 +3,7 @@ cmake_minimum_required (VERSION 2.8)
 project(testupload)
 
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../libtsuploader")
 message( "line-8 HOST is " ${HOST} )
 message( "line-8 HOST is " ${CFLAGS} )
 
@@ -19,7 +19,7 @@ endif()
 if (WITH_OPENSSL)
     message("test WITH_OPENSSL")
     set(DISABLE_OPENSSL OFF)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/wolfssl/output/${HOST}/lib")
 else()
     message("test WITHOUT_OPENSSL")
     set(DISABLE_OPENSSL ON)
