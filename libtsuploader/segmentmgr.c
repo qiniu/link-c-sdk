@@ -43,7 +43,7 @@ typedef struct {
 
 typedef struct {
         pthread_t segMgrThread_;
-        LinkCircleQueue *pSegQueue_;
+        LinkQueue *pSegQueue_;
         Seg handles[8];
         int nQuit_;
 }SegmentMgr;
@@ -491,14 +491,14 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
 
 static void * segmetMgrRun(void *_pOpaque) {
         
-        LinkUploaderStatInfo info = {0};
-        while(!segmentMgr.nQuit_ || info.nLen_ != 0) {
+        LinkQueueInfo info = {0};
+        while(!segmentMgr.nQuit_ || info.nCount != 0) {
                 SegInfo segInfo = {0};
                 segInfo.handle = -1;
-                int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60);
+                int ret = segmentMgr.pSegQueue_->Pop(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60);
                 
-                segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
-                LinkLogDebug("segment queue:%d", info.nLen_);
+                segmentMgr.pSegQueue_->GetInfo(segmentMgr.pSegQueue_, &info);
+                LinkLogDebug("segment queue:%d", info.nCount);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("seg queue error. pop:%d", ret);
@@ -548,8 +548,8 @@ int LinkInitSegmentMgr() {
                 segmentMgr.handles[i].handle = -1;
         }
         
-        LinkCircleQueue *pQueue;
-        int ret = LinkNewCircleQueue(&pQueue, 1, TSQ_FIX_LENGTH, sizeof(SegInfo), 32);
+        LinkQueue *pQueue;
+        int ret = LinkNewCircleQueue(&pQueue, sizeof(SegInfo), 32, LQP_NONE);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&segMgrMutex);
                 return ret;

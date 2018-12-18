@@ -18,7 +18,7 @@ enum LinkPicUploadSignalType {
 typedef struct {
         LinkAsyncInterface asyncWait_;
         pthread_t workerId_;
-        LinkCircleQueue *pSignalQueue_;
+        LinkQueue *pSignalQueue_;
         int nQuit_;
         int64_t nCount_;
         LinkPicUploadFullArg picUpSettings_;
@@ -78,15 +78,15 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
-        LinkUploaderStatInfo info;
-        while(!pPicUploader->nQuit_ || info.nLen_ != 0) {
+        LinkQueueInfo info;
+        while(!pPicUploader->nQuit_ || info.nCount != 0) {
                 LinkPicUploadSignal sig;
-                int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
+                int ret = pPicUploader->pSignalQueue_->Pop(pPicUploader->pSignalQueue_, (char *)(&sig),
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60);
                 fprintf(stderr, "----->pu receive a signal:%d %d\n", sig.signalType_, ret);
                 memset(&info, 0, sizeof(info));
-                pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
-                LinkLogDebug("pic queue:%d", info.nLen_);
+                pPicUploader->pSignalQueue_->GetInfo(pPicUploader->pSignalQueue_, &info);
+                LinkLogDebug("pic queue:%d", info.nCount);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("pic queue error. pop:%d", ret);
@@ -190,7 +190,7 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         }
         memset(pPicUploader, 0, sizeof(PicUploader));
         
-        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 50);
+        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, sizeof(LinkPicUploadSignal) + sizeof(int), 50, LQP_NONE);
         if (ret != 0) {
                 free(pPicUploader);
                 return ret;

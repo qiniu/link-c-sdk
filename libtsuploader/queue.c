@@ -1,99 +1,98 @@
+/**
+ * @file queue.c
+ * @author Qiniu.com
+ * @copyright 2018(c) Shanghai Qiniu Information Technologies Co., Ltd.
+ * @brief link-c-sdk queue library file
+ */
+
 #include "queue.h"
-#include "base.h"
+
+/** @brief 队列实现结构体 */
+typedef struct _LinkQueueImp{
+        LinkQueue linkQueue_;           /**< 队列操作接口 */
+        LinkQueueProperty property_;    /**< 队列属性 */
+        char *pData_;                   /**< 队列数据指针 */
+        size_t nMaxItemLen_;            /**< 队列存储元素的最大单位大小 */
+        size_t nCap_;                   /**< 队列存储元素的最大个数,字节计数模式时表示最大字节数 */
+        size_t nStart_;                 /**< 队列头部游标 */
+        size_t nEnd_;                   /**< 队列尾部游标 */
+        size_t nCount_;                 /**< 队列已保存的元素个数,字节计数模式时表示已保存字节数 */
+        size_t nPushCnt_;               /**< 队列已推送元素统计 */
+        size_t nPopCnt_;                /**< 队列已弹出元素统计 */
+        size_t nDropCnt_;               /**< 队列不满足push条件时丢弃的元素统计 */
+        size_t nOverwriteCnt_;          /**< 队列元素被覆盖的次数 */
+        LinkQueueState state_;          /**< 队列当前状态 */
+        pthread_mutex_t mutex_;         /**< 线程互斥锁 */
+        pthread_cond_t condition_;      /**< 线程条件变量 */
+} LinkQueueImp;
 
 
-#define QUEUE_READ_ONLY_STATE 1
-#define QUEUE_TIMEOUT_STATE 2
-
-typedef struct _CircleQueueImp{
-        LinkCircleQueue circleQueue;
-        char *pData_;
-        int nCap_;
-        int nLen_;
-        int nLenInByte_;
-        int nStart_;
-        int nEnd_;
-        volatile int nQState_;
-        int nItemLen_;
-        pthread_mutex_t mutex_;
-        pthread_cond_t condition_;
-        enum CircleQueuePolicy policy;
-        LinkUploaderStatInfo statInfo;
-	int nIsAvailableAfterTimeout;
-}CircleQueueImp;
-
-static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen) {
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        if (nDataLen + pQueueImp->nLen_  > pQueueImp->nCap_) {
-                int newLen = pQueueImp->nCap_ * 3 / 2;
-                char *pTmp = (char *)realloc(pQueueImp->pData_, newLen);
-                if (pTmp == NULL) {
-                        pthread_mutex_unlock(&pQueueImp->mutex_);
-                        return LINK_NO_MEMORY;
-                }
-
-                pQueueImp->pData_ = pTmp;
-                pQueueImp->nCap_ = newLen;
-                pQueueImp->nLenInByte_ = newLen;
-        }
-        
-        memcpy(pQueueImp->pData_ + pQueueImp->nLen_, pData_, nDataLen);
-        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
-        pQueueImp->nLen_ += nDataLen;
-        return nDataLen;
+static void updateQueueState_(LinkQueue *_pQueue)
+{
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
+        pQueueImp->state_ = LQS_NONE;
+        if (pQueueImp->nCount_  ==  pQueueImp->nCap_)
+                pQueueImp->state_ |= LQS_FULL;
+        if (pQueueImp->nCount_  == 0)
+                pQueueImp->state_ |= LQS_EMPTY;
+        if(pQueueImp->nOverwriteCnt_ > 0)
+                pQueueImp->state_ |= LQS_OVERWIRTE;
+        if(pQueueImp->nDropCnt_ > 0)
+                pQueueImp->state_ |= LQS_DROP;
+        return;
 }
 
-static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
-{
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        assert(pQueueImp->nItemLen_ - sizeof(int) >= nDataLen);
 
+static size_t pushQueueNormal(LinkQueue *_pQueue, const char *_pData, size_t _nDataLen)
+{
+        if (NULL == _pData || NULL == _pQueue) {
+                return LINK_QUEUE_ERROR;
+        }
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
         pthread_mutex_lock(&pQueueImp->mutex_);
-        
-        if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
-                pQueueImp->statInfo.nDropped += nDataLen;
-                LinkLogWarn("queue is timeout dropped:%p", _pQueue);
+
+        if (pQueueImp->property_ & LQP_NO_PUSH) {
+                pQueueImp->nDropCnt_++;
+                LinkLogWarn("Queue is no push now.");
+                updateQueueState_(_pQueue);
                 pthread_mutex_unlock(&pQueueImp->mutex_);
-                return 0;
+                return LINK_QUEUE_NO_PUSH;
         }
-        if (pQueueImp->nQState_ == QUEUE_READ_ONLY_STATE) {
-                pQueueImp->statInfo.nDropped += nDataLen;
-                LinkLogWarn("queue is only readable now");
-                pthread_mutex_unlock(&pQueueImp->mutex_);
-                return LINK_NO_PUSH;
-        }
-        
-        if (pQueueImp->policy == TSQ_APPEND) {
-                int ret = queueAppendPush(_pQueue, pData_, nDataLen);
-                
-                pthread_mutex_unlock(&pQueueImp->mutex_);
-                if (ret > 0)
-                        pthread_cond_signal(&pQueueImp->condition_);
-                return ret;
-        }
-        
-        int nPos = pQueueImp->nEnd_;
-        if (pQueueImp->nLen_ < pQueueImp->nCap_) {
+
+        assert(pQueueImp->nMaxItemLen_ - sizeof(size_t) >= _nDataLen);
+        if (pQueueImp->nCount_ < pQueueImp->nCap_) {
+                /* | start              |        |          start     | */
+                /* |---========---------|   or   |=====-------========| */
+                /* |         end        |        |   end              | */
+                memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_, &_nDataLen, sizeof(size_t));
+                memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_ + sizeof(size_t), _pData, _nDataLen);
                 if(pQueueImp->nEnd_ + 1 == pQueueImp->nCap_){
                         pQueueImp->nEnd_ = 0;
                 } else {
                         pQueueImp->nEnd_++;
                 }
-                memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_, &nDataLen, sizeof(int));
-                memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_ + sizeof(int), pData_, nDataLen);
-                pQueueImp->nLen_++;
-                pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
+                pQueueImp->nCount_++;
+                pQueueImp->nPushCnt_++;
+                updateQueueState_(_pQueue);
+                LinkLogTrace("[QUEUE](!full) push buflen:%d queueLen:%d, queueCap:%d", _nDataLen, pQueueImp->nCount_, pQueueImp->nCap_);
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 pthread_cond_signal(&pQueueImp->condition_);
-                return nDataLen;
-        }
-        
-        if (pQueueImp->nLen_ == pQueueImp->nCap_) {
-                if (pQueueImp->policy == TSQ_FIX_LENGTH) {
-                        pthread_mutex_unlock(&pQueueImp->mutex_);
-                        pthread_cond_signal(&pQueueImp->condition_);
-                        return LINK_Q_OVERFLOW;
-                } else if (pQueueImp->policy == TSQ_FIX_LENGTH_CAN_OVERWRITE) {
+                return _nDataLen;
+        } else {
+                /* |   queue is full    | */
+                /* |====================| */
+                /* |                    | */
+                if (!(pQueueImp->property_ & LQP_VARIABLE_LENGTH)) {
+                        if (!(pQueueImp->property_ & LQP_OVERWRITEABLE)) {
+                                pQueueImp->nDropCnt_++;
+                                LinkLogWarn("[QUEUE] full and no overwrite, dropped:%p", _pQueue);
+                                updateQueueState_(_pQueue);
+                                pthread_mutex_unlock(&pQueueImp->mutex_);
+                                return 0;
+                        }
+                        /* If fix length, overwrite */
+                        memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_, &_nDataLen, sizeof(size_t));
+                        memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_  + sizeof(size_t), _pData, _nDataLen);
                         if(pQueueImp->nEnd_ + 1 == pQueueImp->nCap_){
                                 pQueueImp->nEnd_ = 0;
                                 pQueueImp->nStart_ = 0;
@@ -101,243 +100,362 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                                 pQueueImp->nEnd_++;
                                 pQueueImp->nStart_++;
                         }
-                        memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_, &nDataLen, sizeof(int));
-                        memcpy(pQueueImp->pData_ + nPos * pQueueImp->nItemLen_  + sizeof(int), pData_, nDataLen);
+                        pQueueImp->nPushCnt_++;
+                        pQueueImp->nOverwriteCnt_++;
+                        updateQueueState_(_pQueue);
+                        LinkLogTrace("[QUEUE](full fix length) push buflen:%d queueLen:%d, queueCap:%d", _nDataLen, pQueueImp->nCount_, pQueueImp->nCap_);
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         pthread_cond_signal(&pQueueImp->condition_);
-
-                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
-                        pQueueImp->statInfo.nOverwriteCnt++;
-                        return LINK_Q_OVERWRIT;
+                        return LINK_QUEUE_OVERWRIT;
                 } else {
-                        //TODO TSQ_VAR_LENGTH not used now. so there is may have bug
-                        int newLen = pQueueImp->nCap_ * 3 / 2;
-                        char *pTmp = (char *)malloc(pQueueImp->nItemLen_ * newLen);
-                        int nOriginCap = pQueueImp->nCap_;
-                        if (pTmp == NULL) {
-                                pthread_mutex_unlock(&pQueueImp->mutex_);
-                                return LINK_NO_MEMORY;
+                        /* If variable length, queue capacity expand 1.5 times when it is full */
+                        size_t nNewCap = (pQueueImp->nCap_ + 1) * 3 / 2;
+                        if (pQueueImp->nMaxItemLen_ * nNewCap > QUEUE_MIN_ALLOCATE) {
+                                char *pNewSpace = (char *)realloc(pQueueImp->pData_, pQueueImp->nMaxItemLen_ * nNewCap);
+                                if (NULL == pNewSpace) {
+                                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                                        return LINK_QUEUE_NO_MEMORY;
+                                }
+                                pQueueImp->pData_ = pNewSpace;
                         }
-                        
-                        
-                        if (pQueueImp->nStart_ == 0) {
-                                memcpy(pTmp, pQueueImp->pData_, pQueueImp->nLenInByte_);
-                        } else {
-                                memcpy(pTmp, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_,
-                                       pQueueImp->nLenInByte_ - pQueueImp->nStart_ * pQueueImp->nItemLen_);
-                                memcpy(pTmp + pQueueImp->nLenInByte_ - pQueueImp->nStart_ * pQueueImp->nItemLen_,
-                                       pQueueImp->pData_, pQueueImp->nEnd_ * pQueueImp->nItemLen_);
-                        }
-                        pQueueImp->nStart_ = 0;
-                        
-                        memcpy(pTmp + pQueueImp->nLenInByte_, &nDataLen, sizeof(int));
-                        memcpy(pTmp + pQueueImp->nLenInByte_+ sizeof(int), pData_, nDataLen);
-                        
-                        pQueueImp->nEnd_ = nOriginCap + 1;
-                        pQueueImp->nLen_++;
-                        
-                        pQueueImp->statInfo.nPushDataBytes_ += nDataLen;
-                        
-                        pQueueImp->nCap_ = newLen;
-                        free(pQueueImp->pData_);
-                        pQueueImp->pData_ = pTmp;
-                        pQueueImp->nLenInByte_ = newLen * pQueueImp->nItemLen_;
-                        
-                        pthread_mutex_unlock(&pQueueImp->mutex_);
-                        
-                        pthread_cond_signal(&pQueueImp->condition_);
 
-                        return nDataLen;
+                        if (pQueueImp->nStart_ == 0) {
+                                /* |start         |       |start               | */
+                                /* ||=============|  ==>  |==============------| */
+                                /* |end           |       |             end    | */
+                                pQueueImp->nEnd_ = pQueueImp->nCap_;
+                        } else {
+                                /* |     start    |       |            start   | */
+                                /* |=======|======|  ==>  |=======-------======| */
+                                /* |      end     |       |     end            | */
+                                memmove(pQueueImp->pData_ + pQueueImp->nMaxItemLen_ * (nNewCap - (pQueueImp->nCap_ - pQueueImp->nStart_)),
+                                                pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_,
+                                                (pQueueImp->nCap_ - pQueueImp->nStart_) * pQueueImp->nMaxItemLen_);
+                                pQueueImp->nStart_ = nNewCap - (pQueueImp->nCap_ - pQueueImp->nStart_);
+                        }
+                        pQueueImp->nCap_ = nNewCap;
+                        /* push new iterm into queue */
+                        memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_, &_nDataLen, sizeof(size_t));
+                        memcpy(pQueueImp->pData_ + pQueueImp->nEnd_ * pQueueImp->nMaxItemLen_ + sizeof(size_t), _pData, _nDataLen);
+                        if(pQueueImp->nEnd_ + 1 == pQueueImp->nCap_){
+                                pQueueImp->nEnd_ = 0;
+                        } else {
+                                pQueueImp->nEnd_++;
+                        }
+                        pQueueImp->nCount_++;
+                        pQueueImp->nPushCnt_++;
+                        updateQueueState_(_pQueue);
+                        LinkLogTrace("[QUEUE](full variable length) push buflen:%d queueLen:%d, queueCap:%d", _nDataLen, pQueueImp->nCount_, pQueueImp->nCap_);
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        pthread_cond_signal(&pQueueImp->condition_);
+                        return _nDataLen;
                 }
         }
-        
+        updateQueueState_(_pQueue);
         pthread_mutex_unlock(&pQueueImp->mutex_);
-        
-        return -1;
+        return LINK_QUEUE_ERROR;
 }
 
-static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
+static size_t popQueueNormal(LinkQueue *_pQueue, char *_pBuf, size_t _nBufLen, int64_t _nUSec)
 {
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        
-        pthread_mutex_lock(&pQueueImp->mutex_);
-        if (!pQueueImp->nIsAvailableAfterTimeout && pQueueImp->nQState_ == QUEUE_TIMEOUT_STATE) {
-                pthread_mutex_unlock(&pQueueImp->mutex_);
-                return LINK_TIMEOUT;
+        if (NULL == _pQueue || NULL == _pBuf) {
+                return LINK_QUEUE_ERROR;
         }
-        if (pQueueImp->nQState_ == QUEUE_READ_ONLY_STATE && pQueueImp->nLen_ == 0) {
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
+
+        pthread_mutex_lock(&pQueueImp->mutex_);
+
+        if (pQueueImp->property_ & LQP_NO_POP) {
                 pthread_mutex_unlock(&pQueueImp->mutex_);
                 return 0;
         }
-        
+        if ((pQueueImp->property_ & LQP_NO_PUSH) && (pQueueImp->nCount_ == 0)) {
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                return 0;
+        }
+
         int ret = 0;
-        while (pQueueImp->nLen_ == 0) {
-                struct timeval now;
-                gettimeofday(&now, NULL);
-                struct timespec timeout;
-                timeout.tv_sec = now.tv_sec + nUSec / 1000000;
-                timeout.tv_nsec = (now.tv_usec + nUSec % 1000000) * 1000;
-                
-                ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
-                if (ret == ETIMEDOUT) {
-                        pthread_mutex_unlock(&pQueueImp->mutex_);
-                        pQueueImp->nQState_ = QUEUE_TIMEOUT_STATE;
-                        return LINK_TIMEOUT;
+        while (pQueueImp->nCount_ == 0) {
+                if (_nUSec < 0 ) {
+                        ret = pthread_cond_wait(&pQueueImp->condition_, &pQueueImp->mutex_);
+                } else {
+                        struct timeval now;
+                        gettimeofday(&now, NULL);
+                        struct timespec timeout;
+                        timeout.tv_sec = now.tv_sec + _nUSec / 1000000;
+                        timeout.tv_nsec = (now.tv_usec + _nUSec % 1000000) * 1000;
+                        ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
+                        if (ret == ETIMEDOUT) {
+                                pthread_mutex_unlock(&pQueueImp->mutex_);
+                                return LINK_QUEUE_TIMEOUT;
+                        }
                 }
-                if (pQueueImp->nLen_ == 0) {
+
+                if (pQueueImp->nCount_ == 0) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
                         return 0;
                 }
         }
-        assert (pQueueImp->nLen_ != 0);
-        int nDataLen = 0;
-        memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, sizeof(int));
-        int nRemain = nDataLen - nBufLen;
-        LinkLogTrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, nBufLen, pQueueImp->nLen_);
+        assert (pQueueImp->nCount_ != 0);
+
+        size_t nDataLen = 0;
+        memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_, sizeof(size_t));
+
+        int32_t nRemain = nDataLen - _nBufLen;
+        LinkLogTrace("pop remain:%d pop:%d buflen:%d Count:%d", nRemain, nDataLen, _nBufLen, pQueueImp->nCount_);
         if (nRemain > 0) {
-                memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nBufLen);
-                memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, &nRemain, sizeof(int));
-                memmove(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int),
-                       pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int) + nBufLen,
+                memcpy(_pBuf, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_ + sizeof(size_t), _nBufLen);
+                memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_, &nRemain, sizeof(size_t));
+                memmove(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_ + sizeof(size_t),
+                       pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_ + sizeof(size_t) + _nBufLen,
                        nRemain);
-                nDataLen = nBufLen;
+                nDataLen = _nBufLen;
         } else {
-                memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nDataLen);
+                memcpy(_pBuf, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_ + sizeof(size_t), nDataLen);
+                memset(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nMaxItemLen_, 0, pQueueImp->nMaxItemLen_);
                 if (pQueueImp->nStart_ + 1 == pQueueImp->nCap_) {
                         pQueueImp->nStart_ = 0;
                 } else {
                         pQueueImp->nStart_++;
                 }
-                pQueueImp->nLen_--;
+                pQueueImp->nCount_--;
         }
-        
-        pQueueImp->statInfo.nPopDataBytes_ += nDataLen;
+        updateQueueState_(_pQueue);
         pthread_mutex_unlock(&pQueueImp->mutex_);
         return nDataLen;
 }
 
-
-static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nSec)
+static size_t pushQueueByteAppend(LinkQueue *_pQueue, const char *_pData, size_t _nDataLen)
 {
-        int64_t usec = 1000000;
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        if (pQueueImp->statInfo.nOverwriteCnt > 0) {
-                return LINK_Q_OVERWRIT;
+        if (NULL == _pData || NULL == _pQueue) {
+                return LINK_QUEUE_ERROR;
         }
-        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * nSec);
-}
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
 
-static int PopQueueWithNoOverwrite(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen)
-{
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        if (pQueueImp->statInfo.nOverwriteCnt > 0) {
-                return LINK_Q_OVERWRIT;
-        }
-        int64_t usec = 1000000;
-        if (pQueueImp->statInfo.nPushDataBytes_> 0) {
-                return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 1);
-        } else {
-                return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * 60 * 60 * 24 * 365);
-        }
-}
-
-static void StopPush(LinkCircleQueue *_pQueue)
-{
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        
         pthread_mutex_lock(&pQueueImp->mutex_);
-        pQueueImp->nQState_ = QUEUE_READ_ONLY_STATE;
-        pthread_mutex_unlock(&pQueueImp->mutex_);
-        
-        pthread_cond_signal(&pQueueImp->condition_);
-        return;
-}
 
-static void getStatInfo(LinkCircleQueue *_pQueue, LinkUploaderStatInfo *_pStatInfo)
-{
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        
-        _pStatInfo->nPushDataBytes_ = pQueueImp->statInfo.nPushDataBytes_;
-        _pStatInfo->nPopDataBytes_ = pQueueImp->statInfo.nPopDataBytes_;
-        _pStatInfo->nLen_ = pQueueImp->nLen_;
-        _pStatInfo->nDropped = pQueueImp->statInfo.nDropped;
-        _pStatInfo->nIsReadOnly = pQueueImp->nQState_;
-        return;
-}
-
-enum CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
-        return pQueueImp->policy;
-}
-
-int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
-{
-        int ret;
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp));
-        
-        char *pData = (char *)malloc((_nMaxItemLen + sizeof(int)) * _nInitItemCount);
-        if (pQueueImp == NULL) {
-                return LINK_NO_MEMORY;
+        if (pQueueImp->property_ & LQP_NO_PUSH) {
+                pQueueImp->nDropCnt_++;
+                LinkLogWarn("Queue is no push now.");
+                updateQueueState_(_pQueue);
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                return LINK_QUEUE_NO_PUSH;
         }
-        memset(pQueueImp, 0, sizeof(CircleQueueImp));
 
-        ret = pthread_mutex_init(&pQueueImp->mutex_, NULL);
+        assert(pQueueImp->property_ & LQP_BYTE_APPEND);
+
+        if (pQueueImp->pData_ == NULL) {
+                pQueueImp->pData_ = (char *)malloc(pQueueImp->nCap_);
+                if (pQueueImp->pData_ == NULL) {
+                        return LINK_QUEUE_NO_MEMORY;
+                }
+        }
+        int newLen = 0;
+        if (_nDataLen + pQueueImp->nCount_ > pQueueImp->nCap_) {
+                newLen = (pQueueImp->nCount_ + pQueueImp->nCount_) * 3 / 2;
+                char * newSpace = (char *)realloc(pQueueImp->pData_, newLen);
+                if (newSpace == NULL) {
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        return LINK_QUEUE_NO_MEMORY;
+                }
+                pQueueImp->pData_ = newSpace;
+                pQueueImp->nCap_ = newLen;
+        }
+
+        memcpy(pQueueImp->pData_ + pQueueImp->nCount_, _pData, _nDataLen);
+        pQueueImp->nCount_ += _nDataLen;
+        pQueueImp->nEnd_ += _nDataLen;
+        pQueueImp->nPushCnt_ += _nDataLen;
+        updateQueueState_(_pQueue);
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return _nDataLen;
+
+}
+
+static size_t popQueueByteAppend(LinkQueue *_pQueue, char *_pBuf, size_t _nBufLen, const int64_t _nUSec)
+{
+        if (NULL == _pQueue || NULL == _pBuf) {
+                return LINK_QUEUE_ERROR;
+        }
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
+
+        pthread_mutex_lock(&pQueueImp->mutex_);
+
+        if (pQueueImp->property_ & LQP_NO_POP) {
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                return 0;
+        }
+        if ((pQueueImp->property_ & LQP_NO_PUSH) && (pQueueImp->state_ & LQS_EMPTY)) {
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                return 0;
+        }
+        int nBuflen = pQueueImp->nCount_;
+        if (_nBufLen < nBuflen) {
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                LinkLogWarn("[QUEUE] buffer no enough space, buffer:%d, need:%d", _nBufLen, nBuflen);
+                return LINK_QUEUE_NO_SPACE;
+        }
+
+        int ret = 0;
+        while (pQueueImp->nCount_ == 0) {
+                if (_nUSec < 0) {
+                        ret = pthread_cond_wait(&pQueueImp->condition_, &pQueueImp->mutex_);
+                } else {
+                        struct timeval now;
+                        gettimeofday(&now, NULL);
+                        struct timespec timeout;
+                        timeout.tv_sec = now.tv_sec + _nUSec / 1000000;
+                        timeout.tv_nsec = (now.tv_usec + _nUSec % 1000000) * 1000;
+                        ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
+                        if (ret == ETIMEDOUT) {
+                                pthread_mutex_unlock(&pQueueImp->mutex_);
+                                return LINK_QUEUE_TIMEOUT;
+                        }
+                }
+                if (pQueueImp->nCount_ == 0) {
+                        pthread_mutex_unlock(&pQueueImp->mutex_);
+                        return 0;
+                }
+        }
+
+        assert(pQueueImp->nCount_ != 0);
+        assert(pQueueImp->property_ & LQP_BYTE_APPEND);
+        memcpy(_pBuf, pQueueImp->pData_, nBuflen);
+        pQueueImp->nPopCnt_ += pQueueImp->nCount_;
+        pQueueImp->nCount_ = 0;
+        pQueueImp->nEnd_ = 0;
+        updateQueueState_(_pQueue);
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return nBuflen;
+}
+
+
+static int getInfoQueue(const LinkQueue * _pQueue, LinkQueueInfo * _pInfo)
+{
+        if (NULL == _pQueue || NULL == _pInfo) {
+                return LINK_QUEUE_ERROR;
+        }
+        memset(_pInfo, 0, sizeof(LinkQueueInfo));
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
+        pthread_mutex_lock(&pQueueImp->mutex_);
+
+        _pInfo->property = pQueueImp->property_;
+        _pInfo->state = pQueueImp->state_;
+        _pInfo->nMaxItemLen = (pQueueImp->nMaxItemLen_ == 1) ? 1 : pQueueImp->nMaxItemLen_ - sizeof(size_t);
+        _pInfo->nCap = pQueueImp->nCap_;
+        _pInfo->nCount = pQueueImp->nCount_;
+        _pInfo->nPushCnt = pQueueImp->nPushCnt_;
+        _pInfo->nPopCnt = pQueueImp->nPopCnt_;
+        _pInfo->nDropCnt = pQueueImp->nDropCnt_;
+        _pInfo->nOverwriteCnt = pQueueImp->nOverwriteCnt_;
+
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return LINK_QUEUE_SUCCESS;
+}
+
+
+static int setPropertyQueue(LinkQueue * _pQueue, const LinkQueueProperty * _pProperty)
+{
+        if (NULL == _pQueue || NULL == _pProperty) {
+                return LINK_QUEUE_ERROR;
+        }
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)_pQueue;
+        pthread_mutex_lock(&pQueueImp->mutex_);
+        /* Only can set  LQP_NO_PUSH and LQP_NO_POP */
+        pQueueImp->property_ |= (*_pProperty & LQP_NO_PUSH);
+        pQueueImp->property_ |= (*_pProperty & LQP_NO_POP);
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return LINK_QUEUE_SUCCESS;
+}
+
+
+int LinkNewCircleQueue(LinkQueue **_pQueue, size_t _nMaxItemLen, size_t _nInitItemCount, LinkQueueProperty _pProperty)
+{
+        if (NULL ==_pQueue || _nMaxItemLen < 1 || _nInitItemCount < 1) {
+                return LINK_QUEUE_ERROR;
+        }
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)malloc(sizeof(LinkQueueImp));
+        if (NULL == pQueueImp) {
+                return LINK_QUEUE_NO_MEMORY;
+        }
+        memset(pQueueImp, 0, sizeof(LinkQueueImp));
+
+        /* Initialize property */
+        pQueueImp->property_ = _pProperty;
+
+
+        if (pQueueImp->property_ & LQP_BYTE_APPEND) {
+                /* Asume item Length is 1 when byte append mode  */
+                pQueueImp->nMaxItemLen_ = 1;
+                pQueueImp->nCap_ = _nInitItemCount * _nMaxItemLen;
+        } else {
+                /* Add a size_t type to representation the length of data */
+                pQueueImp->nMaxItemLen_ = _nMaxItemLen + sizeof(size_t);
+                pQueueImp->nCap_ = _nInitItemCount;
+        }
+
+        char *pData;
+        /* allocate memory for elements */
+        /* at least allocate QUEUE_MIN_ALLOCATE byte for variable length to avoid fragment */
+        if (pQueueImp->nMaxItemLen_ * pQueueImp->nCap_ < QUEUE_MIN_ALLOCATE) {
+                pData = (char *)malloc(QUEUE_MIN_ALLOCATE);
+        } else {
+                pData = (char *)malloc(pQueueImp->nMaxItemLen_ * pQueueImp->nCap_);
+        }
+        if (NULL == pData) {
+                return LINK_QUEUE_NO_MEMORY;
+        }
+        memset(pData, 0, pQueueImp->nMaxItemLen_ * pQueueImp->nCap_);
+        pQueueImp->pData_ = pData;
+
+        /* Initialize pthread mutex and cond */
+        int ret = pthread_mutex_init(&pQueueImp->mutex_, NULL);
         if (ret != 0){
-                return LINK_MUTEX_ERROR;
+                return LINK_QUEUE_MUTEX_ERROR;
         }
         ret = pthread_cond_init(&pQueueImp->condition_, NULL);
         if (ret != 0){
                 pthread_mutex_destroy(&pQueueImp->mutex_);
-                return LINK_COND_ERROR;
+                return LINK_QUEUE_COND_ERROR;
         }
-        
-        pQueueImp->policy = _policy;
-        pQueueImp->pData_ = pData;
-        pQueueImp->nCap_ = _nInitItemCount;
-        pQueueImp->nItemLen_ = _nMaxItemLen + sizeof(int); //前缀int类型的一个长度
-        pQueueImp->circleQueue.PopWithTimeout = PopQueue;
-        pQueueImp->circleQueue.Push = PushQueue;
-        pQueueImp->circleQueue.PopWithNoOverwrite = PopQueueWithNoOverwrite;
-        pQueueImp->circleQueue.StopPush = StopPush;
-        pQueueImp->circleQueue.GetStatInfo = getStatInfo;
-        pQueueImp->nLenInByte_ = pQueueImp->nItemLen_ * _nInitItemCount;
-        pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
-        pQueueImp->circleQueue.GetType = getQueueType;
-        
-        if (TSQ_APPEND == _policy) {
-                pQueueImp->nCap_ = pQueueImp->nLenInByte_;
+
+        /* Initialize interface */
+        if (_pProperty & LQP_BYTE_APPEND) {
+                pQueueImp->linkQueue_.Pop = popQueueByteAppend;
+                pQueueImp->linkQueue_.Push = pushQueueByteAppend;
+        } else {
+                pQueueImp->linkQueue_.Pop = popQueueNormal;
+                pQueueImp->linkQueue_.Push = pushQueueNormal;
         }
-        
-        *_pQueue = (LinkCircleQueue*)pQueueImp;
-        return LINK_SUCCESS;
+        pQueueImp->linkQueue_.GetInfo = getInfoQueue;
+        pQueueImp->linkQueue_.SetProperty = setPropertyQueue;
+
+        *_pQueue = (LinkQueue*)pQueueImp;
+        updateQueueState_(*_pQueue);
+        return LINK_QUEUE_SUCCESS;
 }
 
-int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)pQueue;
-        if (pQueueImp->policy != TSQ_APPEND) {
-                return LINK_Q_WRONGSTATE;
+
+int LinkDestroyQueue(LinkQueue **_pQueue)
+{
+        if (NULL == _pQueue || NULL == *_pQueue) {
+                return LINK_QUEUE_ERROR;
         }
+        LinkQueueImp *pQueueImp = (LinkQueueImp *)(*_pQueue);
 
         pthread_mutex_lock(&pQueueImp->mutex_);
-        *pBuf = pQueueImp->pData_;
-        *nBufLen = pQueueImp->nLen_;
+        pQueueImp->property_ |= LQP_NO_PUSH;
+        pQueueImp->property_ |= LQP_NO_POP;
+        updateQueueState_(*_pQueue);
         pthread_mutex_unlock(&pQueueImp->mutex_);
 
-        return pQueueImp->nLen_;
-}
-
-void LinkDestroyQueue(LinkCircleQueue **_pQueue)
-{
-        CircleQueueImp *pQueueImp = (CircleQueueImp *)(*_pQueue);
-
-        StopPush(*_pQueue);
-        
         pthread_mutex_destroy(&pQueueImp->mutex_);
         pthread_cond_destroy(&pQueueImp->condition_);
 
-        if (pQueueImp->pData_)
+        if (pQueueImp->pData_) {
                 free(pQueueImp->pData_);
+        }
         free(pQueueImp);
         *_pQueue = NULL;
-        return;
+        return LINK_QUEUE_SUCCESS;
 }

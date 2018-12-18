@@ -86,7 +86,7 @@ typedef struct _FFTsMuxUploader{
         LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
-        enum CircleQueuePolicy queueType_;
+        LinkQueueProperty queueProp_;
         int8_t isPause;
         int8_t isQuit;
         
@@ -100,7 +100,7 @@ typedef struct _FFTsMuxUploader{
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
         
-        LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
+        LinkQueue *pUpdateQueue_; //for token and remteconfig update
         char sessionId[LINK_MAX_SESSION_ID_LEN + 1];
 }FFTsMuxUploader;
 
@@ -205,7 +205,7 @@ static void switchTs(FFTsMuxUploader *_pFFTsMuxUploader)
                 
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
                         
-                        if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
+                        if (_pFFTsMuxUploader->queueProp_ & LQP_BYTE_APPEND)
                                 _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
                         LinkResetTsMuxerContext( _pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
                 }
@@ -219,7 +219,7 @@ static void pushRecycle(FFTsMuxUploader *_pFFTsMuxUploader)
                 
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
 
-                        if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND)
+                        if (_pFFTsMuxUploader->queueProp_ == LQP_BYTE_APPEND)
                                 _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->NotifyDataPrapared(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
                         LinkLogError("push to mgr:%p", _pFFTsMuxUploader->pTsMuxCtx);
                         LinkPushFunction(_pFFTsMuxUploader->pTsMuxCtx);
@@ -573,10 +573,10 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
         FFTsMuxContext *pTsMuxCtx = (FFTsMuxContext*)_pOpaque;
         
         if (pTsMuxCtx) {
-                LinkUploaderStatInfo statInfo = {0};
+                LinkQueueInfo statInfo = {0};
                 pTsMuxCtx->pTsUploader_->GetStatInfo(pTsMuxCtx->pTsUploader_, &statInfo);
-                LinkLogDebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushDataBytes_,
-                         statInfo.nPopDataBytes_, statInfo.nLen_, statInfo.nDropped);
+                LinkLogDebug("uploader push:%d pop:%d remainItemCount:%d dropped:%d", statInfo.nPushCnt,
+                         statInfo.nPopCnt, statInfo.nCount, statInfo.nDropCnt);
                 LinkDestroyTsUploader(&pTsMuxCtx->pTsUploader_);
 
                 LinkDestroyTsMuxerContext(pTsMuxCtx->pFmtCtx_);
@@ -680,7 +680,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
-                           int nQBufSize, enum CircleQueuePolicy queueType)
+                           int nQBufSize, LinkQueueProperty queueProp)
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
         if (pTsMuxCtx == NULL) {
@@ -688,7 +688,7 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         }
         memset(pTsMuxCtx, 0, sizeof(FFTsMuxContext));
         
-        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueType, 188, nQBufSize / 188);
+        int ret = LinkNewTsUploader(&pTsMuxCtx->pTsUploader_, _pUploadArg, queueProp, 188, nQBufSize / 188);
         if (ret != 0) {
                 free(pTsMuxCtx);
                 return ret;
@@ -854,12 +854,12 @@ static void setUploaderBufferSize(LinkTsMuxUploader* _pTsMuxUploader, int nBuffe
 static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
-        LinkUploaderStatInfo info;
+        LinkQueueInfo info;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         int nUsed = 0;
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetStatInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &info);
-                nUsed = info.nPushDataBytes_ - info.nPopDataBytes_;
+                nUsed = (info.nPushCnt - info.nPopCnt) * info.nMaxItemLen;
         } else {
                 return 0;
         }
@@ -946,7 +946,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
-        pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
+        pFFTsMuxUploader->queueProp_ = LQP_BYTE_APPEND;
         pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
@@ -1301,7 +1301,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
         
         int nBufsize = getBufferSize(pFFTsMuxUploader);
         int ret = newTsMuxContext(&pFFTsMuxUploader->pTsMuxCtx, &pFFTsMuxUploader->avArg,
-                                  &pFFTsMuxUploader->uploadArgBak, nBufsize, pFFTsMuxUploader->queueType_);
+                                  &pFFTsMuxUploader->uploadArgBak, nBufsize, pFFTsMuxUploader->queueProp_);
         if (ret != 0) {
                 return ret;
         }
@@ -1313,7 +1313,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
-        if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
+        if (pFFTsMuxUploader->queueProp_ != LQP_BYTE_APPEND) {
                 return;
         }
         
@@ -1533,10 +1533,10 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
         
         RemoteConfig rc;
         int now;
-        LinkUploaderStatInfo info;
+        LinkQueueInfo info;
         char sessionIdBak[LINK_MAX_SESSION_ID_LEN+1] = {0};
         
-        while(!pFFTsMuxUploader->isQuit || info.nLen_ != 0) {
+        while(!pFFTsMuxUploader->isQuit || info.nCount != 0) {
 
                 int ret = 0;
                 now = (int)(LinkGetCurrentNanosecond() / 1000000000);
@@ -1553,10 +1553,10 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 SessionUpdateParam param;
                 memset(&param, 0, sizeof(param));
                 
-                ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
+                ret = pFFTsMuxUploader->pUpdateQueue_->Pop(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
                                                                       sizeof(SessionUpdateParam), nWait);//nWait * 1000000LL);
                 memset(&info, 0, sizeof(info));
-                pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                pFFTsMuxUploader->pUpdateQueue_->GetInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
                 if (ret <= 0) {
                         if (ret == LINK_TIMEOUT) {
                                 LinkLogDebug("update queue timeout:%d", nWait);
@@ -1592,7 +1592,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                                 
                                 shouldUpdateToken = 0; //rc is Higher priority than token
                                 nNextTryTokenTime = 1;
-    
+
                                 continue;
                         }
                         updateRemoteConfig(pFFTsMuxUploader, &rc);
@@ -1639,7 +1639,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
 
 static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) {
         
-        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, 1, TSQ_FIX_LENGTH, sizeof(SessionUpdateParam), 50);
+        int ret = LinkNewCircleQueue(&pFFTsMuxUploader->pUpdateQueue_, sizeof(SessionUpdateParam), 50, LQP_NONE);
         if (ret != 0) {
                 return ret;
         }

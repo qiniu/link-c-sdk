@@ -3,7 +3,7 @@
 
 typedef struct _ResourceMgr
 {
-        LinkCircleQueue * pQueue_;
+        LinkQueue * pQueue_;
         pthread_t mgrThreadId_;
         int nQuit_;
         int nIsStarted_;
@@ -13,14 +13,14 @@ static ResourceMgr manager;
 
 static void * recycle(void *_pOpaque)
 {
-        LinkUploaderStatInfo info = {0};
-        manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
-        while(!manager.nQuit_ || info.nLen_ != 0) {
+        LinkQueueInfo info = {0};
+        manager.pQueue_->GetInfo(manager.pQueue_, &info);
+        while(!manager.nQuit_ || info.nCount != 0) {
                 LinkAsyncInterface *pAsync = NULL;
-                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(LinkAsyncInterface *), 24 * 60 * 60);
+                int ret = manager.pQueue_->Pop(manager.pQueue_, (char *)(&pAsync), sizeof(LinkAsyncInterface *), 24 * 60 * 60);
    
-                manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
-                LinkLogDebug("thread queue:%d", info.nLen_);
+                manager.pQueue_->GetInfo(manager.pQueue_, &info);
+                LinkLogDebug("thread queue:%d", info.nCount);
                 if (ret == LINK_TIMEOUT) {
                         continue;
                 }
@@ -33,7 +33,7 @@ static void * recycle(void *_pOpaque)
                                 func(pAsync);
                         }
                 }
-                manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
+                manager.pQueue_->GetInfo(manager.pQueue_, &info);
         }
 
 	return NULL;
@@ -53,7 +53,7 @@ int LinkStartMgr()
                 return LINK_SUCCESS;
         }
         
-        int ret = LinkNewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
+        int ret = LinkNewCircleQueue(&manager.pQueue_, sizeof(void *), 100, LQP_NONE);
         if (ret != 0){
                 return ret;
         }
