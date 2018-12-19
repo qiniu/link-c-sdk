@@ -149,7 +149,7 @@ static void getReqidAndResponse(ghttp_request * pRequest, LinkPutret *put_ret) {
  * @return 0 on success, -1 on failure
  * */
 static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
-                      const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret, int isTypeFile) {
+                      const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret, int isTypeFile) {
         
         if (file_key == NULL || upload_token == NULL || filepathOrBufer == NULL) {
                 return -1;
@@ -167,7 +167,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         char *form_data = NULL;
         char *form_data_p = NULL;
         int form_buf_buf_len  = 0;
-        char static_form_data[1024];
+        char static_form_data[1536];
         int staticPrevFormDataLen = 0;
         //alloc body buffer
         struct stat st;
@@ -198,8 +198,14 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
                                       NULL, &form_data_len, 0);
         
         if (nCustomMetaLen > 0) {
-                form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "x-qn-meta-meta_key", customMeta, nCustomMetaLen,
-                                              NULL, &form_data_len, 0);
+                int i = 0;
+                char mkey[32] = "x-qn-meta-";
+                int nKeyPreLen = 10;
+                for (i = 0; i < nCustomMetaLen; i+=2) {
+                        snprintf(mkey + nKeyPreLen, sizeof(mkey) - nKeyPreLen, "%s", customMeta[i]);
+                        form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, mkey,
+                                                      customMeta[i+1], strlen(customMeta[i+1]), NULL, &form_data_len, 0);
+                }
         }
         
         if (!isTypeFile) {
@@ -275,7 +281,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 }
 
 int LinkUploadBuffer(const char *buffer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
-                     const char *customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
+                     const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
         return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen, mime_type, put_ret, 0);
 }
 

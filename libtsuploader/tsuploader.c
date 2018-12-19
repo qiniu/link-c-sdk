@@ -106,11 +106,21 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                 inttoBCD(pMetas[i].nLength, metaBuf + 15 * i + 10);
         }
         int nMetaValueLen = urlsafe_b64_encode(metaBuf, nMetaLen * 15, metaValue, sizeof(metaValue));
-        nMetaValueLen = snprintf(metaBuf, sizeof(metaBuf), "{\"o\":\"%s\",\"d\":%"PRId64",\"s\":%"PRId64",\"c\":%d}",
-                                 metaValue, duration, seqnum, isDiscontinuity);
+        
+        char **pp = (char **)metaBuf;
+        char *pCnt = metaBuf + sizeof(void *) * 8;
+        
+        pp[0] = pCnt; *pCnt++ = 'o'; *pCnt++ = 0;
+        pp[1] = pCnt; memcpy(pCnt, metaValue, nMetaValueLen); pCnt += (nMetaValueLen+1); *pCnt++ = 0;
+        pp[2] = pCnt; *pCnt++ = 'd'; *pCnt++ = 0;
+        pp[3] = pCnt; pCnt += (sprintf(pCnt, "%"PRId64"", duration) + 1); *pCnt++ = 0;
+        pp[4] = pCnt; *pCnt++ = 's'; *pCnt++ = 0;
+        pp[5] = pCnt; pCnt += (sprintf(pCnt, "%"PRId64"", seqnum) + 1); *pCnt++ = 0;
+        pp[6] = pCnt; *pCnt++ = 'c'; *pCnt++ = 0;
+        pp[7] = pCnt; pCnt += (sprintf(pCnt, "%d", isDiscontinuity) + 1); *pCnt++ = 0;
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaBuf, nMetaValueLen, /*mimetype*/NULL, &putret);
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8, /*mimetype*/NULL, &putret);
 
         
 
@@ -207,8 +217,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int isDiscontinuity = 0;
         if (pKodoUploader->nLastSystimeBak > 0) {
-                if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200)
+                if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200000000) {
+                        LinkLogDebug("discontinuity:%"PRId64"-%"PRId64"=%"PRId64"\n", pKodoUploader->nFirstSystime, pKodoUploader->nLastSystimeBak, pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak);
                         isDiscontinuity = 1;
+                }
         }
         pKodoUploader->nLastSystimeBak = pKodoUploader->nLastSystime;
         pKodoUploader->nFirstSystime = 0;
