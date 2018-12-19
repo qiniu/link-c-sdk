@@ -427,10 +427,10 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
 }
 
 static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, int nIsKeyFrame, int _isVideo,
-                       int64_t nSysNanotime, int _nIsSegStart, const char * _pData, int _nDataLen)
+                       int64_t nSysNanotime, int _nIsSegStart, const char * _pData, int _nDataLen, int *pIsVideoMetaChanged)
 {
         int ret;
-        int shouldSwitch = 0;
+        int videoMetaChanged = 0;
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         if (pFFTsMuxUploader->nFirstTimestamp == -1) {
                 pFFTsMuxUploader->nFirstTimestamp = _nTimestamp;
@@ -447,18 +447,20 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                 }
                 if (isSameAsBefore) {
                         LinkLogInfo("video change sps");
-                        shouldSwitch = 1;
+                        videoMetaChanged = 1;
+                        if (pIsVideoMetaChanged)
+                                *pIsVideoMetaChanged = 1;
                 }
         }
         // if start new uploader, start from keyframe
-        if (isVideoKeyframe || shouldSwitch) {
+        if (isVideoKeyframe || videoMetaChanged) {
                 if( ((_nTimestamp - pFFTsMuxUploader->nFirstTimestamp) > pFFTsMuxUploader->remoteConfig.nTsDuration
                                       && pFFTsMuxUploader->nKeyFrameCount > 0)
                    //at least 1 keyframe and aoubt last 5 second
-                   || shouldSwitch
+                   || videoMetaChanged
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0) ){// new segment is specified
                         fprintf(stderr, "normal switchts:%"PRId64" %d %d-%d %d\n", _nTimestamp - pFFTsMuxUploader->nFirstTimestamp,
-                                pFFTsMuxUploader->remoteConfig.nTsDuration, _nIsSegStart, pFFTsMuxUploader->nFrameCount, shouldSwitch);
+                                pFFTsMuxUploader->remoteConfig.nTsDuration, _nIsSegStart, pFFTsMuxUploader->nFrameCount, videoMetaChanged);
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
@@ -498,11 +500,14 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
-        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart, _pData, _nDataLen);
+        int isVideoMetaChanged = 0;
+        ret = checkSwitch(_pTsMuxUploader, _nTimestamp, nIsKeyFrame, 1, nSysNanotime, _nIsSegStart, _pData, _nDataLen, &isVideoMetaChanged);
         if (ret != 0) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return ret;
         }
+        if (isVideoMetaChanged)
+                _nIsSegStart = isVideoMetaChanged;
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -536,7 +541,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return LINK_PAUSED;
         }
         int64_t nSysNanotime = LinkGetCurrentNanosecond();
-        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0, NULL, 0);
+        int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0, NULL, 0, NULL);
         if (ret != 0) {
                 return ret;
         }

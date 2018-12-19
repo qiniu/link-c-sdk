@@ -122,8 +122,6 @@ static void * listenPicUpload(void *_pOpaque)
                                                 char app[LINK_MAX_APP_LEN+1] = {0};
                                                 param.pDeviceName = deviceName;
                                                 param.nDeviceNameLen = sizeof(deviceName);
-                                                param.pApp = app;
-                                                param.nAppLen = sizeof(app);
 #else
                                                 char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
                                                 param.pFilePrefix = fprefix;

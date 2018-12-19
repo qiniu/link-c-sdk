@@ -7,7 +7,6 @@
 #include "servertime.h"
 #include <time.h>
 #include "fixjson.h"
-#include "b64/b64.h"
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
@@ -54,7 +53,11 @@ typedef struct _KodoUploader{
         void *pTsEndUploadCallbackArg;
         int nQuit_;
         LinkSession session;
-        int nTokenDeadline;
+        
+        // for discontinuity
+        int64_t nLastSystime;
+        int64_t nFirstSystime;
+        int64_t nLastSystimeBak;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -92,20 +95,22 @@ static void inttoBCD(int64_t m, char *buf)
 }
 
 static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize,
-                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen) {
+                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen, int64_t duration, int64_t seqnum, int isDiscontinuity) {
        
         char metaValue[200];
-        char metaBcd[150];
+        char metaBuf[250];
         int i = 0;
         for(i = 0; i < nMetaLen; i++) {
-                inttoBCD(pMetas[i].nTimestamp90Khz, metaBcd + 15 * i);
-                inttoBCD(pMetas[i].nOffset, metaBcd + 15 * i + 5);
-                inttoBCD(pMetas[i].nLength, metaBcd + 15 * i + 10);
+                inttoBCD(pMetas[i].nTimestamp90Khz, metaBuf + 15 * i);
+                inttoBCD(pMetas[i].nOffset, metaBuf + 15 * i + 5);
+                inttoBCD(pMetas[i].nLength, metaBuf + 15 * i + 10);
         }
-        int nMetaValueLen = b64_encode(metaBcd, nMetaLen * 15, metaValue, sizeof(metaValue));
+        int nMetaValueLen = urlsafe_b64_encode(metaBuf, nMetaLen * 15, metaValue, sizeof(metaValue));
+        nMetaValueLen = snprintf(metaBuf, sizeof(metaBuf), "{\"o\":\"%s\",\"d\":%"PRId64",\"s\":%"PRId64",\"c\":%d}",
+                                 metaValue, duration, seqnum, isDiscontinuity);
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaValue, nMetaValueLen, /*mimetype*/NULL, &putret);
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaBuf, nMetaValueLen, /*mimetype*/NULL, &putret);
 
         
 
@@ -173,16 +178,13 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char app[LINK_MAX_APP_LEN+1] = {0};
         param.pDeviceName = deviceName;
         param.nDeviceNameLen = sizeof(deviceName);
-        param.pApp = app;
-        param.nAppLen = sizeof(app);
 #else
         char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
 #endif
-        param.nTokenDeadline = pKodoUploader->nTokenDeadline;
+
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
-        param.nSeqNum = pKodoUploader->session.nTsSequenceNumber++;
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
@@ -206,18 +208,16 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
         
+        int isDiscontinuity = 0;
+        if (pKodoUploader->nLastSystimeBak > 0) {
+                if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200)
+                        isDiscontinuity = 1;
+        }
+        pKodoUploader->nLastSystimeBak = pKodoUploader->nLastSystime;
+        pKodoUploader->nFirstSystime = 0;
+        
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
-        
-        uint64_t nSegmentId = pSession->nSessionStartTime;
-        
-        int nDeleteAfterDays_ = 0;
-        int nDeadline = 0;
-        ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, &nDeadline);
-        if (ret != LINK_SUCCESS) {
-                LinkLogWarn("not get deleteafterdays");
-        }
-        pKodoUploader->nTokenDeadline = nDeadline;
 
         memset(key, 0, sizeof(key));
         
@@ -227,6 +227,12 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         r = LinkGetQueueBuffer(pDataQueue, &bufData, &l);
         if (r > 0) {
 #ifdef LINK_USE_OLD_NAME
+                uint64_t nSegmentId = pSession->nSessionStartTime;
+                int nDeleteAfterDays_ = 0;
+                ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, NULL);
+                if (ret != LINK_SUCCESS) {
+                        LinkLogWarn("not get deleteafterdays");
+                }
                 //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
                         sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
@@ -237,19 +243,18 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 }
                 
 #else
-                // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d/%s.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_, suffix);
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%s.ts", param.pFilePrefix,
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, suffix);
                 } else {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%d.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_);
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
                 }
 #endif
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
                 
-                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo,
-                                           pUpMeta->nMetaInfoLen);
+                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
+                                           tsDuration, pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         pKodoUploader->state = LINK_UPLOAD_OK;
@@ -449,6 +454,8 @@ static void handleAudioTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
                 pKodoUploader->session.nFirstAudioFrameTimestamp = pTi->nAvTimestamp;
                 pKodoUploader->session.nLastAudioFrameTimestamp = pTi->nAvTimestamp;
         }
+        if (pKodoUploader->nFirstSystime <= 0)
+                pKodoUploader->nFirstSystime = pTi->nSysTimestamp;
         
         int64_t nDiffAudio = pTi->nAvTimestamp - pKodoUploader->session.nLastAudioFrameTimestamp;
         
@@ -461,6 +468,7 @@ static void handleAudioTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
         
         pKodoUploader->session.nLastAudioFrameTimestamp = pTi->nAvTimestamp;
         pKodoUploader->session.nLastFrameTimestamp = pTi->nAvTimestamp;
+        pKodoUploader->nLastSystime = pTi->nSysTimestamp;
         
         handleSessionCheck(pKodoUploader, pTi->nSysTimestamp, 0);
 }
@@ -476,6 +484,8 @@ static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
                 pKodoUploader->session.nFirstVideoFrameTimestamp = pTi->nAvTimestamp;
                 pKodoUploader->session.nLastVideoFrameTimestamp = pTi->nAvTimestamp;
         }
+        if (pKodoUploader->nFirstSystime <= 0)
+                pKodoUploader->nFirstSystime = pTi->nSysTimestamp;
         
         if (pKodoUploader->session.nTsStartTime <= 0)
                 pKodoUploader->session.nTsStartTime = pTi->nSysTimestamp;
@@ -491,6 +501,7 @@ static void handleVideoTimeReport(KodoUploader * pKodoUploader, TsUploaderComman
         
         pKodoUploader->session.nLastVideoFrameTimestamp = pTi->nAvTimestamp;
         pKodoUploader->session.nLastFrameTimestamp = pTi->nAvTimestamp;
+        pKodoUploader->nLastSystime = pTi->nSysTimestamp;
         
         handleSessionCheck(pKodoUploader, pTi->nSysTimestamp, 0);
 }

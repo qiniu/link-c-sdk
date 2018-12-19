@@ -163,11 +163,15 @@ int LinkGetPolicyFromUptoken(char * pToken, int *pDeleteAfterDays, int *pDeadlin
                 return ret;
         }
         
-        ret = LinkGetJsonIntByKey(pJson, "\"deleteAfterDays\"");
-        *pDeleteAfterDays = ret;
+        if (pDeleteAfterDays != NULL) {
+                ret = LinkGetJsonIntByKey(pJson, "\"deleteAfterDays\"");
+                *pDeleteAfterDays = ret;
+        }
         
-        ret = LinkGetJsonIntByKey(pJson, "\"deadline\"");
-        *pDeadline = ret;
+        if (pDeadline != NULL) {
+                ret = LinkGetJsonIntByKey(pJson, "\"deadline\"");
+                *pDeadline = ret;
+        }
 
         free(pJson);
         return LINK_SUCCESS;
