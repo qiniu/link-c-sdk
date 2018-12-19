@@ -616,6 +616,21 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                 if (nIsKeyFrame && timestamp - pAvuploader->firstTimeStamp > 30000 && pAvuploader->segStartCount == 0) {
                         nNewSegMent = 1;
                         pAvuploader->segStartCount++;
+                        
+                        SessionMeta metas;
+                        metas.len = 3;
+                        char *keys[3] = {"key1", "key23", "key345"};
+                        metas.keys = (const char **)keys;
+                        int keylens[3] = {4, 5, 6};
+                        metas.keylens = keylens;
+                        
+                        char *values[3] = {"value1", "value23", "value345"};
+                        metas.values = (const char **)values;
+                        int valuelens[3] = {6, 7, 8};
+                        metas.valuelens = valuelens;
+                        
+                        metas.isOneShot = 1;
+                        LinkSetTsType(pAvuploader->pTsMuxUploader, &metas);
                 }
                 if (nIsKeyFrame && pAvuploader->nVideoKeyframeAccLen != 0) {
                         //printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);

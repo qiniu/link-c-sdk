@@ -42,8 +42,6 @@ static int getUploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pPar
         if (pParam->nTokenBufLen < strlen(gtestToken)) {
                 return LINK_BUFFER_IS_SMALL;
         }
-        if (pParam->pTypeBuf != NULL)
-                memcpy(pParam->pTokenBuf, gtestToken, strlen(gtestToken));
         if (pParam->pDeviceName != NULL)
                 memcpy(pParam->pDeviceName, "dname1", 6);
         return LINK_SUCCESS;

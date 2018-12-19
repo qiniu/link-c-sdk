@@ -14,10 +14,13 @@
 #define SEGMENT_RELEASE 1
 #define SEGMENT_UPDATE 2
 #define SEGMENT_QUIT 3
+#define SEGMENT_UPDATE_META 4
+#define SEGMENT_CLEAR_META 5
 typedef struct {
         SegmentHandle handle;
         uint8_t nOperation;
         LinkSession session;
+        SessionMeta sessionMeta;
 }SegInfo;
 
 typedef struct {
@@ -34,6 +37,8 @@ typedef struct {
         int64_t nNextUpdateSegTimeInSecond;
         int64_t nLastUpdateTime;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
+        SessionMeta sessionMeta;
+        int sessionMetaIsValid;
 }Seg;
 
 typedef struct {
@@ -296,32 +301,49 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  }
  */
 static int reportSegInfo(SegInfo *pSegInfo, int idx) {
-        char buffer[1024];
+        char buffer[1280];
         int nNotForBodyLen = 512;
         char *body = buffer + nNotForBodyLen;
         int nReportHostLen = sizeof(buffer) - nNotForBodyLen;
         int nBodyLen = 0;
         LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
+        
+        int sessionMetaIsValid = segmentMgr.handles[idx].sessionMetaIsValid;
+        SessionMeta *smeta = &segmentMgr.handles[idx].sessionMeta;
         if (s->nSessionEndResonCode != 0) {
                 const char * reason = "timeout";
                 if (s->nSessionEndResonCode == 1)
                         reason = "normal";
                 else if (s->nSessionEndResonCode == 3)
                         reason = "force";
+                
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
-                        " %"PRId64", \"endReason\": \"%s\" }",
+                        " %"PRId64", \"endReason\": \"%s\"",
                         s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
+
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
-                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"}",
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"",
                         s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
+        
+        if (sessionMetaIsValid && smeta->len > 0) {
+                int i = 0;
+                int nSessionMetaLen = sprintf(body + nBodyLen, ",\"meta\":{");
+                nBodyLen += nSessionMetaLen;
+                for (i = 0; i < smeta->len; i++) {
+                        nBodyLen += sprintf(body + nBodyLen, "\"%s\":\"%s\",", smeta->keys[i], smeta->values[i]);
+                }
+                body[nBodyLen-1] = '}';
+        }
+        body[nBodyLen] = '}';
+        
         LinkLogDebug("%s\n", body);
 #ifndef LINK_USE_OLD_NAME
         
@@ -370,6 +392,11 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime + time(NULL);
         }
 #endif
+        if(sessionMetaIsValid && smeta->isOneShot) {
+                segmentMgr.handles[idx].sessionMetaIsValid = 0;
+                free(smeta->keys);
+        }
+        
         
         return LINK_SUCCESS;
 }
@@ -406,6 +433,44 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
         return;
 }
 
+static void handleUpdateSessionMeta(SegInfo *pSegInfo) {
+        int i, idx = -1;
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
+                if (segmentMgr.handles[i].handle == pSegInfo->handle) {
+                        idx = i;
+                        break;
+                }
+        }
+        if (idx < 0) {
+                LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
+                return;
+        }
+        if (segmentMgr.handles[idx].sessionMetaIsValid) {
+                free(segmentMgr.handles[idx].sessionMeta.keys);
+        }
+        segmentMgr.handles[idx].sessionMeta = pSegInfo->sessionMeta;
+        segmentMgr.handles[idx].sessionMetaIsValid = 1;
+}
+
+static void handleClearSessionMeta(SegInfo *pSegInfo) {
+        int i, idx = -1;
+        for (i = 0; i < sizeof(segmentMgr.handles) / sizeof(Seg); i++) {
+                if (segmentMgr.handles[i].handle == pSegInfo->handle) {
+                        idx = i;
+                        break;
+                }
+        }
+        if (idx < 0) {
+                LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
+                return;
+        }
+        if (segmentMgr.handles[idx].sessionMetaIsValid) {
+                free(segmentMgr.handles[idx].sessionMeta.keys);
+        }
+        segmentMgr.handles[idx].sessionMetaIsValid = 0;
+        return;
+}
+
 static void linkReleaseSegmentHandle(SegmentHandle seg) {
         pthread_mutex_lock(&segMgrMutex);
         if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
@@ -418,6 +483,7 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].segUploadOk = 0;
                 segmentMgr.handles[seg].nLastUpdateTime = 0;
                 segmentMgr.handles[seg].nNextUpdateSegTimeInSecond = 0;
+                segmentMgr.handles[seg].sessionMetaIsValid = 0;
         }
         pthread_mutex_unlock(&segMgrMutex);
         return;
@@ -444,15 +510,25 @@ static void * segmetMgrRun(void *_pOpaque) {
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
-                                if (segInfo.nOperation == SEGMENT_RELEASE) {
-                                        linkReleaseSegmentHandle(segInfo.handle);
-                                } else if (segInfo.nOperation == SEGMENT_UPDATE) {
+                                switch (segInfo.nOperation) {
+                                                
+                                        case SEGMENT_RELEASE:
+                                                linkReleaseSegmentHandle(segInfo.handle);
+                                                break;
+                                        case SEGMENT_UPDATE:
 #ifdef LINK_USE_OLD_NAME
-                                        updateSegmentFile(segInfo);
+                                                updateSegmentFile(segInfo);
 #endif
-                                        handleReportSegInfo(&segInfo);
-                                } else if (segInfo.nOperation == SEGMENT_QUIT) {
-                                        continue;
+                                                handleReportSegInfo(&segInfo);
+                                                break;
+                                        case  SEGMENT_UPDATE_META:
+                                                handleUpdateSessionMeta(&segInfo);
+                                                break;
+                                        case SEGMENT_CLEAR_META:
+                                                handleClearSessionMeta(&segInfo);
+                                                break;
+                                        case  SEGMENT_QUIT:
+                                                continue;
                                 }
                         }
                 }
@@ -544,6 +620,31 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         if (ret <= 0) {
                 LinkLogError("seg queue error. push update:%d", ret);
+                return ret;
+        }
+        return LINK_SUCCESS;
+}
+
+int LinkUpdateSegmentMeta(SegmentHandle seg, const SessionMeta *meta) {
+        SegInfo segInfo;
+        segInfo.handle = seg;
+        segInfo.nOperation = SEGMENT_UPDATE_META;
+        segInfo.sessionMeta = *meta;
+        int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        if (ret <= 0) {
+                LinkLogError("seg queue error. push update meta:%d", ret);
+                return ret;
+        }
+        return LINK_SUCCESS;
+}
+
+int LinkClearSegmentMeta(SegmentHandle seg) {
+        SegInfo segInfo;
+        segInfo.handle = seg;
+        segInfo.nOperation = SEGMENT_CLEAR_META;
+        int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
+        if (ret <= 0) {
+                LinkLogError("seg queue error. push clear meta:%d", ret);
                 return ret;
         }
         return LINK_SUCCESS;

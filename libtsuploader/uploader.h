@@ -96,32 +96,13 @@ int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
- * 临时设置切片上传文件命名的自定义后缀字段
- *
- * 仅当前切片有效
+ * 设置片段上报的元数据
  *
  * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] pType 自定义后缀名称
- * @param[in] nTypeLen 自定义后缀名称长度
- * @return LINK_SUCCESS 成功; 其它值 失败
+ * @param[in] metas 自定义的元数据，key->value结构
+ *                metas->isOneShot 非0，仅上报一次后便不在上报
  */
-int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *pTsMuxUploader,
-                         IN const char *pType,
-                         IN int nTypeLen
-                         );
-
-/**
- * 设置切片上传文件命名的自定义后缀字段
- *
- * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] pType 自定义后缀名称
- * @param[in] nTypeLen 自定义后缀名称长度
- * @return LINK_SUCCESS 成功; 其它值 失败
- */
-int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,
-                  IN const char *pType,
-                  IN int nTypeLen
-                  );
+int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN SessionMeta *metas);
 
 /**
  * 清空切片上传文件命名的自定义后缀字段

@@ -88,9 +88,7 @@ typedef struct _FFTsMuxUploader{
         SegmentHandle segmentHandle;
         enum CircleQueuePolicy queueType_;
         int8_t isPause;
-        int8_t isTypeOneshot;
         int8_t isQuit;
-        char tsType[16];
         
         pthread_t tokenThread;
         
@@ -1037,21 +1035,6 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->nSegUrlLen = nSegLen;
                 pParam->pSegUrl[nSegLen] = 0;
         }
-        
-        if (pParam->pTypeBuf != NULL && pParam->nTypeBufLen != 0) {
-                int nTypeLen = strlen(pFFTsMuxUploader->tsType);
-                if (pParam->nTypeBufLen > nTypeLen) {
-                        memcpy(pParam->pTypeBuf, pFFTsMuxUploader->tsType, nTypeLen);
-                        pParam->pTypeBuf[nTypeLen] = 0;
-                        pParam->nTypeBufLen = nTypeLen;
-                } else {
-                        pParam->nTypeBufLen = 0;
-                }
-                if (pFFTsMuxUploader->isTypeOneshot) {
-                        pFFTsMuxUploader->isTypeOneshot = 0;
-                        memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
-                }
-        }
 
 #ifdef LINK_USE_OLD_NAME
         char *pDeviceName = pFFTsMuxUploader->deviceName_;
@@ -1172,37 +1155,74 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         return ret;
 }
 
-int LinkSetTsTypeOneshot(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
-        if (_pTsMuxUploader == NULL || _pType == NULL) {
-                return LINK_ARG_ERROR;
+static int dupSessionMeta(SessionMeta *metas, SessionMeta *dst) {
+        int idx = 0;
+        int total = 0;
+        for (idx =0; idx < metas->len; idx++) {
+                total += (metas->keylens[idx]+1);
+                total += (metas->valuelens[idx] +1);
+        }
+        total += sizeof(void*) * metas->len * 2;
+        total += sizeof(int) * metas->len * 2;
+        
+        char *tmp = (char *)malloc(total);
+        if (tmp == NULL) {
+                return -1;
+        }
+        memset(dst, 0, sizeof(SessionMeta));
+        
+        char **pp = (char **)tmp;
+        dst->keys = (const char **)pp;
+        int *pl = (int *)(tmp + sizeof(void*) * metas->len);
+        dst->keylens = pl;
+        tmp = (char *)pl + sizeof(int) * metas->len;
+        for (idx =0; idx < metas->len; idx++) {
+                pl[idx] = metas->keylens[idx];
+                pp[idx] = tmp;
+                memcpy(tmp, metas->keys[idx],metas->keylens[idx]);
+                tmp[metas->keylens[idx]] = 0;
+                tmp += metas->keylens[idx] + 1;
         }
         
-        FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
-        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_ARG_TOO_LONG;
+        pp = (char **)tmp;
+        dst->values = (const char **)pp;
+        pl = (int *)(tmp + sizeof(void*) * metas->len);
+        dst->valuelens = pl;
+        tmp = (char *)pl + sizeof(int) * metas->len;
+        for (idx =0; idx < metas->len; idx++) {
+                pl[idx] = metas->valuelens[idx];
+                pp[idx] = tmp;
+                memcpy(tmp, metas->values[idx],metas->valuelens[idx]);
+                tmp[metas->valuelens[idx]] = 0;
+                tmp += metas->valuelens[idx] + 1;
         }
-        pFFTsMuxUploader->isTypeOneshot = 1;
-        memcpy(pFFTsMuxUploader->tsType + strlen(pFFTsMuxUploader->tsType), _pType, nTypeLen);
-        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-        
+        dst->isOneShot = metas->isOneShot;
+        dst->len = metas->len;
         return LINK_SUCCESS;
 }
 
-int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, const char *_pType, IN int nTypeLen) {
-        if (_pTsMuxUploader == NULL || _pType == NULL) {
+
+int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN SessionMeta *metas) {
+        if (_pTsMuxUploader == NULL || metas == NULL || metas->len <= 0) {
                 return LINK_ARG_ERROR;
         }
         
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        if (nTypeLen + strlen(pFFTsMuxUploader->tsType) >= sizeof(pFFTsMuxUploader->tsType) - 1) {
+        
+        SessionMeta dup;
+        int ret = dupSessionMeta(metas, &dup);
+        if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return LINK_ARG_TOO_LONG;
+                return ret;
         }
-        pFFTsMuxUploader->isTypeOneshot = 0;
-        memcpy(pFFTsMuxUploader->tsType + strlen(pFFTsMuxUploader->tsType), _pType, nTypeLen);
+        ret = LinkUpdateSegmentMeta(pFFTsMuxUploader->segmentHandle, &dup);
+        if (ret != LINK_SUCCESS) {
+                free(dup.keys);
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return ret;
+        }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return LINK_SUCCESS;
@@ -1215,8 +1235,11 @@ void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        pFFTsMuxUploader->isTypeOneshot = 0;
-        memset(pFFTsMuxUploader->tsType, 0, sizeof(pFFTsMuxUploader->tsType));
+        int ret = LinkClearSegmentMeta(pFFTsMuxUploader->segmentHandle);
+        if (ret != LINK_SUCCESS) {
+                LinkLogError("LinkClearSegmentMeta fail:%d", ret);
+                return;
+        }
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return;
