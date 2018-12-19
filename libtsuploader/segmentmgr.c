@@ -302,9 +302,8 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  */
 static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         char buffer[1280];
-        int nNotForBodyLen = 512;
-        char *body = buffer + nNotForBodyLen;
-        int nReportHostLen = sizeof(buffer) - nNotForBodyLen;
+        int nReportHostLen = 512;
+        char *body = buffer + nReportHostLen;
         int nBodyLen = 0;
         LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
@@ -342,7 +341,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 }
                 body[nBodyLen-1] = '}';
         }
-        body[nBodyLen] = '}';
+        body[nBodyLen++] = '}';
         
         LinkLogDebug("%s\n", body);
 #ifndef LINK_USE_OLD_NAME
@@ -367,7 +366,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         int nUrlLen = param.nSegUrlLen;
         reportHost[nUrlLen] = 0;
         char * pToken = reportHost + nUrlLen + 1;
-        int nTokenOffset = snprintf(pToken, nNotForBodyLen-nUrlLen-1, "%s:", param.pAk);
+        int nTokenOffset = snprintf(pToken, nReportHostLen-nUrlLen-1, "%s:", param.pAk);
         int nOutputLen = 30;
         ret = GetHttpRequestSign(param.pSk, param.nSkLen, "POST", reportHost, "application/json", body,
                                      nBodyLen, pToken+nTokenOffset, &nOutputLen);
@@ -382,6 +381,10 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
 
         ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, nBodyLen, "application/json",
                                     pToken, nTokenOffset+nOutputLen);
+        if(sessionMetaIsValid && smeta->isOneShot) {
+                segmentMgr.handles[idx].sessionMetaIsValid = 0;
+                free(smeta->keys);
+        }
         if (ret != LINK_SUCCESS) {
                 LinkLogError("report session info fail:%d", ret);
                 return ret;
@@ -392,10 +395,6 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime + time(NULL);
         }
 #endif
-        if(sessionMetaIsValid && smeta->isOneShot) {
-                segmentMgr.handles[idx].sessionMetaIsValid = 0;
-                free(smeta->keys);
-        }
         
         
         return LINK_SUCCESS;
