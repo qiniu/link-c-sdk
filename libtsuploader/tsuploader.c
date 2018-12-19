@@ -207,8 +207,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int isDiscontinuity = 0;
         if (pKodoUploader->nLastSystimeBak > 0) {
-                if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200)
+                if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200000000) {
+                        LinkLogDebug("discontinuity:%"PRId64"-%"PRId64"=%"PRId64"\n", pKodoUploader->nFirstSystime, pKodoUploader->nLastSystimeBak, pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak);
                         isDiscontinuity = 1;
+                }
         }
         pKodoUploader->nLastSystimeBak = pKodoUploader->nLastSystime;
         pKodoUploader->nFirstSystime = 0;
