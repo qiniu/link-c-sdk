@@ -157,7 +157,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         char uptoken[1024] = {0};
         char upHost[192] = {0};
-        char suffix[16] = {0};
         int ret = 0;
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
         KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
@@ -168,8 +167,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
         param.nTokenBufLen = sizeof(uptoken);
-        param.pTypeBuf = suffix;
-        param.nTypeBufLen = sizeof(suffix);
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
         
@@ -234,22 +231,12 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                         LinkLogWarn("not get deleteafterdays");
                 }
                 //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
-                if (suffix[0] != 0) {
-                        sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_, suffix);
-                } else {
-                        sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
-                }
+                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
+                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
                 
 #else
-                if (suffix[0] != 0) {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%s.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, suffix);
-                } else {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
-                }
+                sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
+                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
 #endif
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
                 

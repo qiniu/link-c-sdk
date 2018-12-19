@@ -27,6 +27,15 @@
 #define LINK_USE_OLD_NAME
 
 typedef struct {
+        const char **keys;
+        int *keylens;
+        const char **values;
+        int *valuelens;
+        int len;
+        int isOneShot;
+}SessionMeta;
+
+typedef struct {
         int64_t nTimestamp90Khz;
         int nOffset;
         int nLength;
@@ -37,8 +46,6 @@ typedef void (*LinkSetKeyframeMetaInfo)(void *pUserArg, LinkKeyFrameMetaInfo *pM
 typedef struct {
         IN char *pTokenBuf;
         IN OUT int nTokenBufLen;
-        IN char *pTypeBuf;
-        IN OUT int nTypeBufLen;
         IN char *pUpHost;
         IN OUT int nUpHostLen;
         IN char* pSegUrl;
