@@ -54,7 +54,6 @@ typedef struct _KodoUploader{
         void *pTsEndUploadCallbackArg;
         int nQuit_;
         LinkSession session;
-        int nTokenDeadline;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -178,7 +177,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
 #endif
-        param.nTokenDeadline = pKodoUploader->nTokenDeadline;
+
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
         param.nSeqNum = pKodoUploader->session.nTsSequenceNumber++;
         
@@ -206,16 +205,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
-        
-        uint64_t nSegmentId = pSession->nSessionStartTime;
-        
-        int nDeleteAfterDays_ = 0;
-        int nDeadline = 0;
-        ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, &nDeadline);
-        if (ret != LINK_SUCCESS) {
-                LinkLogWarn("not get deleteafterdays");
-        }
-        pKodoUploader->nTokenDeadline = nDeadline;
 
         memset(key, 0, sizeof(key));
         
@@ -225,6 +214,12 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         r = LinkGetQueueBuffer(pDataQueue, &bufData, &l);
         if (r > 0) {
 #ifdef LINK_USE_OLD_NAME
+                uint64_t nSegmentId = pSession->nSessionStartTime;
+                int nDeleteAfterDays_ = 0;
+                ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, NULL);
+                if (ret != LINK_SUCCESS) {
+                        LinkLogWarn("not get deleteafterdays");
+                }
                 //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
                         sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d/%s.ts", param.pDeviceName,
@@ -235,13 +230,12 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 }
                 
 #else
-                // app/devicename/ts/startts/endts/segment_start_ts/expiry[/type].ts
                 if (suffix[0] != 0) {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%"PRId64"/%d/%s.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_, suffix);
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%s.ts", param.pFilePrefix,
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, suffix);
                 } else {
-                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s/%d.ts", param.pFilePrefix,
-                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId, nDeleteAfterDays_);
+                        sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
+                                tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
                 }
 #endif
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);

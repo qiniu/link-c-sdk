@@ -47,7 +47,6 @@ typedef struct {
         IN OUT int nDeviceNameLen;
 
         int64_t nSeqNum;
-        int nTokenDeadline;
         char sessionId[LINK_MAX_SESSION_ID_LEN+1];
         char *pAk;
         int nAkLen;
