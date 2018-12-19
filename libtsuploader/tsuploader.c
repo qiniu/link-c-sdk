@@ -7,7 +7,6 @@
 #include "servertime.h"
 #include <time.h>
 #include "fixjson.h"
-#include "b64/b64.h"
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
@@ -91,20 +90,22 @@ static void inttoBCD(int64_t m, char *buf)
 }
 
 static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize,
-                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen) {
+                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen, int64_t duration, int64_t seqnum) {
        
         char metaValue[200];
-        char metaBcd[150];
+        char metaBuf[250];
         int i = 0;
         for(i = 0; i < nMetaLen; i++) {
-                inttoBCD(pMetas[i].nTimestamp90Khz, metaBcd + 15 * i);
-                inttoBCD(pMetas[i].nOffset, metaBcd + 15 * i + 5);
-                inttoBCD(pMetas[i].nLength, metaBcd + 15 * i + 10);
+                inttoBCD(pMetas[i].nTimestamp90Khz, metaBuf + 15 * i);
+                inttoBCD(pMetas[i].nOffset, metaBuf + 15 * i + 5);
+                inttoBCD(pMetas[i].nLength, metaBuf + 15 * i + 10);
         }
-        int nMetaValueLen = b64_encode(metaBcd, nMetaLen * 15, metaValue, sizeof(metaValue));
+        int nMetaValueLen = urlsafe_b64_encode(metaBuf, nMetaLen * 15, metaValue, sizeof(metaValue));
+        nMetaValueLen = snprintf(metaBuf, sizeof(metaBuf), "{\"o\":\"%s\",\"d\":%"PRId64",\"s\":%"PRId64",\"c\":%d}",
+                                 metaValue, duration, seqnum, 0);
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaValue, nMetaValueLen, /*mimetype*/NULL, &putret);
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, metaBuf, nMetaValueLen, /*mimetype*/NULL, &putret);
 
         
 
@@ -179,7 +180,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 #endif
 
         strcpy(param.sessionId, pKodoUploader->session.sessionId);
-        param.nSeqNum = pKodoUploader->session.nTsSequenceNumber++;
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
@@ -241,7 +241,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
                 
                 int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo,
-                                           pUpMeta->nMetaInfoLen);
+                                           pUpMeta->nMetaInfoLen, tsDuration, pKodoUploader->session.nTsSequenceNumber++);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         pKodoUploader->state = LINK_UPLOAD_OK;
