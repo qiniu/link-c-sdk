@@ -367,7 +367,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         
         int nextReportTime = LinkGetJsonIntByKey(resp, "\"ttl\"");
         if (nextReportTime > 0) {
-                segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime;
+                segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime + time(NULL);
         }
 #endif
         

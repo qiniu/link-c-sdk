@@ -199,7 +199,7 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
         }
         pToken->nFnamePrefixLen = len;
         
-        int nDeadline = LinkGetJsonIntByKey((const char *)pTokenStr, "\"tts\"");
+        int nDeadline = LinkGetJsonIntByKey((const char *)pTokenStr, "\"ttl\"");
         
         int nDeleteAfterDays = 0;
         ret = LinkGetPolicyFromUptoken(pToken->pToken, &nDeleteAfterDays, &pToken->nDeadline);
@@ -208,8 +208,9 @@ size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) 
                 return 0;
         }
         
-        if (nDeadline > 0)
-                pToken->nDeadline = nDeadline;
+        if (nDeadline > 0) {
+                pToken->nDeadline = nDeadline + time(NULL);
+        }
 
         return size * nmemb;
 }
