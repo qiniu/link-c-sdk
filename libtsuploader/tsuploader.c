@@ -34,7 +34,7 @@ typedef struct _KodoUploader{
         LinkCircleQueue * pQueue_;
         TsUploaderMeta* pUpMeta;
         LinkCircleQueue * pCommandQueue_;
-        enum CircleQueuePolicy policy;
+        CircleQueuePolicy policy;
         int nMaxItemLen;
         int nInitItemCount;
         
@@ -533,7 +533,7 @@ static void * listenTsUpload(void *_pOpaque)
         return NULL;
 }
 
-int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg, CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
         KodoUploader * pKodoUploader = (KodoUploader *) malloc(sizeof(KodoUploader));
         if (pKodoUploader == NULL) {

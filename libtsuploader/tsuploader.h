@@ -37,7 +37,7 @@ typedef struct _LinkTsUploader{
         void (*ReportTimeInfo)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp, IN int64_t nSysNanotime, IN enum LinkUploaderTimeInfoType tmtype);
 }LinkTsUploader;
 
-int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg *pArg, IN enum CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);
+int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg *pArg, IN CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);
 void LinkTsUploaderSetTsEndUploadCallback(IN LinkTsUploader * _pUploader, IN LinkEndUploadCallback cb, IN void *pOpaque);
 void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
