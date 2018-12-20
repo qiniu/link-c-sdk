@@ -6,12 +6,12 @@
 #include <stdint.h>
 #endif
 
-enum CircleQueuePolicy{
+typedef enum _CircleQueuePolicy{
         TSQ_FIX_LENGTH,
         TSQ_FIX_LENGTH_CAN_OVERWRITE,
         TSQ_VAR_LENGTH,
         TSQ_APPEND
-};
+} CircleQueuePolicy;
 
 typedef struct _LinkCircleQueue LinkCircleQueue;
 
@@ -36,11 +36,11 @@ typedef struct _LinkCircleQueue{
         LinkCircleQueuePopWithNoOverwrite PopWithNoOverwrite;
         LinkCircleQueueStopPush StopPush;
         void (*GetStatInfo)(LinkCircleQueue *pQueue, LinkUploaderStatInfo *pStatInfo);
-        enum CircleQueuePolicy (*GetType)(LinkCircleQueue *pQueue);
+        CircleQueuePolicy (*GetType)(LinkCircleQueue *pQueue);
 }LinkCircleQueue;
 
-int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout,  enum CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
+int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
 int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen); //just in append mode
-void LinkDestroyQueue(LinkCircleQueue **_pQueue);
+int LinkDestroyQueue(LinkCircleQueue **_pQueue);
 
 #endif

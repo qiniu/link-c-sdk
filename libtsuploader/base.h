@@ -196,6 +196,7 @@ void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
 #define LINK_PAUSED          -6000
 #define LINK_GHTTP_FAIL      -7000
 #define LINK_SUCCESS         0
+#define LINK_ERROR           -1
 
 
 int LinkIsProcStatusQuit();

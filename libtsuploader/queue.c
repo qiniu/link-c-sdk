@@ -17,7 +17,7 @@ typedef struct _CircleQueueImp{
         int nItemLen_;
         pthread_mutex_t mutex_;
         pthread_cond_t condition_;
-        enum CircleQueuePolicy policy;
+        CircleQueuePolicy policy;
         LinkUploaderStatInfo statInfo;
 	int nIsAvailableAfterTimeout;
 }CircleQueueImp;
@@ -45,6 +45,10 @@ static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
 
 static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
 {
+        if (NULL == pData_ || NULL == _pQueue) {
+                        return LINK_ERROR;
+        }
+
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         assert(pQueueImp->nItemLen_ - sizeof(int) >= nDataLen);
 
@@ -158,6 +162,9 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
 
 static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
 {
+        if (NULL == _pQueue || NULL == pBuf_) {
+                return LINK_ERROR;
+        }
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         
         pthread_mutex_lock(&pQueueImp->mutex_);
@@ -265,13 +272,16 @@ static void getStatInfo(LinkCircleQueue *_pQueue, LinkUploaderStatInfo *_pStatIn
         return;
 }
 
-enum CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
+CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         return pQueueImp->policy;
 }
 
-int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, enum CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
 {
+        if (NULL ==_pQueue || _nMaxItemLen < 1 || _nInitItemCount < 1) {
+                    return LINK_ERROR;
+        }
         int ret;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp));
         
@@ -326,8 +336,11 @@ int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
         return pQueueImp->nLen_;
 }
 
-void LinkDestroyQueue(LinkCircleQueue **_pQueue)
+int LinkDestroyQueue(LinkCircleQueue **_pQueue)
 {
+        if (NULL == _pQueue || NULL == *_pQueue) {
+                return LINK_ERROR;
+        }
         CircleQueueImp *pQueueImp = (CircleQueueImp *)(*_pQueue);
 
         StopPush(*_pQueue);
@@ -339,5 +352,5 @@ void LinkDestroyQueue(LinkCircleQueue **_pQueue)
                 free(pQueueImp->pData_);
         free(pQueueImp);
         *_pQueue = NULL;
-        return;
+        return LINK_SUCCESS;
 }

@@ -85,7 +85,7 @@ typedef struct _FFTsMuxUploader{
         LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
         SegmentHandle segmentHandle;
-        enum CircleQueuePolicy queueType_;
+        CircleQueuePolicy queueType_;
         int8_t isPause;
         int8_t isQuit;
         
@@ -679,7 +679,7 @@ static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
-                           int nQBufSize, enum CircleQueuePolicy queueType)
+                           int nQBufSize, CircleQueuePolicy queueType)
 {
         FFTsMuxContext * pTsMuxCtx = (FFTsMuxContext *)malloc(sizeof(FFTsMuxContext));
         if (pTsMuxCtx == NULL) {
