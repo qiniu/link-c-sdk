@@ -14,7 +14,6 @@ static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pPar
         LinkLogDebug("in segGetTokenCallback");
         memcpy(pParam->pTokenBuf, segStoreToken, strlen(segStoreToken));
         memcpy(pParam->pSegUrl, gpMgrTokenRequestUrl, gnMgrTokenRequestUrlLen);
-        memcpy(pParam->pDeviceName, "abc", 3);
         return strlen(segStoreToken);
         
 }

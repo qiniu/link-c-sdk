@@ -2,7 +2,6 @@
 #include "resource.h"
 #include "queue.h"
 #include "uploader.h"
-#include "fixjson.h"
 #include <qupload.h>
 #include "httptools.h"
  #include <unistd.h>
@@ -117,16 +116,10 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
-#ifdef LINK_USE_OLD_NAME
-                                                char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
-                                                char app[LINK_MAX_APP_LEN+1] = {0};
-                                                param.pDeviceName = deviceName;
-                                                param.nDeviceNameLen = sizeof(deviceName);
-#else
+
                                                 char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
                                                 param.pFilePrefix = fprefix;
                                                 param.nFilePrefix = sizeof(fprefix);
-#endif
                                                 int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
@@ -135,21 +128,19 @@ static void * listenPicUpload(void *_pOpaque)
                                                 
                                                 char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
                                                 memset(key, 0, sizeof(key));
-#ifdef LINK_USE_OLD_NAME
-                                                snprintf(key, sizeof(key), "frame,%s,%"PRId64"_0.jpg", deviceName, sig.nTimestamp);
-#else
+
                                                 char *tmp = param.pFilePrefix;
                                                 while(*tmp != 0) {
                                                         if (*tmp == '/')
                                                             *tmp = ',';
                                                         tmp++;
                                                 }
-                                                snprintf(key, sizeof(key), "%s,frame,%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
+                                                int keyLen = snprintf(key, sizeof(key), "%s,frame,%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
                                                          param.sessionId);
-#endif
+
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
-                                                                                            key, strlen(key));
+                                                                                            key, keyLen);
                                                
                                         }
                                         break;
