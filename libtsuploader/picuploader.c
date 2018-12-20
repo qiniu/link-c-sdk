@@ -116,27 +116,16 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
-
-                                                char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
-                                                param.pFilePrefix = fprefix;
-                                                param.nFilePrefix = sizeof(fprefix);
                                                 int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
                                                         break;
                                                 }
                                                 
-                                                char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
+                                                char key[64];
                                                 memset(key, 0, sizeof(key));
 
-                                                char *tmp = param.pFilePrefix;
-                                                while(*tmp != 0) {
-                                                        if (*tmp == '/')
-                                                            *tmp = ',';
-                                                        tmp++;
-                                                }
-                                                int keyLen = snprintf(key, sizeof(key), "%s,frame,%"PRId64"-%s.jpg", param.pFilePrefix, sig.nTimestamp,
-                                                         param.sessionId);
+                                                int keyLen = snprintf(key, sizeof(key), "%"PRId64"-%s.jpg", sig.nTimestamp, param.sessionId);
 
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
@@ -214,29 +203,13 @@ static void * uploadPicture(void *_pOpaque) {
         LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
         pSig->asyncWait_.function = waitUploadThread;
         
-        // frame/ua/ts_start_timestamp/fragment_start_timestamp.jpeg
-        char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
-        memset(key, 0, sizeof(key));
-        if (pSig->pFileName != NULL) {
-                char *n = strrchr(pSig->pFileName, '/');
-                
-                char *r = pSig->pFileName;
-                if (n != NULL) {
-                        r = ++n;
-                } else {
-                        n = pSig->pFileName;
-                }
-                while(*r != 0) {
-                        if (*r == ',') {
-                                *r = '/';
-                        }
-                        r++;
-                }
-                snprintf(key, sizeof(key), "%s", n);
-        } else {
+        if (pSig->pFileName == NULL) {
                 LinkLogError("picuploader pFileName not exits");
                 return NULL;
         }
+        
+        char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
+        memset(key, 0, sizeof(key));
         
         char uptoken[1024] = {0};
         char upHost[192] = {0};
@@ -246,6 +219,9 @@ static void * uploadPicture(void *_pOpaque) {
         param.nTokenBufLen = sizeof(uptoken);
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
+        
+        param.pFilePrefix = key;
+        param.nFilePrefix = sizeof(key);
         
         int ret = 0;
         int isFirst = 0, tryCount = 2;
@@ -273,6 +249,14 @@ static void * uploadPicture(void *_pOpaque) {
                         break;
                 }
         }
+        char *pFile = strrchr(pSig->pFileName, '/');
+        if (pFile == NULL)
+                pFile = pSig->pFileName;
+        else
+                pFile++;
+        int keyLen = snprintf(key+param.nFilePrefix, sizeof(key) - param.nFilePrefix, "/frame/%s", pFile);
+        keyLen += param.nFilePrefix;
+        assert(keyLen < sizeof(key));
 
         LinkPutret putret;
 
