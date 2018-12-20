@@ -1,4 +1,4 @@
 [submodule "third_party/wolfssl"]
 	path = third_party/wolfssl
 	url = https://github.com/wolfSSL/wolfssl.git
-	ignore = dirty
+    ignore = dirty

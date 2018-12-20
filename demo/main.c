@@ -13,7 +13,6 @@
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <signal.h>
-#include <execinfo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -366,53 +365,6 @@ char *GetAacFile()
     return gIpc.config.aac_file;
 }
 
-void SignalHandler( int sig )
-{
-    FILE *fp = fopen( "/tmp/oem/app/crash.log", "w+" );
-    if ( fp ) {
-        char buffer[32] = { 0 };
-        void *array[20];
-        size_t size;
-        char **strings;
-        size_t i;
-
-        size = backtrace (array, 20);
-        strings = backtrace_symbols (array, size);
-
-        sprintf( buffer, "get sig %d\n", sig );
-        fwrite( buffer, strlen(buffer), 1, fp );
-        memset( buffer, 0, sizeof(buffer) );
-        sprintf( buffer, "Obtained %zd stack frames.\n", size );
-        fwrite( buffer, strlen(buffer), 1, fp );
-        for ( i=0; i<size; i++ ) {
-            fwrite( strings[i], strlen(strings[i]), 1, fp );
-        }
-        fclose( fp );
-    }
-    DBG_LOG("get sig %d\n", sig );
-    switch( sig ) {
-    case SIGINT:
-    case SIGQUIT:
-    case SIGABRT:
-    case SIGSEGV:
-    case SIGKILL:
-    case SIGTERM:
-        exit(0);
-        break;
-
-    }
-}
-
-void SignalSetup()
-{
-    int i = 0;
-
-    for ( i=0; i<32; i++ ) {
-        signal( i, SignalHandler );
-    }
-}
-
-
 int main()
 {
     char *logFile = NULL;
@@ -421,7 +373,6 @@ int main()
     gIpc.version = "v00.00.07";
     gIpc.running = 1;
 
-    SignalSetup();
     InitConfig();
     UpdateConfig();
     
@@ -467,4 +418,5 @@ int main()
 
     return 0;
 }
+
 

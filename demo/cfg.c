@@ -404,9 +404,11 @@ void CfgGetItem()
 
 void DumpConfig()
 {
+#if 0
     printf("log_output : %d\n", gIpc.config.logOutput );
     printf("h264_file : %s\n", gIpc.config.h264_file );
     printf("ota_enable : %d\n", gIpc.config.ota_enable );
+#endif
 }
 
 void UpdateConfig()

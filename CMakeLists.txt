@@ -40,6 +40,11 @@ if (WITH_DEBUG)
     add_definitions("-Wall -g -fstack-protector")
 endif()
 
+if(TRACE_FUNCTION)
+    add_definitions(-DDEBUG_TRACE_FUNCTION)
+    add_definitions("-funwind-tables -finstrument-functions")
+endif()
+
 execute_process(
   COMMAND git describe --abbrev=8 --dirty --always --tags
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}

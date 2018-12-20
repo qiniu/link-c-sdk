@@ -43,6 +43,7 @@ add_executable(demo-tsupload
     stream.h
     ota.c
     md5.c
+    func_trace.c
     ${DEV_FILE}
 )
 
