@@ -4,9 +4,9 @@
 #include "log.h"
 #include <pthread.h>
 #include "servertime.h"
-#include "fixjson.h"
 #include "segmentmgr.h"
 #include "httptools.h"
+#include "cJSON/cJSON.h"
 
 static int volatile nProcStatus = 0;
 
@@ -62,20 +62,11 @@ int LinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkMediaA
 int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg)
 {
         if ( _pUserUploadArg == NULL
-#ifdef LINK_USE_OLD_NAME
-            ||_pUserUploadArg->pDeviceName == NULL || _pUserUploadArg->nDeviceNameLen == 0
-#endif
             || _pUserUploadArg->nDeviceAkLen == 0 || _pUserUploadArg->pDeviceAk == NULL ||
             _pUserUploadArg->pDeviceSk == NULL || _pUserUploadArg->nDeviceSkLen == 0) {
                 LinkLogError("app or deviceName or ak or sk argument is null");
                 return LINK_ARG_ERROR;
         }
-#ifdef LINK_USE_OLD_NAME
-        if (_pUserUploadArg->nDeviceNameLen > LINK_MAX_DEVICE_NAME_LEN) {
-                LinkLogError("app or deviceName is too long: %d", _pUserUploadArg->nDeviceNameLen);
-                return LINK_ARG_ERROR;
-        }
-#endif
         
         LinkMediaArg avArg;
         avArg.nAudioFormat = _pUserUploadArg->nAudioFormat;
@@ -171,86 +162,66 @@ void LinkCleanup()
         return;
 }
 
-struct HttpToken {
-        char * pToken;
-        int nTokenLen;
-        char *pFnamePrefix;
-        int nFnamePrefixLen;
-        int nDeadline;
-        int nHttpRet; //use with curl not ghttp
-};
 
-size_t writeData(void *pTokenStr, size_t size,  size_t nmemb,  void *pUserData) {
-        struct HttpToken *pToken = (struct HttpToken *)pUserData;
-        
-        int len = pToken->nTokenLen;
-        int ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"token\"", pToken->pToken, &len);
-        if (ret != LINK_SUCCESS) {
-                pToken->nHttpRet = ret;
-                return 0;
-        }
-        pToken->nTokenLen = len;
-        
-        len = pToken->nFnamePrefixLen;
-        ret = LinkGetJsonStringByKey((const char *)pTokenStr, "\"fnamePrefix\"", pToken->pFnamePrefix, &len);
-        if (ret != LINK_SUCCESS) {
-                pToken->nHttpRet = ret;
-                return 0;
-        }
-        pToken->nFnamePrefixLen = len;
-        
-        int nDeadline = LinkGetJsonIntByKey((const char *)pTokenStr, "\"ttl\"");
-        
-        int nDeleteAfterDays = 0;
-        ret = LinkGetPolicyFromUptoken(pToken->pToken, &nDeleteAfterDays, &pToken->nDeadline);
-        if (ret != LINK_SUCCESS || pToken->nDeadline < 1543397800) {
-                pToken->nHttpRet = LINK_JSON_FORMAT;
-                return 0;
-        }
-        
-        if (nDeadline > 0) {
-                pToken->nDeadline = nDeadline + time(NULL);
-        }
-
-        return size * nmemb;
-}
-
-int LinkGetUploadToken(char *pBuf, int nBufLen, int *pDeadline, OUT char *pFnamePrefix, IN int nFnamePrefixLen,
-                       const char *pUrl, const char *pToken, int nTokenLen)
+int LinkGetUploadToken(char *pTokenBuf, int nTokenBufLen, int *pDeadline, OUT char *pFnamePrefix, IN int nFnamePrefixLen,
+                       const char *pUrl, const char *pReqToken, int nReqTokenLen)
 {
         
-        if (pUrl == NULL || pBuf == NULL || nBufLen <= 10)
+        if (pUrl == NULL || pTokenBuf == NULL || pFnamePrefix == NULL || nTokenBufLen <= 10)
                 return LINK_ARG_ERROR;
         char httpResp[1024+256]={0};
         int nHttpRespLen = sizeof(httpResp);
         int nRespLen = 0;
-        int ret = LinkSimpleHttpGetWithToken(pUrl, httpResp, nHttpRespLen, &nRespLen, pToken, nTokenLen);
+        int ret = LinkSimpleHttpGetWithToken(pUrl, httpResp, nHttpRespLen, &nRespLen, pReqToken, nReqTokenLen);
         
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
-                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRespLen, nTokenLen);
+                        LinkLogError("buffer is small:%d %d", sizeof(httpResp), nRespLen, nReqTokenLen);
                 }
                 return ret;
         }
         
-        memset(pBuf, 0, nBufLen);
+        memset(pTokenBuf, 0, nTokenBufLen);
 
-        struct HttpToken token;
-        token.pToken = pBuf;
-        token.nTokenLen = nBufLen;
-        token.nDeadline = 0;
-        token.nHttpRet = 0;
-        token.nFnamePrefixLen = nFnamePrefixLen;
-        token.pFnamePrefix = pFnamePrefix;
-        
-        if (writeData(httpResp, nRespLen,  1,  &token) == 0){
-                LinkLogError("maybe response format error:%s[%d]", httpResp, token.nHttpRet);
+        assert(nRespLen <= sizeof(httpResp) - 1);
+        httpResp[nRespLen] = 0;
+        cJSON * pJsonRoot = cJSON_Parse(httpResp);
+        if (pJsonRoot == NULL) {
                 return LINK_JSON_FORMAT;
         }
-        token.pToken[token.nTokenLen] = 0;
-        if (pDeadline) {
-                *pDeadline = token.nDeadline;
-        }
         
+        cJSON *pNode = cJSON_GetObjectItem(pJsonRoot, "ttl");
+        if (pNode == NULL) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_JSON_FORMAT;
+        }
+        *pDeadline = pNode->valueint;
+        
+        pNode = cJSON_GetObjectItem(pJsonRoot, "token");
+        if (pNode == NULL) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_JSON_FORMAT;
+        }
+        int nCpyLen = strlen(pNode->valuestring);
+        if (nTokenBufLen < nCpyLen) {
+                return LINK_BUFFER_IS_SMALL;
+        }
+        memcpy(pTokenBuf, pNode->valuestring, nCpyLen);
+        pTokenBuf[nCpyLen] = 0;
+        
+        pNode = cJSON_GetObjectItem(pJsonRoot, "fnamePrefix");
+        if (pNode == NULL) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_JSON_FORMAT;
+        }
+        nCpyLen = strlen(pNode->valuestring);
+        if (nFnamePrefixLen < nCpyLen) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_BUFFER_IS_SMALL;
+        }
+        memcpy(pFnamePrefix, pNode->valuestring, nCpyLen);
+        pFnamePrefix[nCpyLen] = 0;
+        
+        cJSON_Delete(pJsonRoot);
         return LINK_SUCCESS;
 }

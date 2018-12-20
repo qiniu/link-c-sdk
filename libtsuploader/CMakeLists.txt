@@ -45,8 +45,6 @@ add_library(tsuploader STATIC
     tsmux.c
     mpegts.c
     mpegts.h
-    fixjson.h
-    fixjson.c
     picuploader.h
     picuploader.c
     segmentmgr.c

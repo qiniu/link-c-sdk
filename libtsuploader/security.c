@@ -18,7 +18,9 @@ int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlW
                 return LINK_ARG_ERROR;
         }
         
-        int nBufLen = strlen(pUrlWithPathAndQuery) + nDataLen + 256;
+        int nBufLen = strlen(pUrlWithPathAndQuery);
+        assert(nBufLen < 192); //TODO
+        nBufLen = nBufLen + nDataLen + 256;
         char *buf = malloc(nBufLen);
         if (buf == NULL) {
                 return LINK_NO_MEMORY;
@@ -49,7 +51,8 @@ int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlW
         int ret = HmacSha1(pKey, nKeyLen, buf, nOffset, sha1, &nSha1);
         free(buf);
         
-        urlsafe_b64_encode(sha1, 20, pOutput, pOutputLen);
+        int outlen = urlsafe_b64_encode(sha1, 20, pOutput, *pOutputLen);
+        *pOutputLen = outlen;
         return ret;
 }
 
@@ -57,8 +60,10 @@ int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlW
 int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         char *pOutput, int *pOutputLen) { //EVP_MAX_MD_SIZE
         
-        *pOutputLen=20;
-        unsigned char * res = HMAC(EVP_sha1(), pKey, nKeyLen, pInput, nInputLen, pOutput, pOutputLen);
+        unsigned int outlen=20;
+        unsigned char * res = HMAC(EVP_sha1(), (const unsigned char *)pKey, nKeyLen,
+                                   (const unsigned char *)pInput, nInputLen,
+                                   (unsigned char *)pOutput, &outlen);
         if (res == NULL) {
                 return LINK_WOLFSSL_ERR;
         }

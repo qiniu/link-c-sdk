@@ -6,7 +6,6 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
-#include "fixjson.h"
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
@@ -180,18 +179,12 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
         
-#ifdef LINK_USE_OLD_NAME
-        char deviceName[LINK_MAX_DEVICE_NAME_LEN+1] = {0};
-        char app[LINK_MAX_APP_LEN+1] = {0};
-        param.pDeviceName = deviceName;
-        param.nDeviceNameLen = sizeof(deviceName);
-#else
         char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
-#endif
 
-        strcpy(param.sessionId, pKodoUploader->session.sessionId);
+        int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);
+        assert(nSLen < sizeof(param.sessionId));
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
@@ -235,21 +228,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char *bufData;
         r = LinkGetQueueBuffer(pDataQueue, &bufData, &l);
         if (r > 0) {
-#ifdef LINK_USE_OLD_NAME
-                uint64_t nSegmentId = pSession->nSessionStartTime;
-                int nDeleteAfterDays_ = 0;
-                ret = LinkGetPolicyFromUptoken(uptoken, &nDeleteAfterDays_, NULL);
-                if (ret != LINK_SUCCESS) {
-                        LinkLogWarn("not get deleteafterdays");
-                }
-                //ts/uaid/startts/endts/segment_start_ts/expiry[/type].ts
-                sprintf(key, "ts/%s/%"PRId64"/%"PRId64"/%"PRId64"/%d.ts", param.pDeviceName,
-                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, nSegmentId / 1000000, nDeleteAfterDays_);
-                
-#else
+
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
-#endif
+
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
                 
                 int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
@@ -409,9 +391,9 @@ LinkUploadState getUploaderState(LinkTsUploader *_pTsUploader)
 }
 
 void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
-        char str[15] = {0};
-        sprintf(str, "%"PRId64"", nTsStartSystime/1000000);
-        int nId = urlsafe_b64_encode(str, strlen(str), pSession->sessionId, sizeof(pSession->sessionId));
+        char str[20] = {0};
+        int strLen = sprintf(str, "%"PRId64"", nTsStartSystime/1000000);
+        int nId = urlsafe_b64_encode(str, strLen, pSession->sessionId, sizeof(pSession->sessionId));
         while (pSession->sessionId[nId - 1] == '=') {
                 nId--;
                 pSession->sessionId[nId] = 0;
