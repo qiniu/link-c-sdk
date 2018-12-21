@@ -21,20 +21,26 @@ typedef struct _LinkTsUploadArg {
         int64_t nLastCheckTime;
 }LinkTsUploadArg;
 
+typedef struct _LinkReportTimeInfo {
+        int64_t nAudioDuration;
+        int64_t nVideoDuration;
+        int64_t nMediaDuation;
+        int64_t nSystimestamp;
+}LinkReportTimeInfo;
+
 typedef struct _LinkTsUploader LinkTsUploader;
 
 enum LinkUploaderTimeInfoType {
-        LINK_AUDIO_TIMESTAMP = 1,
-        LINK_VIDEO_TIMESTAMP = 2,
         LINK_SEG_TIMESTAMP = 3,
+        LINK_TS_START = 4,
+        LINK_TS_END = 5,
 };
 
 typedef struct _LinkTsUploader{
         LinkUploadState (*GetUploaderState)(IN LinkTsUploader *pTsUploader);
-        void (*NotifyDataPrapared)(IN LinkTsUploader *pTsUploader);
         int(*Push)(IN LinkTsUploader *pTsUploader, IN const char * pData, int nDataLen);
         void (*GetStatInfo)(IN LinkTsUploader *pTsUploader, IN LinkUploaderStatInfo *pStatInfo);
-        void (*ReportTimeInfo)(IN LinkTsUploader *pTsUploader, IN int64_t nTimestamp, IN int64_t nSysNanotime, IN enum LinkUploaderTimeInfoType tmtype);
+        void (*ReportTimeInfo)(IN LinkTsUploader *pTsUploader, IN LinkReportTimeInfo *pTinfo, IN enum LinkUploaderTimeInfoType tmtype);
 }LinkTsUploader;
 
 int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg *pArg, IN CircleQueuePolicy _policy, IN int _nMaxItemLen, IN int _nInitItemCount);

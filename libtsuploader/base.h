@@ -162,12 +162,7 @@ typedef struct _LinkSession { // seg report info
         
         // current ts scope
         int64_t nTsStartTime;
-        int64_t nFirstAudioFrameTimestamp;
-        int64_t nLastAudioFrameTimestamp;
-        int64_t nFirstVideoFrameTimestamp;
-        int64_t nLastVideoFrameTimestamp;
-        int64_t nFirstFrameTimestamp;
-        int64_t nLastFrameTimestamp;
+        int64_t nTsDuration;
 } LinkSession;
 
 void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
