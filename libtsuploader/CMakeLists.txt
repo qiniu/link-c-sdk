@@ -33,6 +33,7 @@ add_library(tsuploader STATIC
     kmp.c
     log.h
     log.c
+    sign.c
     servertime.h
     servertime.c
     tsmuxuploader.c
