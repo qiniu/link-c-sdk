@@ -176,29 +176,3 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         return LINK_SUCCESS;
 #endif
 }
-
-#if 0
-#ifdef strlen
-#undef strlen
-size_t mystrlen(const char *s) {
-        size_t l = strlen(s);
-        if (l > 120) {
-                return l;
-        }
-        return l;
-}
-#endif
-
-#ifdef strcpy
-#undef strcpy
-char *mystrcpy(char *dest, const char *src) {
-        size_t l = strlen(src);
-        if (l>120) {
-                return strcpy(dest, src);
-        }
-        return strcpy(dest, src);
-}
-
-#endif
-
-#endif

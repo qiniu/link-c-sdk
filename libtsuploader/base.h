@@ -201,8 +201,12 @@ void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
 
 int LinkIsProcStatusQuit();
 #if 0
-#define strlen mystrlen
-#define strcpy mystrcpy
+#define strlen(a, b) mystrlen(a, b)
+inline size_t mystrlen(const char *s, int max) {
+        size_t l = strlen(s);
+        assert(l <= max);
+        return l;
+}
 #endif
 
 #define LINK_DEFINE_HANDLE(object) typedef struct object##_T* object;
