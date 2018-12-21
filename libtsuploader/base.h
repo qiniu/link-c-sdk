@@ -162,12 +162,7 @@ typedef struct _LinkSession { // seg report info
         
         // current ts scope
         int64_t nTsStartTime;
-        int64_t nFirstAudioFrameTimestamp;
-        int64_t nLastAudioFrameTimestamp;
-        int64_t nFirstVideoFrameTimestamp;
-        int64_t nLastVideoFrameTimestamp;
-        int64_t nFirstFrameTimestamp;
-        int64_t nLastFrameTimestamp;
+        int64_t nTsDuration;
 } LinkSession;
 
 void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
@@ -201,8 +196,12 @@ void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
 
 int LinkIsProcStatusQuit();
 #if 0
-#define strlen mystrlen
-#define strcpy mystrcpy
+#define strlen(a, b) mystrlen(a, b)
+inline size_t mystrlen(const char *s, int max) {
+        size_t l = strlen(s);
+        assert(l <= max);
+        return l;
+}
 #endif
 
 #define LINK_DEFINE_HANDLE(object) typedef struct object##_T* object;

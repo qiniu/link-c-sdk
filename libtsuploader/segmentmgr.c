@@ -23,18 +23,13 @@ typedef struct {
 }SegInfo;
 
 typedef struct {
-        int64_t nStart;
-        int64_t nEnd;
         SegmentHandle handle;
-        int segUploadOk;
         int segReportOk;
-        char bucket[LINK_MAX_BUCKET_LEN+1];
         LinkUploadParamCallback getUploadParamCallback;
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
         int64_t nNextUpdateSegTimeInSecond;
-        int64_t nLastUpdateTime;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
         SessionMeta sessionMeta;
         int sessionMetaIsValid;
@@ -56,10 +51,12 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
         if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
                 pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
                 pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
-                return 0;
+                if (pCurSession->isNewSessionStarted == 0 && pCurSession->nSessionEndResonCode == 0 &&
+                    pSeg->segReportOk) {
+                        return 0;
+                }
         }
 
-        pSeg->nLastUpdateTime = pSeg->nNextUpdateSegTimeInSecond; // or nNow
         if (pSeg->tmpSession.nVideoGapFromLastReport > 0)
                 pCurSession->nVideoGapFromLastReport += pSeg->tmpSession.nVideoGapFromLastReport;
         if (pSeg->tmpSession.nAudioGapFromLastReport > 0)
@@ -209,22 +206,16 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
                 LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
                 return;
         }
-        int ret;
-        if (pSegInfo->session.isNewSessionStarted || pSegInfo->session.nSessionEndResonCode != 0) {
-                ret = reportSegInfo(pSegInfo, idx);
-                if (ret == LINK_SUCCESS)
-                        segmentMgr.handles[idx].segReportOk = 1;
+        
+        if (!checkShouldReport(&segmentMgr.handles[idx], &pSegInfo->session)) {
                 return;
         }
-        if (segmentMgr.handles[idx].segReportOk) {
-                if (!checkShouldReport(&segmentMgr.handles[idx], &pSegInfo->session)) {
-                        return;
-                }
-        }
-        
-        ret = reportSegInfo(pSegInfo, idx);
+
+        int ret = reportSegInfo(pSegInfo, idx);
         if (ret == LINK_SUCCESS)
                 segmentMgr.handles[idx].segReportOk = 1;
+        else
+                segmentMgr.handles[idx].segReportOk = 0;
         
         return;
 }
@@ -271,13 +262,8 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
         pthread_mutex_lock(&segMgrMutex);
         if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
                 segmentMgr.handles[seg].handle = -1;
-                segmentMgr.handles[seg].nStart = 0;
-                segmentMgr.handles[seg].nEnd = 0;
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
-                segmentMgr.handles[seg].bucket[0] = 0;
-                segmentMgr.handles[seg].segUploadOk = 0;
-                segmentMgr.handles[seg].nLastUpdateTime = 0;
                 segmentMgr.handles[seg].nNextUpdateSegTimeInSecond = 0;
                 segmentMgr.handles[seg].sessionMetaIsValid = 0;
         }
