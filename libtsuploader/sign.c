@@ -17,39 +17,34 @@ int LinkVerify(char *ak, char *sk, char* token)
                       parserDak = p;
               } else if (index == 1) {
                       EncodedSign = p;
-                      printf("EncodedSign %s\n", EncodedSign);
               } else if (index == 2) {
                       encodedPutPolicy = p;
-                      printf("encodedPutPolicy %s\n", encodedPutPolicy);
               }
               p = strtok(NULL, delim);
               ++index;
         }
         if (EncodedSign == NULL || encodedPutPolicy == NULL) {
-              return 0;
+              return LINK_ERROR;
         }
 	int ret = memcmp(ak, parserDak, strlen(ak));
         if (ret != 0) {
                 printf("DAK is not correct\n");
-                return 0;
+                return LINK_ERROR;
         }
         unsigned char md[20] = {0};
         unsigned int len = 20;
-        printf("sign %s date %s \n", sk, encodedPutPolicy);
 
         unsigned char* digest = HMAC(EVP_sha1(), sk, strlen(sk), (const unsigned char*)encodedPutPolicy, strlen(encodedPutPolicy), md, &len);
 
-        printf("digest %s len %d\n", digest, len);
         char test[100] = {0};
         int testlen = 100;
         int realsize = urlsafe_b64_encode(md, len, test, testlen);
-        printf("test %s len %d\n", test, realsize);
         ret = memcmp(test, EncodedSign, realsize);
         if (ret != 0) {
                 printf("token is not correct\n");
-                return 0;
+                return LINK_ERROR;
         }
-        return 1;
+        return LINK_SUCCESS;
 }
 
 #if 0
