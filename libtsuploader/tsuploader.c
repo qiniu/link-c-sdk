@@ -151,6 +151,21 @@ static void resetSessionReportScope(LinkSession *pSession) {
         pSession->nAudioGapFromLastReport = 0;
         pSession->nVideoGapFromLastReport = 0;
 }
+static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t nCurTsDuration) {
+        int total = pKodoUploader->nMaxItemLen  * pKodoUploader->nInitItemCount;
+        if (nCurTsDuration < 4500) {
+                return;
+        }
+        total += nCurLen;
+        total /= 2;
+        int delta = total * 0.15;
+        if (delta < 50 * 1024)
+                delta = 50 * 1024;
+        total += delta;
+        pKodoUploader->nInitItemCount = total / pKodoUploader->nMaxItemLen;
+        LinkLogInfo("resize queue buffer:%d", pKodoUploader->nInitItemCount * pKodoUploader->nMaxItemLen);
+        return;
+}
 
 static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
@@ -218,7 +233,8 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char *bufData;
         r = LinkGetQueueBuffer(pDataQueue, &bufData, &l);
         if (r > 0) {
-
+                resizeQueueSize(pKodoUploader, l, tsDuration);
+                
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
 
@@ -309,7 +325,6 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         uploadCommand.ts.pData = pKodoUploader->pQueue_;
         uploadCommand.ts.pKodoUploader = pKodoUploader;
         uploadCommand.ts.pUpMeta = pKodoUploader->pUpMeta;
-        
        
         pKodoUploader->pQueue_ = NULL;
         pKodoUploader->pUpMeta = NULL;

@@ -85,8 +85,6 @@ typedef struct _FFTsMuxUploader{
         int nFrameCount;
         LinkMediaArg avArg;
         
-        int nUploadBufferSize;
-        
         Token token_;
         LinkTsUploadArg uploadArgBak;
         PictureUploader *pPicUploader;
@@ -662,67 +660,8 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 #define getFFmpegErrorMsg(errcode) char msg[128];\
 av_strerror(errcode, msg, sizeof(msg))
 
-static void inline setQBufferSize(FFTsMuxUploader *pFFTsMuxUploader, char *desc, int s)
-{
-        pFFTsMuxUploader->nUploadBufferSize = s;
-        LinkLogInfo("desc:(%s) buffer Q size is:%d", desc, pFFTsMuxUploader->nUploadBufferSize);
-        return;
-}
-
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        if (pFFTsMuxUploader->nUploadBufferSize != 0) {
-                return pFFTsMuxUploader->nUploadBufferSize;
-        }
-        int nSize = 256*1024;
-        int64_t nTotalMemSize = 0;
-        int nRet = 0;
-#ifdef __APPLE__
-        int mib[2];
-        size_t length;
-        mib[0] = CTL_HW;
-        mib[1] = HW_MEMSIZE;
-        length = sizeof(int64_t);
-        nRet = sysctl(mib, 2, &nTotalMemSize, &length, NULL, 0);
-#else
-        struct sysinfo info = {0};
-        nRet = sysinfo(&info);
-        nTotalMemSize = info.totalram;
-#endif
-        if (nRet != 0) {
-                setQBufferSize(pFFTsMuxUploader, "default", nSize);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        }
-        LinkLogInfo("total memory size:%"PRId64"\n", nTotalMemSize);
-        
-        int64_t M = 1024 * 1024;
-        if (nTotalMemSize <= 32 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 32M", nSize);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 64 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 64M", nSize * 2);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 128 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 128M", nSize * 3);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 256 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 256M", nSize * 4);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 512 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 512M", nSize * 6);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 1024 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 1G", nSize * 8);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 2 * 1024 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 2G", nSize * 10);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else if (nTotalMemSize <= 4 * 1024 * M) {
-                setQBufferSize(pFFTsMuxUploader, "le 4G", nSize * 12);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        } else {
-                setQBufferSize(pFFTsMuxUploader, "gt 4G", nSize * 16);
-                return pFFTsMuxUploader->nUploadBufferSize;
-        }
+        return 412*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
@@ -891,16 +830,6 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
         return;
 }
 
-static void setUploaderBufferSize(LinkTsMuxUploader* _pTsMuxUploader, int nBufferSize)
-{
-        if (nBufferSize < 256) {
-                LinkLogWarn("setUploaderBufferSize is to small:%d. ge 256 required", nBufferSize);
-                return;
-        }
-        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
-        pFFTsMuxUploader->nUploadBufferSize = nBufferSize * 1024;
-}
-
 static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
@@ -991,7 +920,6 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         pFFTsMuxUploader->tsMuxUploader_.PushAudio = PushAudio;
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
-        pFFTsMuxUploader->tsMuxUploader_.SetUploaderBufferSize = setUploaderBufferSize;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
         pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
         pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
@@ -1461,12 +1389,6 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
                 pRc->nTsDuration = 5000;
         LinkLogInfo("tsDuration:%d", pRc->nTsDuration);
-        
-        pNode = cJSON_GetObjectItem(pSeg, "tsEstimatedSize");
-        if (pNode != NULL) {
-                LinkLogInfo("tsEstimatedSize:%d", pNode->valueint);
-                pFFTsMuxUploader->nUploadBufferSize = pNode->valueint * 1024;
-        }
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
         if (pNode != NULL) {

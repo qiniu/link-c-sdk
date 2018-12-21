@@ -16,7 +16,6 @@ typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
 typedef struct _LinkTsMuxUploader{
         int(*PushVideo)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp, IN int nIsKeyFrame, IN int nIsSegStart);
         int(*PushAudio)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp);
-        void (*SetUploaderBufferSize)(IN LinkTsMuxUploader* pTsMuxUploader, int);
         int (*GetUploaderBufferUsedSize)(IN LinkTsMuxUploader* pTsMuxUploader);
 }LinkTsMuxUploader;
 
