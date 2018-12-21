@@ -124,15 +124,6 @@ int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataL
         return ret;
 }
 
-void LinkSetUploadBufferSize(LinkTsMuxUploader *_pTsMuxUploader, int _nSize)
-{
-        if (_pTsMuxUploader == NULL || _nSize < 0) {
-                LinkLogError("wrong arg.%p %d", _pTsMuxUploader, _nSize);
-                return;
-        }
-        _pTsMuxUploader->SetUploaderBufferSize(_pTsMuxUploader, _nSize);
-}
-
 int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
 {
         return _pTsMuxUploader->GetUploaderBufferUsedSize(_pTsMuxUploader);

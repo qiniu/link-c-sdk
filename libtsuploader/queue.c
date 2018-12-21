@@ -333,7 +333,7 @@ int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
         *nBufLen = pQueueImp->nLen_;
         pthread_mutex_unlock(&pQueueImp->mutex_);
 
-        return pQueueImp->nLen_;
+        return *nBufLen;
 }
 
 int LinkDestroyQueue(LinkCircleQueue **_pQueue)

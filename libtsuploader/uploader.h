@@ -113,19 +113,6 @@ int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN SessionMeta *metas);
 void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
- * 设置上传实例的缓存 buffer
- *
- * buffer 最小值是 256KB, 此函数不是线程安全函数。
- *
- * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] nSize 缓存 buffer 大小
- * @return NULL
- */
-void LinkSetUploadBufferSize(IN LinkTsMuxUploader *pTsMuxUploader,
-                             IN int nSize
-                             );
-
-/**
  * 获取上传实例的缓存 buffer 大小
  *
  * @param[in] pTsMuxUploader 切片上传实例
