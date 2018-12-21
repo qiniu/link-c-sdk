@@ -57,11 +57,11 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
         LinkSession session;
         memset(&session, 0, sizeof(session));
         session.nSessionStartTime = tp.tv_sec * 1000;
-        session.nFirstFrameTimestamp = 0;
-        session.nLastFrameTimestamp = session.nFirstFrameTimestamp+5320;
+        int64_t basetime = session.nSessionStartTime;
+        session.nTsDuration = basetime+5320;
         while(count) {
                 LinkUpdateSegment(segHandle, &session);
-                session.nLastFrameTimestamp+=5222;
+                session.nTsDuration+=5222;
                 count--;
                 sleep(8);
         }

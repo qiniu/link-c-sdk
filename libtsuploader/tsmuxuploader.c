@@ -806,7 +806,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         assert(nSLen < sizeof(upparam.sessionId));
         
         // update upload token
-        fprintf(stderr, "force: update remote token:%"PRId64"\n", pSession->nSessionStartTime);
+        LinkLogInfo("force: update remote token:%"PRId64"\n", pSession->nSessionStartTime);
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
@@ -834,7 +834,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 int nSLen = snprintf(upparam.sessionId, sizeof(upparam.sessionId), "%s", pSession->sessionId);
                 assert(nSLen < sizeof(upparam.sessionId));
                 
-                fprintf(stderr, "start: update remote config:%"PRId64" %"PRId64"\n",
+                LinkLogInfo("start: update remote config:%"PRId64" %"PRId64"\n",
                         pSession->nSessionStartTime, pFFTsMuxUploader->uploadArgBak.nSegmentId_);
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
                 pSession->isNewSessionStarted = 0;
@@ -1461,6 +1461,12 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
         if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
                 pRc->nTsDuration = 5000;
         LinkLogInfo("tsDuration:%d", pRc->nTsDuration);
+        
+        pNode = cJSON_GetObjectItem(pSeg, "tsEstimatedSize");
+        if (pNode != NULL) {
+                LinkLogInfo("tsEstimatedSize:%d", pNode->valueint);
+                pFFTsMuxUploader->nUploadBufferSize = pNode->valueint * 1024;
+        }
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
         if (pNode != NULL) {

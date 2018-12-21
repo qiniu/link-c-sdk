@@ -466,7 +466,7 @@ static void * listenTsUpload(void *_pOpaque)
                 //LinkLogDebug("ts queue:%d", info.nLen_);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
-                                LinkLogError("seg queue error. pop:%d", ret);
+                                LinkLogError("tscmd queue error. pop:%d", ret);
                         }
                         continue;
                 }
@@ -478,7 +478,7 @@ static void * listenTsUpload(void *_pOpaque)
                         case LINK_TSU_QUIT:
                                 LinkLogInfo("tsuploader required to quit");
                                 handleSegTimeReport(pKodoUploader, &cmd.time);
-                                return NULL;
+                                break;
                         case LINK_TSU_START_TIME:
                                 handleTsStartTimeReport(pKodoUploader, &cmd.time);
                                 break;
@@ -575,7 +575,8 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
                         sleep(1);
                 }
         }
-         pKodoUploader->nQuit_ = 1;
+        LinkLogInfo("tsuploader required to quit:%d", ret);
+        pKodoUploader->nQuit_ = 1;
         
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);
