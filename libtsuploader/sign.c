@@ -49,9 +49,9 @@ int LinkVerify(char *ak, char *sk, char* token)
 
 #if 0
 int testLinkVerify() {
-        char key[] = "eNFrLXKG3R8TJ-DJA9YiMjLwuEfQnw8krrDuZzoy";
-        char Pwd[1000] = "Ves3WTXC8XnEHT0I_vacEQQz-9jrJZxNExcmarzQ:nbnRXShp85g6N3kU3LgJC7Ewpw4=:eyJzY29wZSI6ImlwY2FtZXJhIiwiZGVhZGxpbmUiOjE1NDQxMDA1NjAsImNhbGxiYWNrVXJsIjoiaHR0cDovL2lvdC1saW5rLmRldi5xaW5pdS5pby9xaW5pdS91cGxvYWQvY2FsbGJhY2siLCJjYWxsYmFja0JvZHkiOiJ7XCJrZXlcIjpcIiQoa2V5KVwiLFwiaGFzaFwiOlwiJChldGFnKVwiLFwiZnNpemVcIjokKGZzaXplKSxcImJ1Y2tldFwiOlwiJChidWNrZXQpXCIsXCJuYW1lXCI6XCIkKHg6bmFtZSlcIiwgXCJkdXJhdGlvblwiOlwiJChhdmluZm8uZm9ybWF0LmR1cmF0aW9uKVwifSIsImNhbGxiYWNrQm9keVR5cGUiOiJhcHBsaWNhdGlvbi9qc29uIiwiZGVsZXRlQWZ0ZXJEYXlzIjo3fQ==";
-        int ret = LinkVerify("Ves3WTXC8XnEHT0I_vacEQQz-9jrJZxNExcmarzQ", key, Pwd);
+        char key[] = "";
+        char Pwd[1000] = "";
+        int ret = LinkVerify("", key, Pwd);
         if (ret == 0) {
                 printf("token is not correct\n");
         } else {
