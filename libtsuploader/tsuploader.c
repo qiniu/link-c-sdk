@@ -152,17 +152,16 @@ static void resetSessionReportScope(LinkSession *pSession) {
         pSession->nVideoGapFromLastReport = 0;
 }
 static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t nCurTsDuration) {
-        int total = pKodoUploader->nMaxItemLen  * pKodoUploader->nInitItemCount;
+        
         if (nCurTsDuration < 4500) {
                 return;
         }
-        total += nCurLen;
-        total /= 2;
-        int delta = total * 0.15;
-        if (delta < 50 * 1024)
-                delta = 50 * 1024;
-        total += delta;
-        pKodoUploader->nInitItemCount = total / pKodoUploader->nMaxItemLen;
+        
+        int nCurItemCount = nCurLen / pKodoUploader->nMaxItemLen;
+        
+        if (nCurItemCount > pKodoUploader->nInitItemCount) {
+                pKodoUploader->nInitItemCount = nCurItemCount + 1000;
+        }
         LinkLogInfo("resize queue buffer:%d", pKodoUploader->nInitItemCount * pKodoUploader->nMaxItemLen);
         return;
 }
