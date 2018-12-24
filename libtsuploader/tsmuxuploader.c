@@ -43,14 +43,20 @@ typedef struct _Token {
         int nFnamePrefixLen_;
 }Token;
 
+typedef struct _Buffer {
+        char *pData;
+        int nLen;
+        int nCap;
+}Buffer;
+
 typedef struct  {
         int updateConfigInterval;
         int nTsDuration; //millisecond
         int nSessionDuration; //millisecond
         int nSessionTimeout; //millisecond
-        char *pMgrTokenRequestUrl;
-        char *pUpTokenRequestUrl;
-        char *pUpHostUrl;
+        Buffer mgrTokenRequestUrl;
+        Buffer upTokenRequestUrl;
+        Buffer upHostUrl;
         int isValid;
         
         //not use now
@@ -97,11 +103,13 @@ typedef struct _FFTsMuxUploader{
         
         char *pVideoMeta;
         int nVideoMetaLen;
+        int nVideoMetaCap;
         
         char ak[41];
         char sk[41];
         char *pConfigRequestUrl;
         RemoteConfig remoteConfig;
+        RemoteConfig tmpRemoteConfig;
         
         LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
         char sessionId[LINK_MAX_SESSION_ID_LEN + 1];
@@ -432,10 +440,11 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
                         if (*(pData-4) == 00)
                                 nMetaLen--;
                         if(pFFTsMuxUploader->pVideoMeta == NULL) { //save metadata
-                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen);
+                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen+1024);
                                 if (pFFTsMuxUploader->pVideoMeta == NULL)
                                         return LINK_NO_MEMORY;
                                 pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
+                                pFFTsMuxUploader->nVideoMetaCap = nMetaLen+1024;
                                 memcpy(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen);
                                 return 0;
                         } else { //compare metadata
@@ -444,14 +453,17 @@ static int getVideoSpsAndCompare(FFTsMuxUploader *pFFTsMuxUploader, const char *
                                         
                                         *pIsSameAsBefore = 1;
                                         
-                                        if (pFFTsMuxUploader->nVideoMetaLen != nMetaLen) {
+                                        if (pFFTsMuxUploader->nVideoMetaCap >= nMetaLen) {
+                                                pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
+                                        } else {
                                                 free(pFFTsMuxUploader->pVideoMeta);
                                                 pFFTsMuxUploader->pVideoMeta = NULL;
-                                                
-                                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen);
+                                                pFFTsMuxUploader->pVideoMeta = (char *)malloc(nMetaLen+1024);
                                                 if (pFFTsMuxUploader->pVideoMeta == NULL)
                                                         return LINK_NO_MEMORY;
+                                                
                                                 pFFTsMuxUploader->nVideoMetaLen = nMetaLen;
+                                                pFFTsMuxUploader->nVideoMetaCap = nMetaLen+1024;
                                         }
                                         memcpy(pFFTsMuxUploader->pVideoMeta, pSpsStart, nMetaLen);
                                 }
@@ -646,6 +658,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                                 pFFTsMuxUploader->token_.pFnamePrefix_ = NULL;
                         }
                         freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
+                        freeRemoteConfig(&pFFTsMuxUploader->tmpRemoteConfig);
 
                         pthread_mutex_destroy(&pFFTsMuxUploader->tokenMutex_);
                         pthread_mutex_destroy(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -661,7 +674,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 av_strerror(errcode, msg, sizeof(msg))
 
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        return 412*1024;
+        return 640*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
@@ -847,28 +860,29 @@ static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
 }
 
 static void freeRemoteConfig(RemoteConfig *pRc) {
-        if (pRc->pUpHostUrl) {
-                free(pRc->pUpHostUrl);
-                pRc->pUpHostUrl = NULL;
+        if (pRc->upHostUrl.pData) {
+                free(pRc->upHostUrl.pData);
+                pRc->upHostUrl.pData = NULL;
         }
         
-        if (pRc->pMgrTokenRequestUrl) {
-                free(pRc->pMgrTokenRequestUrl);
-                pRc->pMgrTokenRequestUrl = NULL;
+        if (pRc->mgrTokenRequestUrl.pData) {
+                free(pRc->mgrTokenRequestUrl.pData);
+                pRc->mgrTokenRequestUrl.pData = NULL;
         }
         
-        if (pRc->pUpTokenRequestUrl) {
-                free(pRc->pUpTokenRequestUrl);
-                pRc->pUpTokenRequestUrl = NULL;
+        if (pRc->upTokenRequestUrl.pData) {
+                free(pRc->upTokenRequestUrl.pData);
+                pRc->upTokenRequestUrl.pData = NULL;
         }
         
         return;
 }
 
-static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader, RemoteConfig *pRc) {
+static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
-        pFFTsMuxUploader->remoteConfig = *pRc;
+        RemoteConfig rc = pFFTsMuxUploader->remoteConfig;
+        pFFTsMuxUploader->remoteConfig = pFFTsMuxUploader->tmpRemoteConfig;
+        pFFTsMuxUploader->tmpRemoteConfig = rc;
         pFFTsMuxUploader->remoteConfig.isValid = 1;
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
 }
@@ -988,25 +1002,25 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         
         
         if (pParam->pUpHost != NULL) {
-                int nUpHostLen = strlen(pFFTsMuxUploader->remoteConfig.pUpHostUrl);
+                int nUpHostLen = pFFTsMuxUploader->remoteConfig.upHostUrl.nLen;
                 if (pParam->nUpHostLen - 1 < nUpHostLen) {
-                        LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                        LinkLogError("get uphost buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.upHostUrl.pData, nUpHostLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.pUpHostUrl, nUpHostLen);
+                memcpy(pParam->pUpHost, pFFTsMuxUploader->remoteConfig.upHostUrl.pData, nUpHostLen);
                 pParam->nUpHostLen = nUpHostLen;
                 pParam->pUpHost[nUpHostLen] = 0;
         }
         
         if (pParam->pSegUrl != NULL) {
-                int nSegLen = strlen(pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl);
+                int nSegLen = pFFTsMuxUploader->remoteConfig.mgrTokenRequestUrl.nLen;
                 if (pParam->nSegUrlLen - 1 < nSegLen) {
-                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                        LinkLogError("get segurl buffer is small:%d %d", pFFTsMuxUploader->remoteConfig.mgrTokenRequestUrl.pData, nSegLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pSegUrl, pFFTsMuxUploader->remoteConfig.pMgrTokenRequestUrl, nSegLen);
+                memcpy(pParam->pSegUrl, pFFTsMuxUploader->remoteConfig.mgrTokenRequestUrl.pData, nSegLen);
                 pParam->nSegUrlLen = nSegLen;
                 pParam->pSegUrl[nSegLen] = 0;
         }
@@ -1291,30 +1305,46 @@ void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
         return;
 }
 
-static int getJsonString(char **p, const char *pFieldname, cJSON *pJsonRoot) {
+static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) {
         int nCpyLen = 0;
         cJSON * pNode = cJSON_GetObjectItem(pJsonRoot, pFieldname);
         if (pNode != NULL) {
+                char *tmp;
                 nCpyLen = strlen(pNode->valuestring);
-                char *tmp = malloc(nCpyLen + 1);
-                if (tmp == NULL) {
-                        LinkLogError("no memory for json:%s", pFieldname);
-                        *p = NULL;
-                        return LINK_NO_MEMORY;
+                if (buf->nCap >= nCpyLen + 1) {
+                        memcpy(buf->pData, pNode->valuestring, nCpyLen);
+                        buf->pData[nCpyLen] = 0;
+                        buf->nLen = nCpyLen;
+                } else {
+                        
+                        tmp = malloc(nCpyLen + 256 + 1);
+                        if (tmp == NULL) {
+                                LinkLogError("no memory for json:%s", pFieldname);
+                                return LINK_NO_MEMORY;
+                        }
+                        
+                        if (buf->nCap > 0 && buf->pData) {
+                                free(buf->pData);
+                                buf->pData = NULL;
+                        }
+                        
+                        buf->nCap = nCpyLen + 256 + 1;
+                        buf->nLen = nCpyLen;
+                        buf->pData = tmp;
+                        memcpy(tmp, pNode->valuestring, nCpyLen);
+                        tmp[nCpyLen] = 0;
                 }
-                memcpy(tmp, pNode->valuestring, nCpyLen);
-                tmp[nCpyLen] = 0;
-                *p = tmp;
+                
                 return LINK_SUCCESS;
         }
         LinkLogInfo("not found %s in json", pFieldname);
-        *p = NULL;
         return LINK_JSON_FORMAT;
 }
 
-static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc) {
+static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfigInterval) {
 
-        memset(pRc, 0, sizeof(RemoteConfig));
+        RemoteConfig *pRc = &pFFTsMuxUploader->tmpRemoteConfig;
+        
         char buf[2048] = {0};
         int nBufLen = sizeof(buf);
         int nRespLen = 0, ret = 0;
@@ -1353,6 +1383,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 return LINK_JSON_FORMAT;
         }
         pRc->updateConfigInterval = pNode->valueint;
+        *pUpdateConfigInterval = pNode->valueint;
         
         
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
@@ -1361,23 +1392,23 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, RemoteConfig *pRc)
                 return LINK_JSON_FORMAT;
         }
         
-        ret = getJsonString(&pRc->pUpHostUrl, "uploadUrl", pSeg);
+        ret = getJsonString(&pRc->upHostUrl, "uploadUrl", pSeg);
         if (ret == LINK_SUCCESS) {
-                LinkLogInfo("uploadUrl:%s", pRc->pUpHostUrl);
+                LinkLogInfo("uploadUrl:%s", pRc->upHostUrl.pData);
         } else if (ret == LINK_NO_MEMORY) {
                 goto END;
         }
         
-        ret = getJsonString(&pRc->pUpTokenRequestUrl, "uploadTokenRequestUrl", pSeg);
+        ret = getJsonString(&pRc->upTokenRequestUrl, "uploadTokenRequestUrl", pSeg);
         if (ret == LINK_SUCCESS) {
-                LinkLogInfo("tokenRequestUrl:%s", pRc->pUpTokenRequestUrl);
+                LinkLogInfo("tokenRequestUrl:%s", pRc->upTokenRequestUrl.pData);
         } else if (ret == LINK_NO_MEMORY) {
                 goto END;
         }
         
-        ret = getJsonString(&pRc->pMgrTokenRequestUrl, "segmentReportUrl", pSeg);
+        ret = getJsonString(&pRc->mgrTokenRequestUrl, "segmentReportUrl", pSeg);
         if (ret == LINK_SUCCESS) {
-                LinkLogInfo("segReportUrl:%s", pRc->pMgrTokenRequestUrl);
+                LinkLogInfo("segReportUrl:%s", pRc->mgrTokenRequestUrl.pData);
         } else if (ret == LINK_NO_MEMORY) {
                 goto END;
         }
@@ -1437,7 +1468,7 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         }
         
         
-        int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl,
+        int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.upTokenRequestUrl.pData,
                                              pSParam->sessionId, pSParam->nSeqNum);
         pBuf[nUrlLen] = 0;
         char * pToken = pBuf + nUrlLen + 1;
@@ -1457,7 +1488,7 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 free(pPrefix);
-                LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.pUpTokenRequestUrl);
+                LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.upTokenRequestUrl.pData);
                 return ret;
         }
         int nPreLen = strlen(pPrefix);
@@ -1481,7 +1512,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
         int nNextTryTokenTime = 1;
         int shouldUpdateToken = 0;
         
-        RemoteConfig rc;
+        int  nUpdateConfigInterval = 0;
         int now;
         LinkUploaderStatInfo info;
         char sessionIdBak[LINK_MAX_SESSION_ID_LEN+1] = {0};
@@ -1528,8 +1559,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 int getRcOk = 0; // after getRemoteConfig success,must update token
                 if (param.nType == 2 || shouldUpdateRc || (ret == LINK_TIMEOUT && nRcTimeout)) {
                         getRcOk = 0;
-                        memset(&rc, 0, sizeof(rc));
-                        ret = getRemoteConfig(pFFTsMuxUploader, &rc);
+                        ret = getRemoteConfig(pFFTsMuxUploader, &nUpdateConfigInterval);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
                           
@@ -1545,15 +1575,16 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
     
                                 continue;
                         }
-                        updateRemoteConfig(pFFTsMuxUploader, &rc);
+                        updateRemoteConfig(pFFTsMuxUploader);
                         nNextTryRcTime = 1;
                         shouldUpdateRc = 0;
                         shouldUpdateToken = 0; //rc is Higher priority than token
                         nNextTryTokenTime = 1;
-                        if (rc.updateConfigInterval > 1544756657)
-                                rcSleepUntilTime = rc.updateConfigInterval;
+                        if (nUpdateConfigInterval > 1544756657)
+                                rcSleepUntilTime = nUpdateConfigInterval;
                         else
-                                rcSleepUntilTime = now + rc.updateConfigInterval;
+                                rcSleepUntilTime = now + nUpdateConfigInterval;
+                        nUpdateConfigInterval = 0;
                         getRcOk = 1;
 
                 }
