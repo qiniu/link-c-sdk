@@ -157,12 +157,22 @@ static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t n
                 return;
         }
         
-        int nCurItemCount = nCurLen / pKodoUploader->nMaxItemLen;
-        
-        if (nCurItemCount > pKodoUploader->nInitItemCount) {
-                pKodoUploader->nInitItemCount = nCurItemCount + 1000;
+        if (nCurLen > 1152 * 1024) {
+                pKodoUploader->nInitItemCount = 1536 * 1024 / pKodoUploader->nMaxItemLen;
+        } else if (nCurLen > 896 * 1024) {
+                pKodoUploader->nInitItemCount = 1152 * 1024 / pKodoUploader->nMaxItemLen;
+        } else if (nCurLen > 640 * 1024) {
+                pKodoUploader->nInitItemCount = 896 * 1024 / pKodoUploader->nMaxItemLen;
         }
-        LinkLogInfo("resize queue buffer:%d", pKodoUploader->nInitItemCount * pKodoUploader->nMaxItemLen);
+        
+        if (nCurLen < 640 * 1024) {
+                pKodoUploader->nInitItemCount = 640 * 1024 / pKodoUploader->nMaxItemLen;
+        } else if (nCurLen < 896 * 1024) {
+                pKodoUploader->nInitItemCount = 896 * 1024 / pKodoUploader->nMaxItemLen;
+        } else if (nCurLen < 1152 * 1024) {
+                pKodoUploader->nInitItemCount = 1152 * 1024 / pKodoUploader->nMaxItemLen;
+        }
+        LinkLogInfo("resize queue buffer:%dK", (pKodoUploader->nInitItemCount * pKodoUploader->nMaxItemLen)/1024);
         return;
 }
 
