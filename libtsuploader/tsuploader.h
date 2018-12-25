@@ -48,4 +48,6 @@ void LinkTsUploaderSetTsEndUploadCallback(IN LinkTsUploader * _pUploader, IN Lin
 void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
 
+void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput, IN void * pUserArg, IN LinkMediaArg mediaArg);
+
 #endif

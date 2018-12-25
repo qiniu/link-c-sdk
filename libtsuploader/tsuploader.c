@@ -57,6 +57,10 @@ typedef struct _KodoUploader{
         int64_t nLastSystime;
         int64_t nFirstSystime;
         int64_t nLastSystimeBak;
+        
+        LinkTsOutput output;
+        void *pOutputUserArg;
+        LinkMediaArg mediaArg;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -275,6 +279,29 @@ END:
         }
         if (pKodoUploader->pTsEndUploadCallback) {
                 pKodoUploader->pTsEndUploadCallback(pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
+        }
+        
+        if (pKodoUploader->output) {
+                LinkMediaInfo mediaInfo;
+                memset(&mediaInfo, 0, sizeof(mediaInfo));
+                mediaInfo.startTime = tsStartTime;
+                mediaInfo.endTime = tsStartTime + tsDuration;
+                int idx = 0;
+                if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
+                        mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
+                        mediaInfo.media[idx].nAudioFormat = pKodoUploader->mediaArg.nAudioFormat;
+                        mediaInfo.media[idx].nSamplerate = pKodoUploader->mediaArg.nSamplerate;
+                        mediaInfo.mediaType[idx] = LINK_MEDIA_AUDIO;
+                        mediaInfo.nCount++;
+                        idx++;
+                }
+                if (pKodoUploader->mediaArg.nVideoFormat != LINK_VIDEO_NONE) {
+                        mediaInfo.media[idx].nVideoFormat = pKodoUploader->mediaArg.nVideoFormat;
+                        mediaInfo.mediaType[idx] = LINK_MEDIA_VIDEO;
+                        mediaInfo.nCount++;
+                }
+                
+                pKodoUploader->output(bufData, l, pKodoUploader->pOutputUserArg, mediaInfo);
         }
 
         LinkDestroyQueue(&pDataQueue);
@@ -582,6 +609,15 @@ void LinkTsUploaderSetTsEndUploadCallback(LinkTsUploader * _pUploader, LinkEndUp
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
         pKodoUploader->pTsEndUploadCallback = cb;
         pKodoUploader->pTsEndUploadCallbackArg = pOpaque;
+}
+
+void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput output, IN void * pUserArg, IN LinkMediaArg mediaArg) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        pKodoUploader->output = output;
+        pKodoUploader->pOutputUserArg = pUserArg;
+        pKodoUploader->mediaArg = mediaArg;
+        
+        return;
 }
 
 void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
