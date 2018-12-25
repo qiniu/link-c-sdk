@@ -173,5 +173,14 @@ void LinkFreeUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
  */
 void LinkCleanup();
 
+/**
+ * 验证七牛凭证合法性。
+ *
+ * @param[in] pAk 设备端的 accessKey
+ * @param[in] pSk 设备端的 secretKey
+ * @param[in] pToken 访问凭证， 格式为  " ak + ':' + encodedSign + ':' + encodedPutPolicy "
+ * @return LINK_SUCCESS 成功; 其它值 失败
+ */
+int LinkVerify(char *pAk, char *pSk, char* pToken);
 
 #endif
