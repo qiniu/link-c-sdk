@@ -79,9 +79,15 @@ typedef enum {
 typedef void (*UploadStatisticCallback)(void *pUserOpaque, LinkUploadKind uploadKind, LinkUploadResult uploadResult);
 
 typedef enum {
+        LINK_VIDEO_NONE = 0,
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2
 }LinkVideoFormat;
+
+typedef enum {
+        LINK_MEDIA_AUDIO = 1,
+        LINK_MEDIA_VIDEO = 2,
+}LinkMediaType;
 
 typedef enum {
         LINK_AUDIO_NONE = 0,
@@ -125,8 +131,7 @@ typedef struct _LinkUploadArg {
         size_t nChannels;                       /**< 音频通道数 */
         size_t nSampleRate;                     /**< 音频通道数 */
         LinkVideoFormat nVideoFormat;           /**< 视频格式 */
-        const char * pDeviceName;               /**< 设备名 */
-        size_t nDeviceNameLen;                  /**< 设备名长度 */
+
         const char * pConfigRequestUrl;         /**< 获取业务配置的请求地址 */
         size_t nConfigRequestUrlLen;            /**< 业务配置的请求地址长度 */
         const char *pDeviceAk;                  /**< 设备 APP KEY */
@@ -135,7 +140,9 @@ typedef struct _LinkUploadArg {
         size_t nDeviceSkLen;                    /**< 设备 SECRET KEY 长度 */
         void(*getPictureCallback)(void *pUserData, const char *pFilename, int nFilenameLen);
         void *pGetPictureCallbackUserData;      /**< 图片上传回调函数 */
-        size_t nMaxUploadThreadNum;             /*ts切片最多开启的线程数*/
+        UploadStatisticCallback *pUpStatCb;     /*上传结果回调*/
+        void *pUpStatCbUserArg;                 /*作为上传结果回调的第一个参数*/
+
         void * reserved1;                       /**< 预留1 */
         void * reserved2;                       /**< 预留2 */
 }LinkUploadArg;
@@ -166,6 +173,17 @@ typedef struct _LinkSession { // seg report info
 } LinkSession;
 
 void LinkUpdateSessionId(LinkSession* pSession, int64_t nTsStartSystime);
+
+/************for ts output**************/
+typedef struct {
+        int64_t startTime;
+        int64_t endTime;
+        LinkMediaArg media[2];
+        LinkMediaType mediaType[2];
+        int nCount;
+} LinkMediaInfo;
+typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMediaInfo info);
+/**************************/
 
 #define LINK_STREAM_UPLOAD 1
 

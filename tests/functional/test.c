@@ -47,8 +47,6 @@ typedef struct {
         const char *pVFilePath;
         const char *pTokenUrl;
         const char *pConfigUrl;
-        const char *pUa1;
-        const char *pUa2;
         const char *pAk;
         const char *pSk;
         bool IsFileLoop;
@@ -763,16 +761,6 @@ static void checkCmdArg(const char * name)
         if (cmdArg.nUptokenInterval == 0) {
                 cmdArg.nUptokenInterval = 3550;
         }
-        if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
-                if (cmdArg.pUa1 == NULL || cmdArg.pUa2 == NULL) {
-                        LinkLogError("ua1 or ua2 is NULL");
-                        exit(6);
-                }
-        } else {
-                if (cmdArg.pUa1 == NULL) {
-                        cmdArg.pUa1 = "ipc99a";
-                }
-        }
         
         if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture || cmdArg.IsJustTestSegment) {
                 if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture){
@@ -835,7 +823,7 @@ static void do_start_file_test(AVuploader *pAvuploader){
                 }
                 if (cmdArg.IsFileLoop) {
                         cmdArg.nRoundCount++;
-                        LinkLogInfo(">>>>>>>>>%s:next round<<<<<<<<<<<<\n", pAvuploader->userUploadArg.pDeviceName);
+                        LinkLogInfo(">>>>>>>>>:next round<<<<<<<<<<<<\n");
                 }
         } while(cmdArg.IsFileLoop && !cmdArg.IsQuit);
 }
@@ -843,8 +831,6 @@ static void do_start_file_test(AVuploader *pAvuploader){
 static void * second_file_test(void * opaque) {
         AVuploader *pAuploader = (AVuploader *)opaque;;
         AVuploader avuploader = *pAuploader;
-        avuploader.userUploadArg.pDeviceName = cmdArg.pUa2;
-        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa2);
        
 
         int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
@@ -911,10 +897,6 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
-        flag_str(&cmdArg.pUa1, "ua1", "ua(device name) name. default value is ipc99a");
-        flag_str(&cmdArg.pUa2, "ua2", "ua(device name) name");
-        flag_str(&cmdArg.pUa1, "app1", "app name. default value is app99");
-        flag_str(&cmdArg.pUa2, "app2", "app name");
         flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
         flag_str(&cmdArg.pSk, "sk", "device secret token(not kodo sk)");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
@@ -928,7 +910,7 @@ int main(int argc, const char** argv)
                 return 0;
         }
 
-        printf("cmdArg.pUa1=%s\n", cmdArg.pUa1);
+
         printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
         printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
@@ -1040,8 +1022,6 @@ int main(int argc, const char** argv)
                 return ret;
         }
         
-        avuploader.userUploadArg.pDeviceName = cmdArg.pUa1;
-        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa1);
         //avuploader.userUploadArg.pUploadStatisticCb = uploadStatisticCallback; //TODO
         //avuploader.userUploadArg.pUploadStatArg = (void *)10;
         avuploader.userUploadArg.pConfigRequestUrl = cmdArg.pConfigUrl;

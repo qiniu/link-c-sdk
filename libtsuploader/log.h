@@ -26,7 +26,7 @@ extern int nLogLevel;
 typedef void (*LinkLogFunc)(IN int nLevel, IN char * pLog);
 
 void LinkSetLogLevel(IN int nLevel);
-void LinkSetLogCallback(IN LinkLogFunc f);
+//void LinkSetLogCallback(IN LinkLogFunc f);
 void LinkLog(IN int nLevel, IN char * pFmt, ...);
 
 #define LinkLogTrace(fmt,...) \

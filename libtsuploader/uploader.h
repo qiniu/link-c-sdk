@@ -37,6 +37,29 @@ int LinkNewUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
                           );
 
 /**
+ * 设置日志回调函数
+ *
+ * 此函数不是线程安全函数。
+ *
+ * @param[in]  pLogCb 回调函数
+ */
+void LinkSetLogCallback(IN LinkLogFunc pLogCb);
+
+/**
+ * 设置ts切片数据回调
+ *
+ * 此函数不是线程安全函数。
+ *
+ * @param[out] pTsMuxUploader 切片上传实例
+ * @param[in]  pTsDataCb 回调函数
+ * @param[in]  pUserArg 作为pTsDataCb函数的userCtx参数，返回给用户
+ */
+void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *pTsMuxUploader,
+                               IN LinkTsOutput pTsDataCb, IN void * pUserArg
+                               );
+
+
+/**
  * 发送图片上传信号
  *
  * @param[in] pTsMuxUploader 切片上传实例

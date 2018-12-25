@@ -32,7 +32,7 @@ int LinkInit()
                 return ret;
         }
         nProcStatus = 1;
-        LinkLogDebug("main thread id:%ld", (long)pthread_self());
+        LinkLogDebug("main thread id:%ld(libtsuploader: modify tsuploader.h)", (long)pthread_self());
         
         return LINK_SUCCESS;
 
@@ -80,17 +80,14 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         LinkUserUploadArg userUploadArg;
         memset(&userUploadArg, 0, sizeof(userUploadArg));
-        userUploadArg.pDeviceName = _pUserUploadArg->pDeviceName;
-        userUploadArg.nDeviceNameLen = _pUserUploadArg->nDeviceNameLen;
         userUploadArg.pConfigRequestUrl = _pUserUploadArg->pConfigRequestUrl;
         userUploadArg.nConfigRequestUrlLen = _pUserUploadArg->nConfigRequestUrlLen;
         userUploadArg.pDeviceAk = _pUserUploadArg->pDeviceAk;
         userUploadArg.nDeviceAkLen = _pUserUploadArg->nDeviceAkLen;
         userUploadArg.pDeviceSk = _pUserUploadArg->pDeviceSk;
         userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
-        userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->reserved1;
-        userUploadArg.pUploadStatArg = _pUserUploadArg->reserved2;
-        userUploadArg.nMaxUploadThreadNum = _pUserUploadArg->nMaxUploadThreadNum;
+        userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->pUpStatCb;
+        userUploadArg.pUploadStatArg = _pUserUploadArg->pUpStatCbUserArg;
         
         LinkTsMuxUploader *pTsMuxUploader;
         int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);
