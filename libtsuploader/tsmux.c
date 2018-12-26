@@ -24,7 +24,6 @@ typedef struct _LinkTsMuxerContext{
         PIDCounter pidCounterMap[5];
         uint64_t nLastPts;
         int isTableWrited;
-        int nAudioPIDDelta;
         
         uint8_t nPcrFlag; //分析ffmpeg，pcr只在pes中出现一次在最开头
         int nCurrentPos;
@@ -77,9 +76,13 @@ static void writeTable(LinkTsMuxerContext* _pMuxCtx, int64_t _nPts)
                 nCount =getPidCounter(_pMuxCtx, 0x1000);
                 int nAudioType = 0;
                 int nVideoType = 0;
+                char g711Type = 'u';
                 if (_pMuxCtx->arg.nAudioFormat == LINK_AUDIO_AAC) {
                         nAudioType = STREAM_TYPE_AUDIO_AAC;
                 } else if (_pMuxCtx->arg.nAudioFormat == LINK_AUDIO_PCMU || _pMuxCtx->arg.nAudioFormat == LINK_AUDIO_PCMA) {
+                        if (_pMuxCtx->arg.nAudioFormat == LINK_AUDIO_PCMA) {
+                                g711Type = 'a';
+                        }
                         nAudioType = STREAM_TYPE_PRIVATE_DATA;
                 }
                 if (_pMuxCtx->arg.nVideoFormat == LINK_VIDEO_H264) {
@@ -87,7 +90,8 @@ static void writeTable(LinkTsMuxerContext* _pMuxCtx, int64_t _nPts)
                 } else if (_pMuxCtx->arg.nVideoFormat == LINK_VIDEO_H265) {
                         nVideoType = STREAM_TYPE_VIDEO_HEVC;
                 }
-                nLen = LinkWritePMT(_pMuxCtx->tsPacket, 1, nCount, LINK_ADAPTATION_JUST_PAYLOAD, nVideoType, nAudioType);
+                nLen = LinkWritePMT(_pMuxCtx->tsPacket, 1, nCount, LINK_ADAPTATION_JUST_PAYLOAD, nVideoType, nAudioType,
+                                    g711Type, _pMuxCtx->arg.nAudioSampleRate);
                 memset(&_pMuxCtx->tsPacket[nLen], 0xff, 188 - nLen);
                 _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque,_pMuxCtx->tsPacket, 188);
         }
@@ -97,32 +101,20 @@ static void writeTable(LinkTsMuxerContext* _pMuxCtx, int64_t _nPts)
 }
 
 uint16_t Pids[5] = {LINK_AUDIO_PID, LINK_VIDEO_PID, LINK_PAT_PID, LINK_PMT_PID, LINK_SDT_PID};
-static void initPidCounterMap(LinkTsMuxerContext *pTsMuxerCtx) {
-        int i;
-        if (pTsMuxerCtx->arg.nAudioFormat == LINK_AUDIO_PCMA) {
-                pTsMuxerCtx->nAudioPIDDelta = 1;
-        }
-        pTsMuxerCtx->nPidCounterMapLen = 5;
-        for ( i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
-                if (i == 0)
-                        pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i] + pTsMuxerCtx->nAudioPIDDelta;
-                else
-                        pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
-                pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
-        }
-        return;
-}
 int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **_pTsMuxerCtx)
 {
+        int i;
         LinkTsMuxerContext *pTsMuxerCtx = (LinkTsMuxerContext *)malloc(sizeof(LinkTsMuxerContext));
         if (pTsMuxerCtx == NULL) {
                 return LINK_NO_MEMORY;
         }
         memset(pTsMuxerCtx, 0, sizeof(LinkTsMuxerContext));
-        
         pTsMuxerCtx->arg = *pArg;
-        initPidCounterMap(pTsMuxerCtx);
-        
+        pTsMuxerCtx->nPidCounterMapLen = 5;
+        for ( i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
+                pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
+                pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
+        }
         int ret = pthread_mutex_init(&pTsMuxerCtx->tsMutex_, NULL);
         if (ret != 0){
                 free(pTsMuxerCtx);
@@ -133,12 +125,22 @@ int LinkNewTsMuxerContext(LinkTsMuxerArg *pArg, LinkTsMuxerContext **_pTsMuxerCt
 }
 
 int LinkResetTsMuxerContext(LinkTsMuxerContext *pTsMuxerCtx) {
+        int i;
         LinkTsMuxerArg arg = pTsMuxerCtx->arg;
+        pthread_mutex_destroy(&pTsMuxerCtx->tsMutex_);
         
         memset(pTsMuxerCtx, 0, sizeof(LinkTsMuxerContext));
-        
         pTsMuxerCtx->arg = arg;
-        initPidCounterMap(pTsMuxerCtx);
+        pTsMuxerCtx->nPidCounterMapLen = 5;
+        for ( i = 0; i < pTsMuxerCtx->nPidCounterMapLen; i++){
+                pTsMuxerCtx->pidCounterMap[i].nPID = Pids[i];
+                pTsMuxerCtx->pidCounterMap[i].nCounter = 0;
+        }
+        int ret = pthread_mutex_init(&pTsMuxerCtx->tsMutex_, NULL);
+        if (ret != 0){
+                free(pTsMuxerCtx);
+                return LINK_MUTEX_ERROR;
+        }
         
         return 0;
 }
@@ -188,7 +190,7 @@ int LinkMuxerAudio(LinkTsMuxerContext* _pMuxCtx, uint8_t *_pData, int _nDataLen,
                 LinkInitPrivateTypePES(&_pMuxCtx->pes, _pData, _nDataLen, _nPts);
         }
         
-        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID+_pMuxCtx->nAudioPIDDelta, _pMuxCtx->pes.nPts, 0);
+        int nRet = makeTsPacket(_pMuxCtx, LINK_AUDIO_PID, _pMuxCtx->pes.nPts, 0);
         pthread_mutex_unlock(&_pMuxCtx->tsMutex_);
         if (nRet < 0)
                 return nRet;
