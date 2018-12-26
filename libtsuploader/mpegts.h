@@ -55,6 +55,7 @@ void LinkSetAdaptationFieldFlag(uint8_t *_pBuf, int _nAdaptationField);
 void LinkWriteContinuityCounter(uint8_t *pBuf, int nCounter);
 int LinkWriteSDT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField);
 int LinkWritePAT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField);
-int LinkWritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField, int _nVStreamType, int _nAStreamType);
+int LinkWritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nAdaptationField,
+                 int _nVStreamType, int _nAStreamType, char g711Type, int nSampleRate);
 
 #endif
