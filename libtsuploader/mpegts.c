@@ -501,7 +501,8 @@ int LinkWritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nA
                 int esinfolen = i++;
                 _pBuf[esinfolen] = 0x00; //remaint ES_info_length 8bit
                 if (_nAStreamType == 0x06) {//STREAM_TYPE_PRIVATE_DATA)
-                        _pBuf[i++] = 64; //descriptor_tag
+                        //https://en.wikipedia.org/wiki/Program-specific_information#Program_Element_Descriptor_Tags
+                        _pBuf[i++] = 171; //descriptor_tag
                         _pBuf[i++] = 3;  //descriptor_length
                         _pBuf[i++] = g711Type;
                         _pBuf[i++] = nSampleRate / 256;
