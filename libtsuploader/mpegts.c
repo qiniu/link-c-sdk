@@ -500,20 +500,23 @@ int LinkWritePMT(uint8_t *_pBuf, int _nUinitStartIndicator, int _nCount, int _nA
                 _pBuf[i++] = 0xF0; //reserved 4bit, include program_info_length 4bit
                 int esinfolen = i++;
                 _pBuf[esinfolen] = 0x00; //remaint ES_info_length 8bit
+                
                 if (_nAStreamType == 0x06) {//STREAM_TYPE_PRIVATE_DATA)
                         //https://en.wikipedia.org/wiki/Program-specific_information#Program_Element_Descriptor_Tags
-                        _pBuf[i++] = 171; //descriptor_tag
-                        _pBuf[i++] = 3;  //descriptor_length
+                        _pBuf[i++] = 15; //descriptor_tag
+                        _pBuf[i++] = 4;  //descriptor_length
                         _pBuf[i++] = g711Type;
                         _pBuf[i++] = nSampleRate / 256;
                         _pBuf[i++] = nSampleRate % 256;
-                        _pBuf[esinfolen] = 5;
+                        _pBuf[i++] = 0;
+                        _pBuf[esinfolen] = i - esinfolen - 1;
                 }
+                
         } else {
                 noAOrV = -5;
                 _pBuf[2] = 0x12; //section_length 12bit
         }
-        
+        _pBuf[2] = i - 3 + 4; //section_length 12bit
         uint32_t c32 = crc32(_pBuf, i);
         uint8_t *pTmp =  (uint8_t*)&c32;
         _pBuf[i++] = pTmp[3];
