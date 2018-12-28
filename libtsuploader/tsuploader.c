@@ -405,16 +405,15 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
         KodoUploader * pKodoUploader = (KodoUploader *)_pTsUploader;
         
         TsUploaderCommand tmcmd;
+        int isNotifyDataPrepared = 0;
         if (tmtype == LINK_TS_START) {
                 tmcmd.nCommandType = LINK_TSU_START_TIME;
         }
-        else if (tmtype == LINK_TS_END){
+        else if (tmtype == LINK_TS_END) {
                 tmcmd.nCommandType = LINK_TSU_END_TIME;
-                notifyDataPrapared(_pTsUploader);
-                
+                isNotifyDataPrepared = 1;
         }
-        else if (tmtype == LINK_SEG_TIMESTAMP){
-                notifyDataPrapared(_pTsUploader);
+        else if (tmtype == LINK_SEG_TIMESTAMP) {
                 tmcmd.nCommandType = LINK_TSU_SEG_TIME;
         }
         tmcmd.time = *pTinfo;
@@ -423,6 +422,9 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
         ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
         if (ret <= 0) {
                 LinkLogError("ts queue error. push report time:%d", ret);
+        }
+        if (isNotifyDataPrepared) {
+                notifyDataPrapared(_pTsUploader);
         }
         
         return;
@@ -481,7 +483,7 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0);
+        //handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0);
 }
 
 static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {

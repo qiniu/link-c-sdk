@@ -370,10 +370,11 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
         
         if (ret == 0) {
                 LinkReportTimeInfo tinfo;
-                getLinkReportTimeInfo(pFFTsMuxUploader, &tinfo, nSysNanotime);
-                if (nIsForceNewSeg) {
-                        pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, &tinfo, LINK_SEG_TIMESTAMP);
+                if (nIsForceNewSeg || pFFTsMuxUploader->nFirstFrameTimestamp < 0) {
+                        getLinkReportTimeInfo(pFFTsMuxUploader, &tinfo, nSysNanotime);
                 }
+                if (nIsForceNewSeg )
+                        pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, &tinfo, LINK_SEG_TIMESTAMP);
                 if (pFFTsMuxUploader->nFirstFrameTimestamp < 0) {
                         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->ReportTimeInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &tinfo, LINK_TS_START);
                         pFFTsMuxUploader->nFirstFrameTimestamp = _nTimestamp;
