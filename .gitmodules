@@ -1,4 +1,8 @@
 [submodule "third_party/wolfssl"]
 	path = third_party/wolfssl
 	url = https://github.com/wolfSSL/wolfssl.git
-    ignore = dirty
+	ignore = dirty
+[submodule "third_party/mosquitto"]
+	path = third_party/mosquitto
+	url = https://github.com/eclipse/mosquitto.git
+	ignore = dirty
