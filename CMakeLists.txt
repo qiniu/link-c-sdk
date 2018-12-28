@@ -27,6 +27,9 @@ elseif( ${MACPOS} GREATER 0 )
 elseif( ${LINUXPOS} GREATER 0 )
     set ( HOST "x86_64-linux")
 endif()
+if (APPLE) 
+    set( HOST "x86_64-apple-darwin" )
+endif()
 message( "HOST is " ${HOST} )
 
 add_custom_target(all-clean
