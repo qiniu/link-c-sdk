@@ -6,6 +6,8 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader/c-sdk/")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
+include_directories(${THIRD_INC_PATH})
+link_directories(${THIRD_LIB_PATH})
 
 if (WITH_OPENSSL)
     set(DISABLE_OPENSSL OFF)

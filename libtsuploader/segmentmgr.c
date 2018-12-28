@@ -100,14 +100,14 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
                         " %"PRId64", \"endReason\": \"%s\"",
-                        s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->sessionId, s->nSessionStartTime/1000000LL, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000LL, reason);
 
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"",
-                        s->sessionId, s->nSessionStartTime, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->sessionId, s->nSessionStartTime/1000000LL, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
