@@ -2,8 +2,8 @@ cmake_minimum_required (VERSION 2.8)
 
 project(tsuploader)
 
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libghttp")
-
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 
 if (WITH_OPENSSL)
@@ -52,10 +52,10 @@ add_library(tsuploader STATIC
     segmentmgr.h
     security.h
     security.c
-    b64/b64.c
-    b64/b64.h
-    b64/urlsafe_b64.c
-    b64/urlsafe_b64.h
-    cJSON/cJSON.h
-    cJSON/cJSON.c
+    ../b64/b64.c
+    ../b64/b64.h
+    ../b64/urlsafe_b64.c
+    ../b64/urlsafe_b64.h
+    ../cJSON/cJSON.h
+    ../cJSON/cJSON.c
 )
