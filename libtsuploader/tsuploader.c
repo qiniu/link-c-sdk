@@ -6,10 +6,11 @@
 #include <pthread.h>
 #include "servertime.h"
 #include <time.h>
-#include "b64/urlsafe_b64.h"
-#include <qupload.h>
-#include "httptools.h"
 #include <unistd.h>
+#include "b64/urlsafe_b64.h"
+#include "libghttp/qupload.h"
+#include "httptools.h"
+
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 

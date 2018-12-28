@@ -1,5 +1,6 @@
 #include "httptools.h"
-#include <ghttp.h>
+#include "libghttp/ghttp.h"
+
 static int linkSimpleHttpRequest(IN int isPost,
                                  IN const char * pUrl, OUT char* pBuf, IN int nBufLen, OUT int* pRespLen,
                                  IN const char *pReqBody, IN int nReqBodyLen, IN const char *pContentType,
