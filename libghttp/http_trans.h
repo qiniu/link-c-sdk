@@ -67,6 +67,8 @@ typedef struct http_trans_conn_tag {
   int                  chunk_len;         /* length of a chunk. */
   int                  nTimeoutInSecond;
   char                *errstr;            /* a hint as to an error */
+  int (*cb)(void *pOpaque, char *pBuf, int pLen);
+  void                *opaque;
 
   /* SSL support. we always have a USE_SSL var, even if compiled
    * without SSL; it's just always FALSE unless SSL is compiled in. */

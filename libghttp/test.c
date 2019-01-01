@@ -150,6 +150,48 @@ void testupbuf(char * file, char * token) {
 	printf("%d %d [%s] [%s]\n", ret, putret.code, putret.error, putret.body);
 }
 
+int myLinkStreamCallback(void *pOpaque, LinkStreamCallbackType *type, char *pData, int nDataLen) {
+        static int cbTimes = 0;
+        cbTimes++;
+        if (cbTimes < 3) {
+                memset(pData, 0x31 + cbTimes, nDataLen);
+                *type = LinkStreamCallbackType_Data;
+                fprintf(stderr, "set datalen:%d\n", nDataLen);
+                return nDataLen;
+        }
+        if (cbTimes == 3) {
+                *type = LinkStreamCallbackType_Key;
+                return sprintf(pData, "teststreamupload-%ld.txt", time(NULL));
+        }
+        if (cbTimes == 4) {
+                *type = LinkStreamCallbackType_Meta;
+                char **pp = (char **)pData;
+                char *pCnt = pData + sizeof(void *) * 8;
+                
+                pp[0] = pCnt; *pCnt++ = 'o'; *pCnt++ = 0;
+                pp[1] = pCnt; memcpy(pCnt, "12345", 5); pCnt += (5+1); *pCnt++ = 0;
+                pp[2] = pCnt; *pCnt++ = 'd'; *pCnt++ = 0;
+                pp[3] = pCnt; pCnt += (sprintf(pCnt, "%d", 673) + 1); *pCnt++ = 0;
+                pp[4] = pCnt; *pCnt++ = 's'; *pCnt++ = 0;
+                pp[5] = pCnt; pCnt += (sprintf(pCnt, "%d", 5) + 1); *pCnt++ = 0;
+                pp[6] = pCnt; *pCnt++ = 'c'; *pCnt++ = 0;
+                pp[7] = pCnt; pCnt += (sprintf(pCnt, "%d", 0) + 1); *pCnt++ = 0;
+                return pCnt - pData;
+        }
+
+        return 0;
+}
+
+void teststream(char * token) {
+        LinkPutret putret={0};
+        printf("token:%s\n", token);
+        int ret = LinkUploadStream(
+                                   //"http://upload.qiniup.com",
+                                   "http://up.dev-kodo.dev.qiniu.io",
+                                   token,  NULL, myLinkStreamCallback, NULL, &putret);
+        printf("%d %d [%s] [%s]\n", ret, putret.code, putret.error, putret.body);
+}
+
 int main(int argc, char **argv) {
 	if (argc < 2) {
 		printf("usage as:%s testmethod [arg...]\n", argv[0]);
@@ -183,5 +225,11 @@ int main(int argc, char **argv) {
 			return 2;
 		}
 		testupfile(argv[2], argv[3]);
-	}
+        }else if (memcmp("teststream", argv[1], 10) == 0) {
+                if (argc != 3) {
+                        printf("usage as:%s teststream token\n", argv[0]);
+                        return 2;
+                }
+                teststream(argv[2]);
+        }
 }

@@ -227,7 +227,6 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
       http_trans_buf_reset(a_conn);
                     
     }else {
-            
             const char *dataArr[3];
             int dataLens[3];
             dataArr[0] = a_req->body;
@@ -263,6 +262,41 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             a_conn->io_buf_io_left = io_buf_io_left;
             a_conn->io_buf_io_done = io_buf_io_left;
       }
+    } else {
+            if (a_conn->cb) {
+                    char *io_buf= a_conn->io_buf;
+                    
+                    char buf[1384];
+                    int bufLen;
+                    int done = 0;
+                    do {
+                            bufLen = a_conn->cb(a_conn->opaque, buf,sizeof(buf));
+                            buf[bufLen]=0; fprintf(stderr, "[%s]:%d\n", buf, bufLen);
+                            if (bufLen > 0) {
+                                    a_conn->io_buf = buf;
+                                    a_conn->io_buf_len = bufLen;
+                                    a_conn->io_buf_alloc = bufLen;
+                                    a_conn->io_buf_io_left = bufLen;
+                                    a_conn->io_buf_io_done = 0;
+                            } else if (bufLen == 0) {
+                                    done = 1;
+                                    break;
+                            } else {
+                                    return HTTP_TRANS_ERR;
+                            }
+                            l_rv = http_trans_write_buf(a_conn);
+                            if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0))
+                                    return HTTP_TRANS_ERR;
+                    } while (done == 0 && l_rv == HTTP_TRANS_DONE);
+ 
+                    a_conn->io_buf = io_buf;
+                    http_trans_buf_reset(a_conn);
+                    if (l_rv != HTTP_TRANS_DONE) {
+                            return HTTP_TRANS_ERR;
+                    }
+ 
+                    return HTTP_TRANS_DONE;
+            }
     }
   return HTTP_TRANS_DONE;
 }

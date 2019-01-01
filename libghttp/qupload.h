@@ -15,4 +15,15 @@ int LinkUploadBuffer(const char *buffer, int bufferLen, const char* upHost, cons
 	       	const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret);
 void LinkFreePutret(LinkPutret *put_ret);
 
+
+typedef enum {
+        LinkStreamCallbackType_Data = 1,
+        LinkStreamCallbackType_Meta = 2,
+        LinkStreamCallbackType_Magic = 3,
+        LinkStreamCallbackType_Key = 4
+} LinkStreamCallbackType;
+typedef int (*LinkStreamCallback)(void *pOpaque, LinkStreamCallbackType *type, char *pData, int nDataLen);
+int LinkUploadStream(const char * upHost, const char *upload_token, const char *mime_type,
+                     LinkStreamCallback cb, void *opaque, LinkPutret *put_ret);
+
 #endif

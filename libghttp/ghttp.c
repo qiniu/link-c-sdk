@@ -179,6 +179,13 @@ ghttp_uri_validate(char *a_uri)
   return(http_uri_parse(a_uri, NULL));
 }
 
+void ghttp_set_data_callback(ghttp_request *a_request, int (*cb)(void *pOpaque, char *pBuf, int pLen), void *pOpaque) {
+        if (a_request->conn) {
+                a_request->conn->cb = cb;
+                a_request->conn->opaque = pOpaque;
+        }
+}
+
 int
 ghttp_set_uri(ghttp_request *a_request, const char *a_uri)
 {

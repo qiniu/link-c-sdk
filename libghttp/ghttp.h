@@ -102,6 +102,10 @@ void ghttp_set_global_cert_file_path(const char *file, const char *path);
 
 int
 ghttp_set_uri(ghttp_request *a_request, const char *a_uri);
+        
+void ghttp_set_data_callback(ghttp_request *a_request,
+  int (*cb)(void *pOpaque, char *pBuf, int pLen),
+	       	 void *pOpaque);
 
 /* Set a proxy for a request
  * This will return -1 if the uri is invalid

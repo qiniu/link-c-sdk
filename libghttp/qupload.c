@@ -157,7 +157,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         memset(put_ret, 0, sizeof(LinkPutret));
         
         //form boundary
-        const char *form_prefix = "--------LINKFormBoundary"; //24
+        const char *form_prefix = "________LINKFormBoundary"; //24
         size_t form_prefix_len = strlen(form_prefix);
         char form_boundary[24+16+1];
         memcpy(form_boundary, form_prefix, form_prefix_len);
@@ -352,4 +352,246 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
         
         ghttp_request_destroy(pRequest);
         return 0;
+}
+
+typedef struct {
+        void                   *pUserOpaque;
+        LinkStreamCallback userCb;
+        const char * boundary;
+        const char * mimeType;
+        int nBoundaryLen;
+        char *pTmpBuf;
+        int nTmpBuf;
+        int nCurTmpBufLen;
+        uint8_t sendFirstDataState; // 0init, 1 sending, 2 sendover
+        uint8_t isTailWrited;
+}UploadStreamParam;
+
+static int fillChunkData(const char *pSrc, int *pSrclen, char *pBuf, int nBufLen, int isEnd) {
+        int len = nBufLen - 8; // 2 for tail \r\n
+        if (*pSrclen < len) {
+                len = *pSrclen;
+        }
+        
+        int prefixLen = snprintf(pBuf, nBufLen, "%X\r\n", len);
+
+        memmove(pBuf + prefixLen, pSrc, len);
+        *pSrclen -= len;
+        len = len+prefixLen;
+        pBuf[len++] = '\r';
+        pBuf[len++] = '\n';
+        if (isEnd) {
+                pBuf[len++] = '0';
+                pBuf[len++] = '\r';
+                pBuf[len++] = '\n';
+                pBuf[len++] = '\r';
+                pBuf[len++] = '\n';
+        }
+        return len;
+}
+#include <assert.h>
+// [chunk size][\r\n][chunk data][\r\n][chunk size][\r\n][chunk data][\r\n]
+int static linkStreamCallback(void *pOpaque, char *pData, int nDataLen) {
+        UploadStreamParam* pParam = (UploadStreamParam *)pOpaque;
+        
+        int i = 0, ret = 0, nCustomMeatLen = 0, prevLen = 0;;
+        LinkStreamCallbackType type;
+        const char **customMeta = NULL;
+        char * form_data_p = NULL;
+        char tmpBuf[512];
+        
+        if (pParam->isTailWrited) {
+                return 0;
+        }
+SendData:
+        if (pParam->nCurTmpBufLen > 0) {
+                return fillChunkData(pParam->pTmpBuf, &pParam->nCurTmpBufLen, pData, nDataLen, 0);
+                /*
+                if (pParam->sendFirstDataState != 1) {
+                        return fillChunkData(pParam->pTmpBuf, &pParam->nCurTmpBufLen, pData, nDataLen);
+                } else {
+                        int len = pParam->nCurTmpBufLen;
+                        if (nDataLen < len)
+                                len = nDataLen;
+                        memmove(pData, pParam->pTmpBuf, len);
+                        pParam->nCurTmpBufLen -= len;
+                        return len;
+                }
+                 */
+        }
+        
+        // nCurTmpBufLen must be zero
+        assert(pParam->nCurTmpBufLen == 0);
+        ret = pParam->userCb(pParam->pUserOpaque, &type, pParam->pTmpBuf, pParam->nTmpBuf);
+        if (ret < 0) {
+                return ret;
+        } else if (ret > 0){
+                pParam->nCurTmpBufLen = ret;
+                switch(type) {
+                        case LinkStreamCallbackType_Data:
+                                if (pParam->sendFirstDataState == 0) {
+                                        i = 0;
+                                        pParam->sendFirstDataState = 1;
+                                        qn_addformfield(tmpBuf, (char *)pParam->boundary, pParam->nBoundaryLen, "file",  NULL, 0,
+                                                                      pParam->mimeType, &i, 0);
+
+                                        i = i-4; // trucated form filed tail
+                                        return fillChunkData(tmpBuf, &i, pData, nDataLen, 0);
+                                } else if (pParam->sendFirstDataState == 1) {
+                                        goto SendData;
+                                }
+                        case LinkStreamCallbackType_Meta:
+                                prevLen = 0;
+                                if (pParam->sendFirstDataState == 1) {
+                                        pParam->sendFirstDataState = 2;
+                                        i = 4;
+                                        memcpy(tmpBuf, "\r\n--" , 4);
+                                        prevLen = fillChunkData(tmpBuf, &i, pData, nDataLen, 0);
+                                }
+                                
+                                customMeta = (const char **)pParam->pTmpBuf;
+                                form_data_p = tmpBuf;
+                                
+                                int fdpLen = 0;
+                                char mkey[32] = "x-qn-meta-";
+                                int nKeyPreLen = 10;
+                                for (i = 0; i < 8; i+=2) {
+                                        snprintf(mkey + nKeyPreLen, sizeof(mkey) - nKeyPreLen, "%s", customMeta[i]);
+                                        form_data_p = qn_addformfield(form_data_p, pParam->boundary, pParam->nBoundaryLen, mkey,
+                                                                      customMeta[i+1], strlen(customMeta[i+1]), NULL, &fdpLen, 0);
+                                }
+                                pParam->nCurTmpBufLen = 0;
+                                return fillChunkData(tmpBuf, &fdpLen, pData, nDataLen, 0);
+                                
+                        case LinkStreamCallbackType_Magic:
+                                prevLen = 0;
+                                if (pParam->sendFirstDataState == 1) {
+                                        pParam->sendFirstDataState = 2;
+                                        i = 4;
+                                        memcpy(tmpBuf, "\r\n--" , 4);
+                                        prevLen = fillChunkData(tmpBuf, &i, pData, nDataLen, 0);
+                                }
+                                
+                                
+                        case LinkStreamCallbackType_Key:
+                                prevLen = 0;
+                                if (pParam->sendFirstDataState == 1) {
+                                        pParam->sendFirstDataState = 2;
+                                        i = 4;
+                                        memcpy(tmpBuf, "\r\n--" , 4);
+                                        prevLen = fillChunkData(tmpBuf, &i, pData, nDataLen, 0);
+                                }
+                                
+                                //add file key //TODO key add in the last is ok? or must use magic variable?
+                                i = 0;
+                                qn_addformfield(tmpBuf, pParam->boundary, pParam->nBoundaryLen, "key", (char *)pParam->pTmpBuf,
+                                                              ret,
+                                                              NULL, &i, 0);
+                                pParam->nCurTmpBufLen = 0;
+                                return fillChunkData(tmpBuf, &i, pData + prevLen, nDataLen - prevLen, 0) + prevLen;
+
+                }
+        } else {
+                if (pParam->isTailWrited == 0) {
+                        // tail
+                        pParam->isTailWrited = 1;
+                        memcpy(tmpBuf, pParam->boundary, pParam->nBoundaryLen);
+                        memcpy(tmpBuf + pParam->nBoundaryLen, "--\r\n", 4);
+                        i = pParam->nBoundaryLen + 4;
+                        return fillChunkData(tmpBuf, &i, pData, nDataLen, 1);
+                }
+        }
+
+        return 0;
+}
+
+int LinkUploadStream(const char * upHost, const char *upload_token, const char *mime_type,
+                     LinkStreamCallback cb, void *opaque, LinkPutret *put_ret) {
+        
+        
+        if (upload_token == NULL || cb == NULL || put_ret == NULL) {
+                return -1;
+        }
+        memset(put_ret, 0, sizeof(LinkPutret));
+        
+        //form boundary
+        const char *form_prefix = "________LINKFormBoundary"; //24
+        size_t form_prefix_len = strlen(form_prefix);
+        char form_boundary[24+16+1];
+        memcpy(form_boundary, form_prefix, form_prefix_len);
+        get_fix_random_str(form_boundary + form_prefix_len, sizeof(form_boundary) - form_prefix_len, 16);
+        size_t form_boundary_len = strlen(form_boundary);
+        
+        
+        char static_form_data[1024+256];
+        char *form_data = static_form_data;
+        char *form_data_p = static_form_data;
+        
+        //add init tag
+        size_t form_data_len = 0;
+        form_data_p = qn_memconcat(form_data_p, "--", 2);
+        form_data_len += 2;
+        
+        //add upload_token
+        form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "token", (char *) upload_token,
+                                      strlen(upload_token), NULL, &form_data_len, 0);
+        
+        ghttp_request *request = NULL;
+        request = ghttp_request_new();
+        if (request == NULL) {
+                snprintf(put_ret->error, sizeof(put_ret->error), "ghttp_request_new return null");
+                if (form_data != static_form_data)
+                        free(form_data);
+                return -4;
+        }
+        
+        ghttp_set_uri(request, upHost);
+        
+        //construct content-type header
+        size_t form_content_type_len = 31 + form_boundary_len;
+        char form_content_type[31+64] = {0};
+        snprintf(form_content_type, form_content_type_len, "multipart/form-data; boundary=%s", form_boundary);
+        ghttp_set_header(request, "Content-Type", form_content_type);
+        
+        ghttp_set_header(request, "Transfer-Encoding", "chunked");
+        ghttp_set_type(request, ghttp_type_post);
+        
+        UploadStreamParam upsParam;
+        upsParam.boundary = form_boundary;
+        upsParam.nBoundaryLen = form_boundary_len;
+        upsParam.userCb = cb;
+        upsParam.pUserOpaque = opaque;
+        upsParam.pTmpBuf = form_data;
+        upsParam.nTmpBuf = sizeof(static_form_data);
+        upsParam.nCurTmpBufLen = form_data_len;
+        upsParam.sendFirstDataState = 0;
+        upsParam.mimeType = mime_type;
+        upsParam.isTailWrited = 0;
+        ghttp_set_data_callback(request, linkStreamCallback, &upsParam);
+        
+        ghttp_prepare(request);
+        ghttp_status status = ghttp_process(request);
+        if (status == ghttp_error) {
+                if (ghttp_is_timeout(request)) {
+                        snprintf(put_ret->error, sizeof(put_ret->error), "ghttp_process timeout[%s]", ghttp_get_error(request));
+                } else {
+                        snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(request));
+                        getReqidAndResponse(request, put_ret);
+                }
+                ghttp_request_destroy(request);
+                if (form_data != static_form_data)
+                        free(form_data);
+                return -5;
+        }
+        
+        put_ret->code = ghttp_status_code(request);
+        if (put_ret->code / 100 == 2) {
+                ghttp_request_destroy(request);
+                return 0;
+        }
+        
+        getReqidAndResponse(request, put_ret);
+        ghttp_request_destroy(request);
+        
+        return 0; //http request ok(maybe return 404, but http is ok)
 }

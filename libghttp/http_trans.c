@@ -546,6 +546,7 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
   return HTTP_TRANS_NOT_DONE;
 }
 
+//static FILE *pFile;
 int
 http_trans_write_buf(http_trans_conn *a_conn)
 {
@@ -556,6 +557,15 @@ http_trans_write_buf(http_trans_conn *a_conn)
       a_conn->io_buf_io_left = a_conn->io_buf_alloc;
       a_conn->io_buf_io_done = 0;
     }
+        /*
+        if (pFile == NULL) {
+                pFile = fopen("http.bin", "wb+");
+        }
+        if (pFile) {
+                fwrite(a_conn->io_buf, 1, a_conn->io_buf_io_left, pFile);
+                fflush(pFile);
+        }
+         */
   /* write out some data */
   if(a_conn->USE_SSL)
     {
