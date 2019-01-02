@@ -251,8 +251,14 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                             a_conn->io_buf_io_done = 0;
                             do {
                                     l_rv = http_trans_write_buf(a_conn);
-                                    if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0))
+                                    if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0)) {
+                                            a_conn->io_buf = io_buf;
+                                            a_conn->io_buf_len = io_buf_len;
+                                            a_conn->io_buf_alloc = io_buf_alloc;
+                                            a_conn->io_buf_io_left = io_buf_io_left;
+                                            a_conn->io_buf_io_done = io_buf_io_left;
                                             return HTTP_TRANS_ERR;
+                                    }
                             } while (l_rv == HTTP_TRANS_NOT_DONE);
                     }
             }
@@ -271,7 +277,7 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                     int done = 0;
                     do {
                             bufLen = a_conn->cb(a_conn->opaque, buf,sizeof(buf));
-                            buf[bufLen]=0; fprintf(stderr, "[%s]:%d\n", buf, bufLen);
+                            //buf[bufLen]=0; fprintf(stderr, "[%s]:%d\n", buf, bufLen);
                             if (bufLen > 0) {
                                     a_conn->io_buf = buf;
                                     a_conn->io_buf_len = bufLen;
@@ -282,19 +288,23 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                                     done = 1;
                                     break;
                             } else {
+                                    a_conn->io_buf = io_buf;
                                     return HTTP_TRANS_ERR;
                             }
                             l_rv = http_trans_write_buf(a_conn);
-                            if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0))
+                            if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0)) {
+                                    a_conn->io_buf = io_buf;
                                     return HTTP_TRANS_ERR;
+                            }
                     } while (done == 0 && l_rv == HTTP_TRANS_DONE);
  
                     a_conn->io_buf = io_buf;
                     http_trans_buf_reset(a_conn);
+                    //fprintf(stderr, "=============>a_conn->io_buf:%x\n", a_conn->io_buf);
                     if (l_rv != HTTP_TRANS_DONE) {
                             return HTTP_TRANS_ERR;
                     }
- 
+
                     return HTTP_TRANS_DONE;
             }
     }
