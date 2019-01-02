@@ -515,7 +515,7 @@ static void * listenTsUpload(void *_pOpaque)
         while(!pKodoUploader->nQuit_ || info.nLen_ != 0) {
                 TsUploaderCommand cmd;
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
-                                                                      sizeof(TsUploaderCommand), 24 * 60 * 60);
+                                                                      sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
                 //LinkLogDebug("ts queue:%d", info.nLen_);
                 if (ret <= 0) {

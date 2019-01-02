@@ -277,7 +277,7 @@ static void * segmetMgrRun(void *_pOpaque) {
         while(!segmentMgr.nQuit_ || info.nLen_ != 0) {
                 SegInfo segInfo = {0};
                 segInfo.handle = -1;
-                int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60);
+                int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60 * 1000000LL);
                 
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
                 LinkLogDebug("segment queue:%d", info.nLen_);

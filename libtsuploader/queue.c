@@ -224,14 +224,13 @@ static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLe
 }
 
 
-static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nSec)
+static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nMicroSec)
 {
-        int64_t usec = 1000000;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (pQueueImp->statInfo.nOverwriteCnt > 0) {
                 return LINK_Q_OVERWRIT;
         }
-        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * nSec);
+        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, nMicroSec);
 }
 
 static int PopQueueWithNoOverwrite(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen)

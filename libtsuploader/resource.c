@@ -17,7 +17,7 @@ static void * recycle(void *_pOpaque)
         manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
         while(!manager.nQuit_ || info.nLen_ != 0) {
                 LinkAsyncInterface *pAsync = NULL;
-                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(LinkAsyncInterface *), 24 * 60 * 60);
+                int ret = manager.pQueue_->PopWithTimeout(manager.pQueue_, (char *)(&pAsync), sizeof(LinkAsyncInterface *), 24 * 60 * 60 * 1000000LL);
    
                 manager.pQueue_->GetStatInfo(manager.pQueue_, &info);
                 LinkLogDebug("thread queue:%d", info.nLen_);

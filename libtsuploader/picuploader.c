@@ -81,7 +81,7 @@ static void * listenPicUpload(void *_pOpaque)
         while(!pPicUploader->nQuit_ || info.nLen_ != 0) {
                 LinkPicUploadSignal sig;
                 int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
-                                                                       sizeof(LinkPicUploadSignal), 24 * 60 * 60);
+                                                                       sizeof(LinkPicUploadSignal), 24 * 60 * 60 * 1000000LL);
                 fprintf(stderr, "----->pu receive a signal:%d %d\n", sig.signalType_, ret);
                 memset(&info, 0, sizeof(info));
                 pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
