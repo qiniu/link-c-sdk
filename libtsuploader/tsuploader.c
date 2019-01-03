@@ -111,13 +111,13 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         char *pCnt = metaBuf + sizeof(void *) * 8;
         
         pp[0] = pCnt; *pCnt++ = 'o'; *pCnt++ = 0;
-        pp[1] = pCnt; memcpy(pCnt, metaValue, nMetaValueLen); pCnt += (nMetaValueLen+1); *pCnt++ = 0;
+        pp[1] = pCnt; memcpy(pCnt, metaValue, nMetaValueLen); pCnt += nMetaValueLen; *pCnt++ = 0;
         pp[2] = pCnt; *pCnt++ = 'd'; *pCnt++ = 0;
-        pp[3] = pCnt; pCnt += (sprintf(pCnt, "%"PRId64"", duration) + 1); *pCnt++ = 0;
+        pp[3] = pCnt; pCnt += sprintf(pCnt, "%"PRId64"", duration); *pCnt++ = 0;
         pp[4] = pCnt; *pCnt++ = 's'; *pCnt++ = 0;
-        pp[5] = pCnt; pCnt += (sprintf(pCnt, "%"PRId64"", seqnum) + 1); *pCnt++ = 0;
+        pp[5] = pCnt; pCnt += sprintf(pCnt, "%"PRId64"", seqnum); *pCnt++ = 0;
         pp[6] = pCnt; *pCnt++ = 'c'; *pCnt++ = 0;
-        pp[7] = pCnt; pCnt += (sprintf(pCnt, "%d", isDiscontinuity) + 1); *pCnt++ = 0;
+        pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
         LinkPutret putret;
         int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8, /*mimetype*/NULL, &putret);
