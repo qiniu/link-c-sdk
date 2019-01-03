@@ -36,7 +36,7 @@ static int get_fix_random_str(char *buf, int bufLen, int len) {
  *
  * @return the end pointer of the dst_buffer, used for the next concatenation
  * */
-static char *qn_memconcat(char *dst_buffer, const char *src_buffer, size_t src_buffer_len) {
+static char *qn_memconcat(char *dst_buffer, const char *src_buffer, int src_buffer_len) {
         memcpy(dst_buffer, src_buffer, src_buffer_len);
         char *p_end = dst_buffer + src_buffer_len;
         return p_end;
@@ -57,13 +57,13 @@ static char *qn_memconcat(char *dst_buffer, const char *src_buffer, size_t src_b
  *
  * @return the end pointer of the dst_buffer, used for the next concatenation
  * **/
-static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_boundary_len,
+static char *qn_addformfield(char *dst_buffer, char *form_boundary, int form_boundary_len,
                              const char *field_name,
-                             const char *field_value, size_t field_value_len,
-                             const char *field_mime_type, size_t *form_data_len, int isFieldValueFile) {
-        size_t delta_len = 0;
-        size_t field_name_len = strlen(field_name);
-        size_t field_mime_len = 0;
+                             const char *field_value, int field_value_len,
+                             const char *field_mime_type, int *form_data_len, int isFieldValueFile) {
+        int delta_len = 0;
+        int field_name_len = strlen(field_name);
+        int field_mime_len = 0;
         if (field_mime_type) {
                 field_mime_len = strlen(field_mime_type);
         }
@@ -98,7 +98,7 @@ static char *qn_addformfield(char *dst_buffer, char *form_boundary, size_t form_
                 long file_len = ftell(fp);
                 rewind(fp);
                 
-                size_t read_num = fread(dst_buffer_p, sizeof(char), file_len, fp);
+                int read_num = fread(dst_buffer_p, sizeof(char), file_len, fp);
                 if (read_num != file_len) {
                         fclose(fp);
                         return NULL;
@@ -158,11 +158,11 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         
         //form boundary
         const char *form_prefix = "________LINKFormBoundary"; //24
-        size_t form_prefix_len = strlen(form_prefix);
+        int form_prefix_len = strlen(form_prefix);
         char form_boundary[24+16+1];
         memcpy(form_boundary, form_prefix, form_prefix_len);
         get_fix_random_str(form_boundary + form_prefix_len, sizeof(form_boundary) - form_prefix_len, 16);
-        size_t form_boundary_len = strlen(form_boundary);
+        int form_boundary_len = strlen(form_boundary);
         
         char *form_data = NULL;
         char *form_data_p = NULL;
@@ -184,7 +184,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         form_data_p = form_data;
         
         //add init tag
-        size_t form_data_len = 0;
+        int form_data_len = 0;
         form_data_p = qn_memconcat(form_data_p, "--", 2);
         form_data_len += 2;
         
@@ -229,7 +229,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         
         
         //send the request
-        size_t form_content_type_len = 31 + form_boundary_len;
+        int form_content_type_len = 31 + form_boundary_len;
         char form_content_type[31+64] = {0};
         snprintf(form_content_type, form_content_type_len, "multipart/form-data; boundary=%s", form_boundary);
         
@@ -394,7 +394,7 @@ static int fillChunkData(const char *pSrc, int *pSrclen, char *pBuf, int nBufLen
 int static linkStreamCallback(void *pOpaque, char *pData, int nDataLen) {
         UploadStreamParam* pParam = (UploadStreamParam *)pOpaque;
         
-        int i = 0, ret = 0, nCustomMeatLen = 0, prevLen = 0;;
+        int i = 0, ret = 0,  prevLen = 0;;
         LinkStreamCallbackType type;
         const char **customMeta = NULL;
         char * form_data_p = NULL;
@@ -457,7 +457,7 @@ SendData:
                                 int nKeyPreLen = 10;
                                 for (i = 0; i < 8; i+=2) {
                                         snprintf(mkey + nKeyPreLen, sizeof(mkey) - nKeyPreLen, "%s", customMeta[i]);
-                                        form_data_p = qn_addformfield(form_data_p, pParam->boundary, pParam->nBoundaryLen, mkey,
+                                        form_data_p = qn_addformfield(form_data_p, (char *)pParam->boundary, pParam->nBoundaryLen, mkey,
                                                                       customMeta[i+1], strlen(customMeta[i+1]), NULL, &fdpLen, 0);
                                 }
                                 pParam->nCurTmpBufLen = 0;
@@ -484,7 +484,7 @@ SendData:
                                 
                                 //add file key //TODO key add in the last is ok? or must use magic variable?
                                 i = 0;
-                                qn_addformfield(tmpBuf, pParam->boundary, pParam->nBoundaryLen, "key", (char *)pParam->pTmpBuf,
+                                qn_addformfield(tmpBuf, (char *)pParam->boundary, pParam->nBoundaryLen, "key", (char *)pParam->pTmpBuf,
                                                               ret,
                                                               NULL, &i, 0);
                                 pParam->nCurTmpBufLen = 0;
@@ -516,11 +516,11 @@ int LinkUploadStream(const char * upHost, const char *upload_token, const char *
         
         //form boundary
         const char *form_prefix = "________LINKFormBoundary"; //24
-        size_t form_prefix_len = strlen(form_prefix);
+        int form_prefix_len = strlen(form_prefix);
         char form_boundary[24+16+1];
         memcpy(form_boundary, form_prefix, form_prefix_len);
         get_fix_random_str(form_boundary + form_prefix_len, sizeof(form_boundary) - form_prefix_len, 16);
-        size_t form_boundary_len = strlen(form_boundary);
+        int form_boundary_len = strlen(form_boundary);
         
         
         char static_form_data[188*7];
@@ -528,7 +528,7 @@ int LinkUploadStream(const char * upHost, const char *upload_token, const char *
         char *form_data_p = static_form_data;
         
         //add init tag
-        size_t form_data_len = 0;
+        int form_data_len = 0;
         form_data_p = qn_memconcat(form_data_p, "--", 2);
         form_data_len += 2;
         
@@ -548,7 +548,7 @@ int LinkUploadStream(const char * upHost, const char *upload_token, const char *
         ghttp_set_uri(request, upHost);
         
         //construct content-type header
-        size_t form_content_type_len = 31 + form_boundary_len;
+        int form_content_type_len = 31 + form_boundary_len;
         char form_content_type[31+64] = {0};
         snprintf(form_content_type, form_content_type_len, "multipart/form-data; boundary=%s", form_boundary);
         ghttp_set_header(request, "Content-Type", form_content_type);

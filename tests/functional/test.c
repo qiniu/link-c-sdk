@@ -12,9 +12,9 @@
 #include "flag.h"
 
 #ifdef __APPLE__
-#define MATERIAL_PATH "./"
+#define MATERIAL_PATH "../../../../tests/functional/material/"
 #else
-#define MATERIAL_PATH "./"
+#define MATERIAL_PATH "../../../tests/functional/material/"
 #endif
 
 char *gpPictureBuf = NULL;
