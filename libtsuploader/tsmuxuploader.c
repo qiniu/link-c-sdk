@@ -1545,7 +1545,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 memset(&param, 0, sizeof(param));
                 
                 ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
-                                                                      sizeof(SessionUpdateParam), nWait);//nWait * 1000000LL);
+                                                                      sizeof(SessionUpdateParam), nWait * 1000000LL);
                 memset(&info, 0, sizeof(info));
                 pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
                 if (ret <= 0) {

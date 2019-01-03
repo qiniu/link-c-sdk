@@ -160,7 +160,7 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
         return -1;
 }
 
-static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nUSec)
+static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nMicroSec)
 {
         if (NULL == _pQueue || NULL == pBuf_) {
                 return LINK_ERROR;
@@ -182,8 +182,8 @@ static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLe
                 struct timeval now;
                 gettimeofday(&now, NULL);
                 struct timespec timeout;
-                timeout.tv_sec = now.tv_sec + nUSec / 1000000;
-                timeout.tv_nsec = (now.tv_usec + nUSec % 1000000) * 1000;
+                timeout.tv_sec = now.tv_sec + (now.tv_usec + nMicroSec) / 1000000;
+                timeout.tv_nsec = ((now.tv_usec + nMicroSec) % 1000000)*1000;
                 
                 ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
                 if (ret == ETIMEDOUT) {
@@ -224,14 +224,13 @@ static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLe
 }
 
 
-static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nSec)
+static int PopQueue(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen, int64_t nMicroSec)
 {
-        int64_t usec = 1000000;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (pQueueImp->statInfo.nOverwriteCnt > 0) {
                 return LINK_Q_OVERWRIT;
         }
-        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, usec * nSec);
+        return PopQueueWithTimeout(_pQueue, pBuf_, nBufLen, nMicroSec);
 }
 
 static int PopQueueWithNoOverwrite(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLen)
