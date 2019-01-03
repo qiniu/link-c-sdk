@@ -1059,7 +1059,7 @@ int main(int argc, const char** argv)
                 do_start_file_test(&avuploader);
         }
         
-        sleep(1);
+        LinkFlushUploader(avuploader.pTsMuxUploader);
         LinkFreeUploader(&avuploader.pTsMuxUploader);
         if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);

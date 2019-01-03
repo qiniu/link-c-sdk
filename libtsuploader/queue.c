@@ -348,7 +348,7 @@ int LinkDestroyQueue(LinkCircleQueue **_pQueue)
         CircleQueueImp *pQueueImp = (CircleQueueImp *)(*_pQueue);
 
         StopPush(*_pQueue);
-        
+        LinkLogDebug("remain item:%d", pQueueImp->nLen_);
         pthread_mutex_destroy(&pQueueImp->mutex_);
         pthread_cond_destroy(&pQueueImp->condition_);
 

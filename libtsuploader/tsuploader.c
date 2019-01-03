@@ -563,17 +563,17 @@ static void * listenTsUpload(void *_pOpaque)
         KodoUploader * pKodoUploader = (KodoUploader *)_pOpaque;
         LinkUploaderStatInfo info = {0};
         while(!pKodoUploader->nQuit_ || info.nLen_ != 0) {
-                
+                info.nLen_  = 0;
                 int ret = 0;
                 if (pKodoUploader->cmdIsPending == 0) {
                         ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&pKodoUploader->cmd),
                                                                             sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
-                        pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
                         //LinkLogDebug("ts queue:%d", info.nLen_);
                         if (ret <= 0) {
                                 if (ret != LINK_TIMEOUT) {
                                         LinkLogError("tscmd queue error. pop:%d", ret);
                                 }
+                                pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
                                 continue;
                         }
                 }
@@ -604,7 +604,7 @@ static void * listenTsUpload(void *_pOpaque)
                         default:
                                 break;
                 }
-                
+                pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
         }
         return NULL;
 }
