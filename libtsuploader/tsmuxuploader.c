@@ -98,6 +98,7 @@ typedef struct _FFTsMuxUploader{
         CircleQueuePolicy queueType_;
         int8_t isPause;
         int8_t isQuit;
+        int8_t shouldSwitch;
         
         pthread_t tokenThread;
         
@@ -236,8 +237,9 @@ static void switchTs(FFTsMuxUploader *_pFFTsMuxUploader, int64_t nSysNanotime)
                         }
                         LinkReportTimeInfo tinfo;
                         getLinkReportTimeInfo(_pFFTsMuxUploader, &tinfo, nSysNanotime);
-                        if (_pFFTsMuxUploader->queueType_ == TSQ_APPEND && _pFFTsMuxUploader->nFirstFrameTimestamp >= 0)
+                        if (_pFFTsMuxUploader->nFirstFrameTimestamp >= 0)
                                 _pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->ReportTimeInfo(_pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &tinfo, LINK_TS_END);
+                        LinkLogDebug("last frame ts:%"PRId64", systeime:%"PRId64"", _pFFTsMuxUploader->nLastFrameTimestamp, nSysNanotime/1000000);
                         LinkResetTsMuxerContext( _pFFTsMuxUploader->pTsMuxCtx->pFmtCtx_);
                         resetTimeInfo(_pFFTsMuxUploader);
                 }
@@ -376,6 +378,7 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                 if (nIsForceNewSeg )
                         pTsMuxCtx->pTsUploader_->ReportTimeInfo(pTsMuxCtx->pTsUploader_, &tinfo, LINK_SEG_TIMESTAMP);
                 if (pFFTsMuxUploader->nFirstFrameTimestamp < 0) {
+                        LinkLogDebug("start frame ts:%"PRId64", systeime:%"PRId64"", _nTimestamp, nSysNanotime/1000000);
                         pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->ReportTimeInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &tinfo, LINK_TS_START);
                         pFFTsMuxUploader->nFirstFrameTimestamp = _nTimestamp;
                 }
@@ -391,6 +394,9 @@ static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDa
                         }
                         pFFTsMuxUploader->nLastAudioFrameTimestamp = _nTimestamp;
                 }
+        } else {
+                // TODO should switch next time
+                pFFTsMuxUploader->shouldSwitch = 1;
         }
 
         return ret;
@@ -503,10 +509,11 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                 }
         }
         // if start new uploader, start from keyframe
-        if (isVideoKeyframe || videoMetaChanged) {
+        if (isVideoKeyframe || videoMetaChanged || pFFTsMuxUploader->shouldSwitch) {
                 if( ((_nTimestamp - bakFirstFrameTimestamp) > pFFTsMuxUploader->remoteConfig.nTsDuration
                                       && pFFTsMuxUploader->nKeyFrameCount > 0)
                    //at least 1 keyframe and aoubt last 5 second
+                   || pFFTsMuxUploader->shouldSwitch
                    || videoMetaChanged
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0) ){// new segment is specified
                         fprintf(stderr, "normal switchts:%"PRId64" %d %d-%d %d\n", _nTimestamp - pFFTsMuxUploader->nFirstFrameTimestamp,
@@ -514,6 +521,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
                         pFFTsMuxUploader->nFrameCount = 0;
+                        pFFTsMuxUploader->shouldSwitch = 0;
                         
                         switchTs(pFFTsMuxUploader, nSysNanotime);
                         
@@ -546,7 +554,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 
         int64_t nSysNanotime = LinkGetCurrentNanosecond();
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
-                LinkLogWarn("first video frame not IDR. drop this frame\n");
+                LinkLogWarn("first video frame not IDR. drop this frame:%"PRId64"", _nTimestamp);
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
@@ -599,7 +607,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         }
         if (pFFTsMuxUploader->nKeyFrameCount == 0) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                LinkLogDebug("no keyframe. drop audio frame");
+                LinkLogDebug("no keyframe. drop audio frame:%"PRId64"", _nTimestamp);
                 return 0;
         }
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0, nSysNanotime, 0);
@@ -675,7 +683,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 av_strerror(errcode, msg, sizeof(msg))
 
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        return 640*1024;
+        return 384*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
@@ -936,7 +944,7 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->tsMuxUploader_.PushAudio = PushAudio;
         pFFTsMuxUploader->tsMuxUploader_.PushVideo = PushVideo;
         pFFTsMuxUploader->tsMuxUploader_.GetUploaderBufferUsedSize = getUploaderBufferUsedSize;
-        pFFTsMuxUploader->queueType_ = TSQ_APPEND;// TSQ_FIX_LENGTH;
+        pFFTsMuxUploader->queueType_ = TSQ_FIX_LENGTH; //TSQ_APPEND;
         pFFTsMuxUploader->segmentHandle = LINK_INVALIE_SEGMENT_HANDLE;
         
         pFFTsMuxUploader->avArg = *_pAvArg;
@@ -1289,9 +1297,6 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
-        if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
-                return;
-        }
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         fprintf(stderr, "LinkFlushUploader switchts\n");

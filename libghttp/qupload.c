@@ -523,7 +523,7 @@ int LinkUploadStream(const char * upHost, const char *upload_token, const char *
         size_t form_boundary_len = strlen(form_boundary);
         
         
-        char static_form_data[1024+256];
+        char static_form_data[188*7];
         char *form_data = static_form_data;
         char *form_data_p = static_form_data;
         

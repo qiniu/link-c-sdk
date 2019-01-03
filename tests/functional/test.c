@@ -381,7 +381,8 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                 }
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO, cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, type == 5);
                                                 if (cbRet != 0 && cbRet != LINK_PAUSED) {
-                                                        bVideoOk = 0;
+                                                        LinkLogError("\033[1;31;40m video callback:%d \033[0m", cbRet);
+                                                        //bVideoOk = 0;
                                                 }
                                                 nNextVideoTime += 40;
                                                 break;
@@ -407,7 +408,8 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                 //printf("send one video(%d) frame packet:%ld", type, end - sendp);
                                                 cbRet = callback(opaque, sendp, end - sendp, THIS_IS_VIDEO,cmdArg.nRolloverTestBase+nNextVideoTime-nSysTimeBase, hevctype == HEVC_I);
                                                 if (cbRet != 0  && cbRet != LINK_PAUSED) {
-                                                        bVideoOk = 0;
+                                                        LinkLogError("\033[1;31;40m audio callback:%d \033[0m", cbRet);
+                                                        //bVideoOk = 0;
                                                 }
                                                 nNextVideoTime += 40;
                                                 break;

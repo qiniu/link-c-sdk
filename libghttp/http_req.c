@@ -272,7 +272,7 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             if (a_conn->cb) {
                     char *io_buf= a_conn->io_buf;
                     
-                    char buf[1384];
+                    char buf[1480];
                     int bufLen;
                     int done = 0;
                     do {

@@ -280,7 +280,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                 int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60 * 1000000LL);
                 
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
-                LinkLogDebug("segment queue:%d", info.nLen_);
+                LinkLogTrace("segment queue:%d", info.nLen_);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("seg queue error. pop:%d", ret);
@@ -288,7 +288,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
-                        LinkLogDebug("pop segment info:%d\n", segInfo.handle);
+                        LinkLogTrace("pop segment info:%d\n", segInfo.handle);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {

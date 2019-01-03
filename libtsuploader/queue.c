@@ -197,30 +197,35 @@ static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLe
                 }
         }
         assert (pQueueImp->nLen_ != 0);
-        int nDataLen = 0;
-        memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, sizeof(int));
-        int nRemain = nDataLen - nBufLen;
-        LinkLogTrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, nBufLen, pQueueImp->nLen_);
-        if (nRemain > 0) {
-                memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nBufLen);
-                memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, &nRemain, sizeof(int));
-                memmove(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int),
-                       pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int) + nBufLen,
-                       nRemain);
-                nDataLen = nBufLen;
-        } else {
-                memcpy(pBuf_, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nDataLen);
-                if (pQueueImp->nStart_ + 1 == pQueueImp->nCap_) {
-                        pQueueImp->nStart_ = 0;
+        int retLen = 0, leftBuf = nBufLen;
+        while(pQueueImp->nLen_ > 0 && leftBuf > 0) {
+                int nDataLen = 0;
+                memcpy(&nDataLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, sizeof(int));
+                int nRemain = nDataLen - leftBuf;
+                LinkLogTrace("pop remain:%d pop:%d buflen:%d len:%d", nRemain, nDataLen, leftBuf, pQueueImp->nLen_);
+                if (nRemain > 0) {
+                        memcpy(pBuf_+retLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), leftBuf);
+                        memcpy(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_, &nRemain, sizeof(int));
+                        memmove(pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int),
+                                pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int) + leftBuf,
+                                nRemain);
+                        retLen += leftBuf;
+                        leftBuf = 0;
                 } else {
-                        pQueueImp->nStart_++;
+                        memcpy(pBuf_+retLen, pQueueImp->pData_ + pQueueImp->nStart_ * pQueueImp->nItemLen_ + sizeof(int), nDataLen);
+                        if (pQueueImp->nStart_ + 1 == pQueueImp->nCap_) {
+                                pQueueImp->nStart_ = 0;
+                        } else {
+                                pQueueImp->nStart_++;
+                        }
+                        pQueueImp->nLen_--;
+                        retLen += nDataLen;
+                        leftBuf -= nDataLen;
                 }
-                pQueueImp->nLen_--;
         }
-        
-        pQueueImp->statInfo.nPopDataBytes_ += nDataLen;
+        pQueueImp->statInfo.nPopDataBytes_ += retLen;
         pthread_mutex_unlock(&pQueueImp->mutex_);
-        return nDataLen;
+        return retLen;
 }
 
 
