@@ -1,7 +1,7 @@
 #include "security.h"
-#include <openssl/hmac.h>
 #include "base.h"
-#include "wolfssl/wolfcrypt/sha.h"
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/hmac.h>
 #include "b64/urlsafe_b64.h"
 
 int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlWithPathAndQuery, char *pContentType,
@@ -59,7 +59,7 @@ int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlW
 /*hmac-sha1 output is 160bit(20 byte)*/
 int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         char *pOutput, int *pOutputLen) { //EVP_MAX_MD_SIZE
-        
+#if 0
         unsigned int outlen=20;
         unsigned char * res = HMAC(EVP_sha1(), (const unsigned char *)pKey, nKeyLen,
                                    (const unsigned char *)pInput, nInputLen,
@@ -70,7 +70,9 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         *pOutputLen = 20;
         return LINK_SUCCESS;
         
-#if 0
+#endif
+
+#if 1
         Hmac hmac;
         memset(&hmac, 0, sizeof(hmac));
         int ret = 0;

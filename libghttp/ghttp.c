@@ -52,7 +52,7 @@ struct _ghttp_request
   char               *proxy_authtoken;
   int                 secure_uri;
   int                 nTimeoutInSecond;
-#ifdef USE_SSL
+#if defined (USE_OPENSSL) || (USE_WOLFSSL)
   ghttp_ssl_cert_cb   cert_cb;
   void               *cert_cb_data;
 #endif
@@ -98,7 +98,7 @@ int ghttp_is_timeout(ghttp_request *a_request)
 				return 1;
 			else
 				return 0;
-#ifdef USE_SSL
+#if defined (USE_OPENSSL) || (USE_WOLFSSL)
 		case http_trans_err_type_ssl:
 			if (a_request->conn->error==SSL_ERROR_WANT_READ || a_request->conn->error==SSL_ERROR_WANT_WRITE)
 				return 1;
@@ -223,7 +223,7 @@ ghttp_set_uri(ghttp_request *a_request, const char *a_uri)
 	  a_request->uri = l_new_uri;
 	}
 
-#ifdef USE_SSL
+#if defined (USE_OPENSSL) || (USE_WOLFSSL)
       if (!strcmp(a_request->uri->proto, "https"))
         {
           a_request->secure_uri = 1;
@@ -386,7 +386,7 @@ ghttp_prepare(ghttp_request *a_request)
   if ((a_request->conn->host == NULL) ||
       (a_request->conn->host != a_request->uri->host) ||
       (a_request->conn->port != a_request->uri->port) ||
-      (a_request->conn->use_ssl != a_request->secure_uri) ||
+      (a_request->conn->USE_SSL != a_request->secure_uri) ||
       (a_request->conn->proxy_host != a_request->proxy->host) ||
       (a_request->conn->proxy_port != a_request->proxy->port)) 
     {
@@ -459,9 +459,9 @@ ghttp_process (ghttp_request *a_request)
 		a_request->errstr = gai_strerror(a_request->conn->error);
 	      return ghttp_error;
 	    }
-#ifdef USE_SSL 
+#ifdef USE_OPENSSL
           /* call callback to verify certificate if it's an SSL connection*/
-          if(a_request->conn->use_ssl) 
+          if(a_request->conn->USE_SSL)
             { 
               if(a_request->conn->ssl_cert &&
                  ((a_request->cert_cb == NULL) ||
@@ -476,6 +476,22 @@ ghttp_process (ghttp_request *a_request)
                 }
             }
           else 
+            a_request->connected = 1;
+
+#elif defined (USE_WOLFSSL)
+          /* call callback to verify certificate if it's an SSL connection*/
+          if(a_request->conn->USE_SSL)
+            {
+              if(a_request->cert_cb == NULL)
+              {
+                a_request->connected = 1;
+              }
+              else
+                {
+                  return ghttp_error;
+                }
+            }
+          else
             a_request->connected = 1;
 #else 
           a_request->connected = 1;
@@ -646,10 +662,16 @@ ghttp_get_error(ghttp_request *a_request)
             a_request->errstr = strerror(a_request->conn->error);
             return a_request->errstr;
             if (a_request->conn->error == EAGAIN || a_request->conn->error == EWOULDBLOCK)
-#ifdef USE_SSL
+#ifdef USE_OPENSSL
         case http_trans_err_type_ssl:
             a_request->errstr = ERR_reason_error_string(a_request->conn->error);
             return a_request->errstr;
+
+#elif defined (USE_WOLFSSL)
+        case http_trans_err_type_ssl:
+            a_request->errstr = wolfSSL_ERR_reason_error_string(a_request->conn->error);
+            return a_request->errstr;
+
 #endif
 	default:
 	    break;
@@ -879,7 +901,7 @@ ghttp_set_ssl_certificate_callback(ghttp_request     *a_request,
                                    ghttp_ssl_cert_cb callback,
                                    void              *user_data) 
 {
-#ifdef USE_SSL
+#if defined (USE_OPENSSL) || (USE_WOLFSSL)
   a_request->cert_cb      = callback;
   a_request->cert_cb_data = user_data;
 #endif

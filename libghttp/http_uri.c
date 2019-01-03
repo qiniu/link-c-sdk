@@ -61,7 +61,7 @@ http_uri_parse(const char *a_string,
     
     /* change default port for secure connections */
     if(!strcmp(a_uri->proto, "https")) {
-#ifdef USE_SSL
+#if defined (USE_OPENSSL) || (USE_WOLFSSL)
       a_uri->port = 443; 
 #else
       goto ec;

@@ -4,8 +4,15 @@ project(libghttp)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
 add_definitions("-Wall -g")
+if (WITH_WOLFSSL)
+    add_definitions(-DUSE_WOLFSSL)
+
+    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
+    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include")
+endif()
+
 if (WITH_OPENSSL)
-    add_definitions(-DUSE_SSL)
+    add_definitions(-DUSE_OPENSSL)
 
     link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
     include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include")
@@ -39,6 +46,8 @@ add_library(ghttp STATIC
 add_executable(testghttp test.c qupload.c qupload.h)
 if (WITH_OPENSSL)
     target_link_libraries(testghttp ghttp wolfssl m)
+elseif (WITH_WOLFSSL)
+	target_link_libraries(testghttp ghttp wolfssl m)
 else()
     target_link_libraries(testghttp ghttp m)
 endif()
