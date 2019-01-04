@@ -113,7 +113,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN SessionMeta *metas);
 
 /**
- * 清空切片上传文件命名的自定义后缀字段
+ * 清空段上报的元数据
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @return LINK_SUCCESS 成功; 其它值 失败

@@ -181,6 +181,8 @@ typedef struct {
         LinkMediaArg media[2];
         LinkMediaType mediaType[2];
         int nCount;
+        char sessionId[21];
+        const SessionMeta* pSessionMeta;
 } LinkMediaInfo;
 typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMediaInfo info);
 /**************************/
