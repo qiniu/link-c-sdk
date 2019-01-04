@@ -288,8 +288,8 @@ END:
                 pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);
                 LinkMediaInfo mediaInfo;
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
-                mediaInfo.startTime = tsStartTime;
-                mediaInfo.endTime = tsStartTime + tsDuration;
+                mediaInfo.startTime = tsStartTime / 1000000;
+                mediaInfo.endTime = tsStartTime / 1000000 + tsDuration;
                 mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
                 memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
                 int idx = 0;
