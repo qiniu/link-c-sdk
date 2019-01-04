@@ -19,7 +19,7 @@ typedef struct {
         SegmentHandle handle;
         uint8_t nOperation;
         LinkSession session;
-        const SessionMeta* pSessionMeta;
+        const LinkSessionMeta* pSessionMeta;
 }SegInfo;
 
 typedef struct {
@@ -31,7 +31,7 @@ typedef struct {
         void *pUploadStatArg;
         int64_t nNextUpdateSegTimeInSecond;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
-        const SessionMeta* pSessionMeta;
+        const LinkSessionMeta* pSessionMeta;
 }Seg;
 
 typedef struct {
@@ -87,7 +87,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
         
-        const SessionMeta* smeta = segmentMgr.handles[idx].pSessionMeta;
+        const LinkSessionMeta* smeta = segmentMgr.handles[idx].pSessionMeta;
         if (s->nSessionEndResonCode != 0) {
                 const char * reason = "timeout";
                 if (s->nSessionEndResonCode == 1)
@@ -401,7 +401,7 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         return LINK_SUCCESS;
 }
 
-int LinkUpdateSegmentMeta(SegmentHandle seg, const SessionMeta *meta) {
+int LinkUpdateSegmentMeta(SegmentHandle seg, const LinkSessionMeta *meta) {
         SegInfo segInfo;
         segInfo.handle = seg;
         segInfo.nOperation = SEGMENT_UPDATE_META;

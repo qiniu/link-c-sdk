@@ -110,7 +110,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] metas 自定义的元数据，key->value结构
  *                metas->isOneShot 非0，仅上报一次后便不在上报
  */
-int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN SessionMeta *metas);
+int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas);
 
 /**
  * 清空段上报的元数据

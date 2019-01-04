@@ -63,7 +63,7 @@ typedef struct _KodoUploader{
         LinkTsOutput output;
         void *pOutputUserArg;
         LinkMediaArg mediaArg;
-        SessionMeta *pSessionMeta;
+        LinkSessionMeta *pSessionMeta;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -290,7 +290,7 @@ END:
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
                 mediaInfo.startTime = tsStartTime;
                 mediaInfo.endTime = tsStartTime + tsDuration;
-                mediaInfo.pSessionMeta = (const SessionMeta *)pKodoUploader->pSessionMeta;
+                mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
                 memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
                 int idx = 0;
                 if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
@@ -682,7 +682,7 @@ void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo)
         }
 }
 
-void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, SessionMeta *pSessionMeta) {
+void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessionMeta) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
         
         pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);

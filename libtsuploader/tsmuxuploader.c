@@ -1123,7 +1123,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         return ret;
 }
 
-static int dupSessionMeta(SessionMeta *metas, SessionMeta **pDst) {
+static int dupSessionMeta(LinkSessionMeta *metas, LinkSessionMeta **pDst) {
         int idx = 0;
         int total = 0;
         for (idx =0; idx < metas->len; idx++) {
@@ -1133,14 +1133,14 @@ static int dupSessionMeta(SessionMeta *metas, SessionMeta **pDst) {
         total += sizeof(void*) * metas->len * 2;
         total += sizeof(int) * metas->len * 2;
         
-        char *tmp = (char *)malloc(total + sizeof(SessionMeta));
+        char *tmp = (char *)malloc(total + sizeof(LinkSessionMeta));
         if (tmp == NULL) {
                 return -1;
         }
-        memcpy(tmp, metas, sizeof(SessionMeta));
+        memcpy(tmp, metas, sizeof(LinkSessionMeta));
         
-        SessionMeta *dst = (SessionMeta *)tmp;
-        tmp += sizeof(SessionMeta);
+        LinkSessionMeta *dst = (LinkSessionMeta *)tmp;
+        tmp += sizeof(LinkSessionMeta);
         char **pp = (char **)tmp;
         dst->keys = (const char **)pp;
         int *pl = (int *)(tmp + sizeof(void*) * metas->len);
@@ -1182,7 +1182,7 @@ void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *_pTsMuxUploader,
         return;
 }
 
-int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN SessionMeta *metas) {
+int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *metas) {
         if (_pTsMuxUploader == NULL || metas == NULL || metas->len <= 0) {
                 return LINK_ARG_ERROR;
         }
@@ -1190,7 +1190,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN SessionMeta *metas) 
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         
-        SessionMeta *pDup;
+        LinkSessionMeta *pDup;
         int ret = dupSessionMeta(metas, &pDup);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1204,7 +1204,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN SessionMeta *metas) 
         }
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
-                SessionMeta *pDup2;
+                LinkSessionMeta *pDup2;
                 ret = dupSessionMeta(metas, &pDup2);
                 if (ret != LINK_SUCCESS) {
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);

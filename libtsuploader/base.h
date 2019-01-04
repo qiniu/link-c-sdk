@@ -31,7 +31,7 @@ typedef struct {
         int *valuelens;
         int len;
         int isOneShot;
-}SessionMeta;
+}LinkSessionMeta;
 
 typedef struct {
         int64_t nTimestamp90Khz;
@@ -182,7 +182,7 @@ typedef struct {
         LinkMediaType mediaType[2];
         int nCount;
         char sessionId[21];
-        const SessionMeta* pSessionMeta;
+        const LinkSessionMeta* pSessionMeta;
 } LinkMediaInfo;
 typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMediaInfo info);
 /**************************/
