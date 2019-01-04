@@ -40,6 +40,7 @@ typedef struct _KodoUploader{
         int nInitItemCount;
         
         pthread_mutex_t uploadMutex_;
+        pthread_mutex_t sessionMetaMutex_;
         int nTsCacheNum;
         int nTsMaxCacheNum;
 
@@ -62,6 +63,7 @@ typedef struct _KodoUploader{
         LinkTsOutput output;
         void *pOutputUserArg;
         LinkMediaArg mediaArg;
+        LinkSessionMeta *pSessionMeta;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -283,10 +285,13 @@ END:
         }
         
         if (pKodoUploader->output) {
+                pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);
                 LinkMediaInfo mediaInfo;
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
                 mediaInfo.startTime = tsStartTime;
                 mediaInfo.endTime = tsStartTime + tsDuration;
+                mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
+                memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
                 int idx = 0;
                 if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
                         mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
@@ -303,6 +308,7 @@ END:
                 }
                 
                 pKodoUploader->output(bufData, l, pKodoUploader->pOutputUserArg, mediaInfo);
+                pthread_mutex_unlock(&pKodoUploader->sessionMetaMutex_);
         }
 
         LinkDestroyQueue(&pDataQueue);
@@ -585,7 +591,8 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return ret;
         }
         ret = pthread_mutex_init(&pKodoUploader->uploadMutex_, NULL);
-        if (ret != 0){
+        int ret1 = pthread_mutex_init(&pKodoUploader->sessionMetaMutex_, NULL);
+        if (ret != 0 || ret1 != 0){
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
                 free(pKodoUploader->pUpMeta);
@@ -652,6 +659,8 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         if (pKodoUploader->pUpMeta) {
                 free(pKodoUploader->pUpMeta);
         }
+        pthread_mutex_destroy(&pKodoUploader->uploadMutex_);
+        pthread_mutex_destroy(&pKodoUploader->sessionMetaMutex_);
 
         free(pKodoUploader);
         * _pUploader = NULL;
@@ -671,4 +680,27 @@ void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo)
                         //fprintf(stderr, "==========------->%lld %d %d %x\n", pMediaInfo->nTimestamp, pMediaInfo->nOffset, pMediaInfo->nLength, pOpaque);
                 }
         }
+}
+
+void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessionMeta) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);
+        if (pKodoUploader->pSessionMeta) {
+                free(pKodoUploader->pSessionMeta);
+                pKodoUploader->pSessionMeta = NULL;
+        }
+        pKodoUploader->pSessionMeta = pSessionMeta;
+        pthread_mutex_unlock(&pKodoUploader->sessionMetaMutex_);
+}
+
+void LinkClearSessionMeta(IN LinkTsUploader * _pUploader) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);
+        if (pKodoUploader->pSessionMeta) {
+                free(pKodoUploader->pSessionMeta);
+                pKodoUploader->pSessionMeta = NULL;
+        }
+        pthread_mutex_unlock(&pKodoUploader->sessionMetaMutex_);
 }

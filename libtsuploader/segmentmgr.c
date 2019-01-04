@@ -19,7 +19,7 @@ typedef struct {
         SegmentHandle handle;
         uint8_t nOperation;
         LinkSession session;
-        SessionMeta sessionMeta;
+        const LinkSessionMeta* pSessionMeta;
 }SegInfo;
 
 typedef struct {
@@ -31,8 +31,7 @@ typedef struct {
         void *pUploadStatArg;
         int64_t nNextUpdateSegTimeInSecond;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
-        SessionMeta sessionMeta;
-        int sessionMetaIsValid;
+        const LinkSessionMeta* pSessionMeta;
 }Seg;
 
 typedef struct {
@@ -88,8 +87,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
         
-        int sessionMetaIsValid = segmentMgr.handles[idx].sessionMetaIsValid;
-        SessionMeta *smeta = &segmentMgr.handles[idx].sessionMeta;
+        const LinkSessionMeta* smeta = segmentMgr.handles[idx].pSessionMeta;
         if (s->nSessionEndResonCode != 0) {
                 const char * reason = "timeout";
                 if (s->nSessionEndResonCode == 1)
@@ -112,7 +110,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
         
-        if (sessionMetaIsValid && smeta->len > 0) {
+        if (smeta && smeta->len > 0) {
                 int i = 0;
                 int nSessionMetaLen = sprintf(body + nBodyLen, ",\"meta\":{");
                 nBodyLen += nSessionMetaLen;
@@ -162,9 +160,9 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
 
         ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, nBodyLen, "application/json",
                                     pToken, nTokenOffset+nOutputLen);
-        if(sessionMetaIsValid && smeta->isOneShot) {
-                segmentMgr.handles[idx].sessionMetaIsValid = 0;
-                free(smeta->keys);
+        if(smeta && smeta->isOneShot) {
+                free((void *)smeta);
+                segmentMgr.handles[idx].pSessionMeta = NULL;
         }
         if (ret != LINK_SUCCESS) {
                 LinkLogError("report session info fail:%d", ret);
@@ -232,11 +230,11 @@ static void handleUpdateSessionMeta(SegInfo *pSegInfo) {
                 LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
                 return;
         }
-        if (segmentMgr.handles[idx].sessionMetaIsValid) {
-                free(segmentMgr.handles[idx].sessionMeta.keys);
+        if (segmentMgr.handles[idx].pSessionMeta) {
+                free((void *)segmentMgr.handles[idx].pSessionMeta);
+                segmentMgr.handles[idx].pSessionMeta = NULL;
         }
-        segmentMgr.handles[idx].sessionMeta = pSegInfo->sessionMeta;
-        segmentMgr.handles[idx].sessionMetaIsValid = 1;
+        segmentMgr.handles[idx].pSessionMeta = pSegInfo->pSessionMeta;
 }
 
 static void handleClearSessionMeta(SegInfo *pSegInfo) {
@@ -251,10 +249,10 @@ static void handleClearSessionMeta(SegInfo *pSegInfo) {
                 LinkLogWarn("wrong segment handle:%d", pSegInfo->handle);
                 return;
         }
-        if (segmentMgr.handles[idx].sessionMetaIsValid) {
-                free(segmentMgr.handles[idx].sessionMeta.keys);
+        if (segmentMgr.handles[idx].pSessionMeta) {
+                free((void *)segmentMgr.handles[idx].pSessionMeta);
+                segmentMgr.handles[idx].pSessionMeta = NULL;
         }
-        segmentMgr.handles[idx].sessionMetaIsValid = 0;
         return;
 }
 
@@ -265,7 +263,6 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].nNextUpdateSegTimeInSecond = 0;
-                segmentMgr.handles[seg].sessionMetaIsValid = 0;
         }
         pthread_mutex_unlock(&segMgrMutex);
         return;
@@ -404,11 +401,11 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         return LINK_SUCCESS;
 }
 
-int LinkUpdateSegmentMeta(SegmentHandle seg, const SessionMeta *meta) {
+int LinkUpdateSegmentMeta(SegmentHandle seg, const LinkSessionMeta *meta) {
         SegInfo segInfo;
         segInfo.handle = seg;
         segInfo.nOperation = SEGMENT_UPDATE_META;
-        segInfo.sessionMeta = *meta;
+        segInfo.pSessionMeta = meta;
         int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         if (ret <= 0) {
                 LinkLogError("seg queue error. push update meta:%d", ret);

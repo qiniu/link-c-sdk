@@ -110,10 +110,10 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] metas 自定义的元数据，key->value结构
  *                metas->isOneShot 非0，仅上报一次后便不在上报
  */
-int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN SessionMeta *metas);
+int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas);
 
 /**
- * 清空切片上传文件命名的自定义后缀字段
+ * 清空段上报的元数据
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @return LINK_SUCCESS 成功; 其它值 失败

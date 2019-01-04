@@ -18,7 +18,7 @@ int LinkInitSegmentMgr();
 int LinkNewSegmentHandle(OUT SegmentHandle *pSeg, IN const SegmentArg *pArg);
 void LinkReleaseSegmentHandle(IN OUT SegmentHandle *pSeg);
 int LinkUpdateSegment(IN SegmentHandle seg, IN const LinkSession *pSession);
-int LinkUpdateSegmentMeta(SegmentHandle seg, const SessionMeta *meta);
+int LinkUpdateSegmentMeta(SegmentHandle seg, const LinkSessionMeta *meta);
 
 int LinkClearSegmentMeta(SegmentHandle seg);
 
