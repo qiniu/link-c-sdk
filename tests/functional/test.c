@@ -617,7 +617,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         nNewSegMent = 1;
                         pAvuploader->segStartCount++;
                         
-                        SessionMeta metas;
+                        LinkSessionMeta metas;
                         metas.len = 3;
                         char *keys[3] = {"key1", "key23", "key345"};
                         metas.keys = (const char **)keys;
