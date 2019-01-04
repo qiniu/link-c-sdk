@@ -47,6 +47,8 @@ int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg
 void LinkTsUploaderSetTsEndUploadCallback(IN LinkTsUploader * _pUploader, IN LinkEndUploadCallback cb, IN void *pOpaque);
 void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
+void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, SessionMeta *pSessionMeta);
+void LinkClearSessionMeta(IN LinkTsUploader * _pUploader);
 
 void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput, IN void * pUserArg, IN LinkMediaArg mediaArg);
 
