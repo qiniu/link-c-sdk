@@ -22,4 +22,4 @@ aux_source_directory(./wolfmqtt MQTT_MAP)
 
 add_library(mqtt STATIC ${LIB_MQTT} ${MQTT_MAP})
 
-# add_subdirectory(test)
+add_subdirectory(test)
