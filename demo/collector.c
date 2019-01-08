@@ -25,7 +25,6 @@ static void *coll_mem_thread(void *args)
 //    used = DbgGetMemUsed();
     report->pData = "4096";
     report->nLen = sizeof("4096");
-//    printf("%s[%d] mqtt pInstance :%p\n", __func__, __LINE__, report->pBase->pInstance);
     if (coll->nStatus == COLLECTOR_START) {
         report->ops->deal(report);
     }
@@ -55,18 +54,9 @@ static void SigAlarmHandle(int signo)
     if (gCollector.nModule & LOG_MODULE_MEM) {
         pthread_t  tid_mem;
 
-//        struct LogReportObj *report = (struct LogReportObj *)gCollector.pInstance;
-//        report->pData = "1024";
-//        report->nLen = sizeof("1024");
-//        report->ops->deal(report);
-
         pthread_create(&tid_mem, NULL, coll_mem_thread, &gCollector);
     } else if (gCollector.nModule & LOG_MODULE_CPU) {
-        pthread_t tid_cpu;
-        pthread_create(&tid_cpu, NULL, coll_cpu_thread, &gCollector);
     } else if (gCollector.nModule & LOG_MODULE_FP) {
-        pthread_t tid_fp;
-        pthread_create(&tid_fp, NULL, coll_fp_thread, &gCollector);
     }
 }
 

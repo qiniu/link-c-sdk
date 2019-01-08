@@ -64,7 +64,6 @@ static void SendLog(IN struct LogReportObj *_pObj)
     GetModuleStr(_pObj->nModule, &module[0]);
     int len = 0;
     len = sprintf(str, "%s %s %s %s %s", timestamp, "logmqtt", _pObj->pDevName, &module[0], _pObj->pData);
-    printf("LinkSendLog str:%s\n", str);
     if (LinkSendLog(_pObj->nLevel, str, len +1) != 1) {
         sleep(2);
     }
