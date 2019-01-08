@@ -5,6 +5,7 @@
 #include "control.h"
 #include "control_internal.h"
 #include "queue.h"
+#include "log.h"
 #include "cJSON/cJSON.h"
 
 struct _LinkIOCrtlInfo Session[10] = {0};
@@ -53,7 +54,7 @@ int LinkInitIOCtrl(const char *_pAppId, const char *_pEncodeDeviceName, void *_p
         }
         Session[index].pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
         if (!Session[index].pQueue) {
-                printf("queue malloc fail\n");
+                LinkLogError("queue malloc fail\n");
                 return MQTT_ERR_NOMEM;
         }
         memset(Session[index].pubTopic, 0, sizeof(Session[index].pubTopic));
@@ -202,7 +203,7 @@ int LinkInitLog(const char *_pAppId, const char *_pEncodeDeviceName, void *_pIns
         }
         LogSession.pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
         if (!LogSession.pQueue) {
-                printf("queue malloc fail\n");
+                LinkLogError("queue malloc fail\n");
                 return MQTT_ERR_NOMEM;
         }
         memset(LogSession.pubTopic, 0, sizeof(LogSession.pubTopic));
