@@ -27,30 +27,16 @@ else()
     set( DEV_FILE sim_dev.c )
 endif()
 
-add_executable(demo-tsupload
-    main.c
-    main.h
-    log2file.c
-    log2file.h
-    cfg.c
-    cfg.h
-    dbg.c
-    dbg.h
-    mymalloc.c
-    mymalloc.h
-    queue.c
-    queue.h
-    log2tcp.c
-    log2tcp.h
-    dev_core.c
-    dev_core.h
-    stream.c
-    stream.h
-    ota.c
-    md5.c
-    func_trace.c
-    ${DEV_FILE}
-)
+set(SOURCE_LIST main.c main.h log2file.c log2file.h cfg.c cfg.h dbg.c dbg.h mymalloc.c 
+			mymalloc.h queue.c queue.h log2tcp.c log2tcp.h dev_core.c dev_core.h stream.c 
+			stream.h ota.c md5.c func_trace.c)
+
+if (MODULE_COLLECTOR)
+	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libmqtt")
+	set(SOURCE_LIST ${SOURCE_LIST} collector.c connect_mqtt.c log_mqtt.c)
+endif()
+			
+add_executable(demo-tsupload 	${SOURCE_LIST} ${DEV_FILE})	
 
 if(APPLE)
 	set(CMAKE_EXE_LINKER_FLAGS
