@@ -2,8 +2,9 @@
 #include "mqtt_types.h"
 #include "mqtt_packet.h"
 #include "mqtt_socket.h"
-#include "mqtt_client.h"
+#include "wolfmqtt/mqtt_client.h"
 #include "mqttnet.h"
+#include "log.h"
 
 #include <signal.h>
 
@@ -81,7 +82,7 @@ int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _n
         pthread_mutex_lock(&pInstance->listMutex);
         int rc = MqttClient_Publish(client, &publish);
         if (rc != MQTT_CODE_SUCCESS) {
-                printf("MQTT Publish fail, %s(%d)\n“", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Publish fail, %s(%d)\n“", MqttClient_ReturnCodeToString(rc), rc);
         }
         pthread_mutex_unlock(&pInstance->listMutex);
         usleep(1000);
@@ -108,7 +109,7 @@ int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic)
                 InsertNode(&pInstance->pSubsribeList, _pTopic);
         }
         else {
-                printf("MQTT Subscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Subscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
         pthread_mutex_unlock(&pInstance->listMutex);
         usleep(1000);
@@ -119,7 +120,7 @@ int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
 {
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         if (_pTopic == NULL) {
-                fprintf(stderr, "Error: Invalid input.\n");
+                LinkLogError("Error: Invalid input.\n");
                 return MQTT_ERR_INVAL;
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(pInstance->mosq);
@@ -135,7 +136,7 @@ int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic)
                 DeleteNode(&pInstance->pSubsribeList, _pTopic);
         }
         else {
-                printf("MQTT Unsubscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Unsubscribe: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
         pthread_mutex_unlock(&pInstance->listMutex);
         usleep(1000);
@@ -150,7 +151,7 @@ int LinkMqttLibInit()
         sigaddset(&signal_mask, SIGPIPE);
         int rc = pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
         if (rc != 0) {
-                printf("block sigpipe error\n");
+                LinkLogError("block sigpipe error\n");
         } 
         return MQTT_SUCCESS;
 }
@@ -169,7 +170,7 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         if (pInstance == NULL) {
                  return 0;
         }
-        printf("OnDisconnectCallback result %d %p \n", error_code, pInstance);
+        LinkLogInfo("OnDisconnectCallback result %d %p \n", error_code, pInstance);
         OnEventCallback(pInstance,
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
                 (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
@@ -197,7 +198,7 @@ static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage,
                 memset(pInstance->mosq->message, 0, MAX_MQTT_MESSAGE_LEN);
                 memcpy(pInstance->mosq->message_topic, _pMessage->topic_name, min((MAX_MQTT_TOPIC_LEN - 1), _pMessage->topic_name_len));
                 memcpy(pInstance->mosq->message, _pMessage->buffer, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
-                printf("topic %s \n", pInstance->mosq->message_topic);
+                LinkLogDebug("topic %s \n", pInstance->mosq->message_topic);
                 if (memcmp(pInstance->mosq->message_topic, IO_CTR_MESSAGE, IO_CTR_MESSAGE_LENGTH) == 0) {
                         OnIOCtrlMessage(pInstance, pInstance->options.nAccountId, pInstance->mosq->message_topic,
                                         (const char *)pInstance->mosq->message, min((MAX_MQTT_MESSAGE_LEN - 1), _pMessage->buffer_len));
@@ -215,16 +216,16 @@ static int mqtt_tls_verify_cb(int preverify, WOLFSSL_X509_STORE_CTX* store)
         MQTTCtx *mqttCtx = NULL;
         char appName[MAX_BUFFER_SIZE] = {0};
 
-        printf("MQTT TLS Verify  PreVerify %d, Error %d (%s) \n",
+        LinkLogError("MQTT TLS Verify  PreVerify %d, Error %d (%s) \n",
                 preverify,
                 store->error, store->error != 0 ?
                 wolfSSL_ERR_error_string(store->error, buffer) : "none");
-        printf("Subject's domain name is %s \n", store->domain);
+        LinkLogDebug("Subject's domain name is %s \n", store->domain);
 
         if (store->error != 0) {
                 /* Allowing to continue */
                 /* Should check certificate and return 0 if not okay */
-                printf("Allowing cert anyways \n");
+                LinkLogError("Allowing cert anyways \n");
         }
         return 1;
 }
@@ -248,7 +249,7 @@ int mqtt_tls_cb(MqttClient* client)
                           }
                 }
         }
-        printf("MQTT TLS Setup (%d)", rc);
+        LinkLogError("MQTT TLS Setup (%d)", rc);
         return rc;
 }
 
@@ -281,7 +282,7 @@ int LinkMqttInit(struct MqttInstance* _pInstance)
         rc = MqttClient_Init(&mqtt_ctx->client, &mqtt_ctx->net, OnMessageCallback, mqtt_ctx->tx_buf, MAX_BUFFER_SIZE,
                              mqtt_ctx->rx_buf, MAX_BUFFER_SIZE, DEFAULT_CON_TIMEOUT_MS);
         mqtt_ctx->client.ctx = _pInstance;
-        printf(" _pInstance->mosq %p _pInstance %p client  %p\n", _pInstance->mosq, _pInstance, &mqtt_ctx->client);
+        LinkLogDebug(" _pInstance->mosq %p _pInstance %p client  %p\n", _pInstance->mosq, _pInstance, &mqtt_ctx->client);
         MqttClient_SetDisconnectCallback(&mqtt_ctx->client, OnDisconnectCallback, NULL);
         return MqttErrorStatusChange(rc);
 }
@@ -310,7 +311,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
 
-        printf("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
+        LinkLogError("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
         int rc = 0;
         MqttMessage lwt_msg;
         /* Define connect parameters */
@@ -335,18 +336,18 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         /* Optional authentication */
         ctx->connect.username = _pInstance->options.userInfo.pUsername;
         ctx->connect.password = _pInstance->options.userInfo.pPassword;
-	printf("MqttConnect username %s, password %s  tls %d\n", ctx->connect.username, ctx->connect.password, ctx->use_tls); 
+	LinkLogDebug("MqttConnect username %s, password %s  tls %d\n", ctx->connect.username, ctx->connect.password, ctx->use_tls); 
 	rc = MqttClient_NetConnect(client, _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort,
                                    5000, ctx->use_tls, mqtt_tls_cb);
         if (rc != MQTT_CODE_SUCCESS) {
             sleep(1);
-            printf("EstablishConnect failed rc %d %s \n", rc, MqttClient_ReturnCodeToString(rc));
+            LinkLogError("EstablishConnect failed rc %d %s \n", rc, MqttClient_ReturnCodeToString(rc));
             return MqttErrorStatusChange(rc);
         }
         /* Send Connect and wait for Connect Ack */
         rc = MqttClient_Connect(client, &ctx->connect);
         if (rc != MQTT_CODE_SUCCESS) {
-                printf("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         } else {
                 _pInstance->connected = true;
                 _pInstance->status = STATUS_CONNACK_RECVD;
@@ -355,7 +356,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         OnEventCallback(_pInstance,
                (rc == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(rc),
                (rc == 0) ? "on connect success" : MqttClient_ReturnCodeToString(rc));
-	printf("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+	LinkLogError("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
 	return MqttErrorStatusChange(rc);
 }
 
@@ -372,11 +373,11 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
         }
 	int rc = MqttClient_Disconnect(client);
         if (rc != MQTT_CODE_SUCCESS) {
-                printf("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
 	rc = MqttClient_NetDisconnect(client);
 	if (rc != MQTT_CODE_SUCCESS) {
-                printf("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+                LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
 	_pInstance->connected = false;
 }
@@ -393,14 +394,14 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
         if (rc == MQTT_CODE_ERROR_TIMEOUT) {
 		++ ctx->timeoutCount;
                 /* Keep Alive */
-                //printf("Keep-alive timeout, sending ping");
+                //LinkLogError("Keep-alive timeout, sending ping");
 		if (ctx->timeoutCount * DEFAULT_CON_TIMEOUT_MS > 5000) {
                         rc = MqttClient_Ping(&client);
                         if (rc == MQTT_CODE_CONTINUE) {
                                 return MqttErrorStatusChange(rc);
                         }
                         else if (rc != MQTT_CODE_SUCCESS) {
-                                printf("MQTT Ping Keep Alive Error: %s (%d)",
+                                LinkLogError("MQTT Ping Keep Alive Error: %s (%d)",
                                         MqttClient_ReturnCodeToString(rc), rc);
                                 ctx->timeoutCount = 0;
                         }
@@ -410,7 +411,7 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
 	pthread_mutex_unlock(&_pInstance->listMutex);
 	usleep(10000);
         if (rc != MQTT_CODE_SUCCESS && rc != MQTT_CODE_ERROR_TIMEOUT) {
-		printf("MQTT WaitMessage error %d", rc);
+		LinkLogError("MQTT WaitMessage error %d", rc);
         }
 	return MqttErrorStatusChange(rc);
 }
