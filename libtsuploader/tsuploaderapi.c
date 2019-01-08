@@ -7,6 +7,13 @@
 #include "segmentmgr.h"
 #include "httptools.h"
 #include "cJSON/cJSON.h"
+#include <signal.h>
+#include "version.c.in"
+
+#ifndef LINK_SDK_VERSION
+#error "must define LINK_SDK_VERSION"
+#endif
+const char * gVersionAgent = LINK_SDK_VERSION;
 
 static int volatile nProcStatus = 0;
 
@@ -15,6 +22,16 @@ int LinkInit()
         if (nProcStatus) {
                 return LINK_SUCCESS;
         }
+        
+        signal(SIGPIPE, SIG_IGN);
+        sigset_t signal_mask;
+        sigemptyset(&signal_mask);
+        sigaddset(&signal_mask, SIGPIPE);
+        int rc = pthread_sigmask(SIG_BLOCK, &signal_mask, NULL);
+        if (rc != 0) {
+                LinkLogError("block sigpipe error");
+        }
+        
         LinkInitSn();
         
         setenv("TZ", "GMT-8", 1);
@@ -32,7 +49,7 @@ int LinkInit()
                 return ret;
         }
         nProcStatus = 1;
-        LinkLogDebug("main thread id:%ld(libtsuploader: modify tsuploader.h)", (long)pthread_self());
+        LinkLogDebug("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
         
         return LINK_SUCCESS;
 

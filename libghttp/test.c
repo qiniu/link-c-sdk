@@ -2,6 +2,7 @@
 #include <string.h>
 #include <ghttp.h>
 #include "qupload.h"
+const char *gVersionAgent = "libghttp/1.0";
 int testhttps(char * p)
 {
     char *uri = "https://www.baidu.com";
