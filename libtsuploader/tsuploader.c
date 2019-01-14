@@ -238,9 +238,6 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         }
         pKodoUploader->nLastSystimeBak = pKodoUploader->nLastSystime;
         pKodoUploader->nFirstSystime = 0;
-        
-        resetSessionReportScope(pSession);
-        resetSessionCurrentTsScope(pSession);
 
         memset(key, 0, sizeof(key));
         
@@ -276,6 +273,8 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 
 
 END:
+        resetSessionReportScope(pSession);
+        resetSessionCurrentTsScope(pSession);
         if (pKodoUploader->uploadArg.pUploadStatisticCb) {
                 pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                         LINK_UPLOAD_TS, uploadResult);
