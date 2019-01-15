@@ -64,4 +64,7 @@ if (WITH_WOLFSSL AND WITH_MQTT)
 endif()
 add_subdirectory(tests/functional)
 add_subdirectory(tests/unit)
-add_subdirectory(demo)
+if (WITH_DEMO)
+	add_subdirectory(demo)
+endif()
+
