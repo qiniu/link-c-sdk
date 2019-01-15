@@ -71,7 +71,7 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
                 LinkLogError("pic push queue error:%d", ret);
         }
 
-        return ret;
+        return LINK_SUCCESS;
 }
 
 static void * listenPicUpload(void *_pOpaque)
