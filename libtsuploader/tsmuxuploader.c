@@ -85,6 +85,8 @@ typedef struct _FFTsMuxUploader{
         int64_t nLastVideoFrameTimestamp;
         int64_t nFirstFrameTimestamp; //determinate if to cut ts file
         int64_t nLastFrameTimestamp;
+        int64_t nLastVideoFrameTsForCheck;
+        int64_t nLastAudioFrameTsForCheck;
         
         int64_t nLastPicCallbackSystime; //upload picture need
         int nKeyFrameCount;
@@ -537,6 +539,13 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->nLastVideoFrameTsForCheck > 0){
+                if (_nTimestamp <= pFFTsMuxUploader->nLastVideoFrameTsForCheck) {
+                        LinkLogWarn("Video timestamp not monotonical:%"PRId64" %"PRId64"",_nTimestamp, pFFTsMuxUploader->nLastVideoFrameTsForCheck);
+                }
+        }
+        pFFTsMuxUploader->nLastVideoFrameTsForCheck =_nTimestamp;
+        
         
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -586,6 +595,12 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
+        if (pFFTsMuxUploader->nLastAudioFrameTsForCheck > 0){
+                if (_nTimestamp <= pFFTsMuxUploader->nLastAudioFrameTsForCheck) {
+                        LinkLogWarn("Audio timestamp not monotonical:%"PRId64" %"PRId64"",_nTimestamp, pFFTsMuxUploader->nLastAudioFrameTsForCheck);
+                }
+        }
+        pFFTsMuxUploader->nLastAudioFrameTsForCheck =_nTimestamp;
 
         if (pFFTsMuxUploader->isPause) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
