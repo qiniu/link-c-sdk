@@ -72,22 +72,65 @@ struct MqttOptions
         bool bRetain;
 };
 
-/* step 1 : Init mosquitto lib */
+
+/**
+ * @brief 初始化 MQTT SDK
+ *
+ * @return MQTT_ERR_CODE
+ */
 extern int LinkMqttLibInit();
 
+/**
+ * @brief 注销 MQTT SDK
+ *
+ * @return MQTT_ERR_CODE
+ */
 extern int LinkMqttLibCleanup();
 
-/* step 2 : create mosquitto instance */
+/**
+ * @brief 创建一个 MQTT 实例
+ *
+ * @param[out] pInstance 创建成功的 MQTT 实例指针
+ * @param[in]  pMqttpOption 创建的 MQTT 参数
+ * @return MQTT_ERR_CODE
+ */
 extern void* LinkMqttCreateInstance(IN const struct MqttOptions* _pOption);
 
+/**
+ * @brief 销毁一个 MQTT 实例
+ *
+ * @param[in] pInstance 需要销毁的MQTT实例
+ * @return MQTT_ERR_CODE
+ */
 extern void LinkMqttDestroy(IN const void* _pInstance);
 
-/* step 3 : mosquitto pub/sub */
-
+/**
+ * @brief 上报 MQTT 消息
+ *
+ * @param[in] pInstance MQTT实 例
+ * @param[in] pTopic 发布主题
+ * @param[in] nPayloadlen 发布消息长度
+ * @param[in] pPayload 发布消息负载
+ * @return MQTT_ERR_CODE
+ */
 extern int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload);
 
+/**
+ * @brief 订阅 MQTT 消息
+ *
+ * @param[in] pInstance MQTT 实例
+ * @param[in] pTopic 订阅主题
+ * @return
+ */
 extern int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
+/**
+ * 取消订阅 MQTT 消息
+ *
+ * @param[in] pInstance MQTT 实例
+ * @param[in] pTopic 取消订阅主题
+ * @return
+ */
 extern int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
 #endif
