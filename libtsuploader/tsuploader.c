@@ -60,6 +60,8 @@ typedef struct _KodoUploader{
         int64_t nFirstSystime;
         int64_t nLastSystimeBak;
         
+        int64_t nLastTsEndTime;
+        
         LinkTsOutput output;
         void *pOutputUserArg;
         LinkMediaArg mediaArg;
@@ -226,6 +228,14 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nTsDuration;
+        
+        int64_t tsEndTime = tsStartTime / 1000000 + tsDuration;
+        if (pKodoUploader->nLastTsEndTime > 0) {
+                if (tsEndTime <= pKodoUploader->nLastTsEndTime) {
+                        LinkLogWarn("ts timestamp not monotonical:%"PRId64" %"PRId64"",tsEndTime, pKodoUploader->nLastTsEndTime);
+                }
+        }
+        pKodoUploader->nLastTsEndTime = tsEndTime;
         
         handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
         
