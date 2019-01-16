@@ -1329,6 +1329,8 @@ void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         fprintf(stderr, "LinkFlushUploader switchts\n");
         switchTs(pFFTsMuxUploader, 0);
+        pFFTsMuxUploader->nKeyFrameCount = 0;
+        pFFTsMuxUploader->nFrameCount = 0;
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         return;
 }
