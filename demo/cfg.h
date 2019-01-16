@@ -47,6 +47,7 @@ typedef struct {
     char *appName;
     int ota_check_interval;
     int ota_enable;
+    char *audioType;
 } Config;
 
 struct cfg_struct;
