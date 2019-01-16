@@ -37,6 +37,7 @@ typedef struct {
         bool IsTwoUpload;
         bool IsTwoFileUpload;
         bool IsWriteVideoFrame;
+        bool IsEnableTsCb;
         int nSleeptime;
         int nFirstFrameSleeptime;
         int64_t nRolloverTestBase;
@@ -692,8 +693,21 @@ static void getPicCallback (void *pOpaque, const char *pFileName, int nFilenameL
         GetPicSaver * saver = (GetPicSaver*)pOpaque;
         char filename[128] = {0};
         sprintf(filename, "/tmp/abc/%s", pFileName);
-        LinkPushPicture((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        int ret = LinkPushPicture((LinkTsMuxUploader *)saver->pData, filename, strlen(filename), gpPictureBuf, gnPictureBufLen);
+        fprintf(stderr, "===========--------->%d\n", ret);
         return ;
+}
+
+FILE *pTsFile;
+int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
+        if (pTsFile == NULL) {
+                pTsFile = fopen("./cb.ts", "wb+");
+        }
+        if (pTsFile != NULL && buffer && size > 0) {
+                fwrite(buffer, 1, size, pTsFile);
+                fflush(pTsFile);
+        }
+        return 0;
 }
 
 static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg) {
@@ -715,6 +729,9 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
                 memset(saver, 0, sizeof(GetPicSaver));
                 _pUserUploadArg->pGetPictureCallbackUserData = saver;
                 ret = LinkNewUploader(_pTsMuxUploader, _pUserUploadArg);
+                if (cmdArg.IsEnableTsCb) {
+                        LinkUploaderSetTsOutputCallback(*_pTsMuxUploader,tsToFile, NULL);
+                }
                 saver->pData = *_pTsMuxUploader;
         }
         return ret;
@@ -881,6 +898,8 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
         flag_bool(&cmdArg.IsJustTestSegment, "jseg", "just test segment manager");
         flag_bool(&cmdArg.IsJustTestAuth, "jauth", "just test http(s) auth");
+        flag_bool(&cmdArg.IsEnableTsCb, "tscb", "enable ts callback");
+        
         flag_str(&cmdArg.pMgrToken, "mgrtoken", "where to get move token");
         
         

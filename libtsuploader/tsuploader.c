@@ -190,6 +190,8 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         char uptoken[1024] = {0};
         char upHost[192] = {0};
         int ret = 0;
+        int getBufDataRet, lenOfBufData = 0;
+        char *bufData = NULL;
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
         KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
         TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
@@ -251,19 +253,16 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 
         memset(key, 0, sizeof(key));
         
-        
-        int r, l;
-        char *bufData;
-        r = LinkGetQueueBuffer(pDataQueue, &bufData, &l);
-        if (r > 0) {
-                resizeQueueSize(pKodoUploader, l, tsDuration);
+        getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
+        if (getBufDataRet > 0) {
+                resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
 
-                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, l);
+                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
                 
-                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, l, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
+                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
                                            tsDuration, pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
@@ -277,7 +276,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 }
                 goto END;
         } else {
-                LinkLogError("LinkGetQueueBuffer get no data:%d", r);
+                LinkLogError("LinkGetQueueBuffer get no data:%d", getBufDataRet);
                 goto END;
         }
 
@@ -293,7 +292,7 @@ END:
                 pKodoUploader->pTsEndUploadCallback(pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
         
-        if (pKodoUploader->output) {
+        if (pKodoUploader->output && lenOfBufData > 0 && bufData) {
                 pthread_mutex_lock(&pKodoUploader->sessionMetaMutex_);
                 LinkMediaInfo mediaInfo;
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
@@ -316,7 +315,7 @@ END:
                         mediaInfo.nCount++;
                 }
                 
-                pKodoUploader->output(bufData, l, pKodoUploader->pOutputUserArg, mediaInfo);
+                pKodoUploader->output(bufData, lenOfBufData, pKodoUploader->pOutputUserArg, mediaInfo);
                 pthread_mutex_unlock(&pKodoUploader->sessionMetaMutex_);
         }
 
