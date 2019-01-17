@@ -125,7 +125,6 @@ static void * listenPicUpload(void *_pOpaque)
                         continue;
                 }
                 
-                LinkPicUploadSignal *pUpInfo;
                 if (ret == sizeof(LinkPicUploadSignal)) {
 
                         switch (sig.signalType_) {
@@ -144,15 +143,7 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadSignalStop:
                                         return NULL;
                                 case LinkPicUploadSignalUpload:
-                                        pUpInfo = (LinkPicUploadSignal*)malloc(sizeof(LinkPicUploadSignal));
-                                        if (pUpInfo == NULL) {
-                                                LinkLogWarn("upload picture:%"PRId64" no memory", sig.nTimestamp);
-                                        } else {
-                                                memcpy(pUpInfo, &sig, sizeof(sig));
-                                                uploadPicture(pUpInfo);
-                                                //ret = pthread_create(&pUpInfo->uploadPicThread, NULL, uploadPicture, pUpInfo);
-                                        }
-                                
+                                        uploadPicture(&sig);
                                         break;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
@@ -231,19 +222,8 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         return LINK_SUCCESS;
 }
 
-static int waitUploadThread(void * _pOpaque) {
-        LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
-        pthread_join(pSig->uploadPicThread, NULL);
-        if (pSig->pFileName) {
-                free(pSig->pFileName);
-        }
-        free(pSig);
-        return 0;
-}
-
 static void * uploadPicture(void *_pOpaque) {
         LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
-        //pSig->asyncWait_.function = waitUploadThread;
         
         if (pSig->pFileName == NULL) {
                 LinkLogError("picuploader pFileName not exits");
@@ -282,7 +262,6 @@ static void * uploadPicture(void *_pOpaque) {
                                 LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
                                 sleep(3);
                         } else {
-                                //LinkPushFunction(pSig);
                                 return NULL;
                         }
                 } else {
@@ -330,11 +309,12 @@ static void * uploadPicture(void *_pOpaque) {
                 pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
         
-        //LinkPushFunction(pSig);
-        
         if (pSig->pPicUploader->tsType_ < 0)
                 pSig->pPicUploader->tsType_ = 0;
-        
+        if (pSig->pFileName) {
+                free(pSig->pFileName);
+        }
+ 
         return NULL;
 }
 
