@@ -9,11 +9,11 @@ int LinkInitKmp(LinkKMP *pKmp, const unsigned char *pattern, int patternSize) {
 
 	int len_p = patternSize;
 	if (len_p < 2) {
-		fprintf(stderr, "at least two byte\n");
+		//fprintf(stderr, "at least two byte\n");
 		return -1;
 	}
 	if (len_p > 32) {
-		fprintf(stderr, "exceed 32 byte\n");
+		//fprintf(stderr, "exceed 32 byte\n");
 		return -2;
 	}
 

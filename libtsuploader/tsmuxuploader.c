@@ -511,7 +511,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
                    //at least 1 keyframe and aoubt last 5 second
                    || videoMetaChanged
                    || (_nIsSegStart && pFFTsMuxUploader->nFrameCount != 0) ){// new segment is specified
-                        fprintf(stderr, "normal switchts:%"PRId64" %d %d-%d %d\n", _nTimestamp - pFFTsMuxUploader->nFirstFrameTimestamp,
+                        LinkLogTrace("normal switchts:%"PRId64" %d %d-%d %d", _nTimestamp - pFFTsMuxUploader->nFirstFrameTimestamp,
                                 pFFTsMuxUploader->remoteConfig.nTsDuration, _nIsSegStart, pFFTsMuxUploader->nFrameCount, videoMetaChanged);
                         //printf("next ts:%d %"PRId64"\n", pFFTsMuxUploader->nKeyFrameCount, _nTimestamp - pFFTsMuxUploader->nLastUploadVideoTimestamp);
                         pFFTsMuxUploader->nKeyFrameCount = 0;
@@ -584,7 +584,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                fprintf(stderr, "video nomem switchts\n");
+                LinkLogWarn("video nomem switchts");
                 switchTs(pFFTsMuxUploader, nSysNanotime);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -622,7 +622,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 pFFTsMuxUploader->nFrameCount++;
         }
         if (ret == LINK_NO_MEMORY) {
-                 fprintf(stderr, "audio nomem switchts\n");
+                LinkLogWarn("audio nomem switchts");
                 switchTs(pFFTsMuxUploader, nSysNanotime);
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -826,18 +826,18 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
         if (pFFTsMuxUploader->remoteConfig.isValid) {
                 int64_t nDuration = nCurSystime - pFFTsMuxUploader->uploadArgBak.nSegmentId_;
                 if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
-                        fprintf(stderr, "normal: update remote config:\n");
+                        LinkLogDebug("normal: update remote config");
                         isSegIdChange = 1;
                 }
                 
                 int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
                 if (pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
                     nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
-                        fprintf(stderr, "timeout: update remote config:\n");
+                        LinkLogWarn("timeout: update remote config");
                         isSegIdChange = 2;
                 } else {
                         if (pFFTsMuxUploader->uploadArgBak.nSegSeqNum < pSession->nTsSequenceNumber) {
-                                fprintf(stderr, "seqnum: report segment:%"PRId64" %"PRId64"\n",
+                                LinkLogDebug("seqnum: report segment:%"PRId64" %"PRId64"",
                                         pFFTsMuxUploader->uploadArgBak.nSegSeqNum, pSession->nTsSequenceNumber);
                                 isSeqNumChange = 1;
                         }
@@ -1266,7 +1266,7 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         pFFTsMuxUploader->nKeyFrameCount = 0;
         pFFTsMuxUploader->nFrameCount = 0;
-        fprintf(stderr, "pause switchts\n");
+        LinkLogDebug("pause switchts");
         switchTs(pFFTsMuxUploader, 0);
         
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -1327,7 +1327,7 @@ void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         }
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        fprintf(stderr, "LinkFlushUploader switchts\n");
+        LinkLogDebug("LinkFlushUploader switchts");
         switchTs(pFFTsMuxUploader, 0);
         pFFTsMuxUploader->nKeyFrameCount = 0;
         pFFTsMuxUploader->nFrameCount = 0;

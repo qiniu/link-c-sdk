@@ -189,7 +189,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         char uptoken[1024] = {0};
         char upHost[192] = {0};
-        int ret = 0;
+        int ret = 0, getUploadParamOk = 0;
         int getBufDataRet, lenOfBufData = 0;
         char *bufData = NULL;
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
@@ -221,11 +221,11 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
                         LinkLogError("param buffer is too small. drop file");
-                        goto END;
                 } else {
                         LinkLogError("not get param yet:%d", ret);
-                        goto END;
                 }
+        } else {
+                getUploadParamOk = 1;
         }
         
         int64_t tsStartTime = pSession->nTsStartTime;
@@ -239,10 +239,11 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         }
         pKodoUploader->nLastTsEndTime = tsEndTime;
         
-        handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
+        if (getUploadParamOk)
+                handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
         
         int isDiscontinuity = 0;
-        if (pKodoUploader->nLastSystimeBak > 0) {
+        if (pKodoUploader->nLastSystimeBak > 0 && getUploadParamOk) {
                 if (pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak > 200000000) {
                         LinkLogDebug("discontinuity:%"PRId64"-%"PRId64"=%"PRId64"\n", pKodoUploader->nFirstSystime, pKodoUploader->nLastSystimeBak, pKodoUploader->nFirstSystime - pKodoUploader->nLastSystimeBak);
                         isDiscontinuity = 1;
@@ -254,7 +255,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         memset(key, 0, sizeof(key));
         
         getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
-        if (getBufDataRet > 0) {
+        if (getBufDataRet > 0 && getUploadParamOk) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
@@ -274,14 +275,10 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                         pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                                 LINK_UPLOAD_TS, uploadResult);
                 }
-                goto END;
         } else {
                 LinkLogError("LinkGetQueueBuffer get no data:%d", getBufDataRet);
-                goto END;
         }
 
-
-END:
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
         if (pKodoUploader->uploadArg.pUploadStatisticCb) {
