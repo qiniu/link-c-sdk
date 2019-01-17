@@ -537,6 +537,7 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
 
 static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
 {
+        int64_t nSysNanotime = LinkGetCurrentNanosecond();
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->nLastVideoFrameTsForCheck > 0){
@@ -553,7 +554,6 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         }
         int ret = 0;
 
-        int64_t nSysNanotime = LinkGetCurrentNanosecond();
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
                 LinkLogWarn("first video frame not IDR. drop this frame\n");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
@@ -593,6 +593,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
 
 static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp)
 {
+        int64_t nSysNanotime = LinkGetCurrentNanosecond();
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->nLastAudioFrameTsForCheck > 0){
@@ -607,7 +608,6 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 return LINK_PAUSED;
         }
 
-        int64_t nSysNanotime = LinkGetCurrentNanosecond();
         int ret = checkSwitch(_pTsMuxUploader, _nTimestamp, 0, 0, nSysNanotime, 0, NULL, 0, NULL);
         if (ret != 0) {
                 return ret;
