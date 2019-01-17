@@ -17,7 +17,7 @@ static int mPacketIdLast;
 
 //将wolfMQTT的错误码转成link错误码
 static int MqttErrorStatusChange(int nStatus)
-{   
+{
         switch (nStatus) {
         case MQTT_CODE_SUCCESS:
                 return MQTT_SUCCESS;
@@ -387,31 +387,34 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
         if (_pInstance == NULL || _pInstance->mosq == NULL) {
                 return MQTT_ERR_NOMEM;
         }
-	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
+        struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient client = ctx->client;
-	pthread_mutex_lock(&_pInstance->listMutex);
-	int rc = MqttClient_WaitMessage(&client, DEFAULT_CON_TIMEOUT_MS);
+        pthread_mutex_lock(&_pInstance->listMutex);
+        int rc = MqttClient_WaitMessage(&client, DEFAULT_CON_TIMEOUT_MS);
         if (rc == MQTT_CODE_ERROR_TIMEOUT) {
-		++ ctx->timeoutCount;
+                ++ ctx->timeoutCount;
                 /* Keep Alive */
-                //LinkLogError("Keep-alive timeout, sending ping");
-		if (ctx->timeoutCount * DEFAULT_CON_TIMEOUT_MS > 5000) {
+//                LinkLogError("Keep-alive timeout, sending ping , timeoutCount:%d\n", ctx->timeoutCount);
+                if (ctx->timeoutCount * DEFAULT_CON_TIMEOUT_MS
+                    > ctx->connect.keep_alive_sec * 1000) {
                         rc = MqttClient_Ping(&client);
                         if (rc == MQTT_CODE_CONTINUE) {
                                 return MqttErrorStatusChange(rc);
                         }
                         else if (rc != MQTT_CODE_SUCCESS) {
                                 LinkLogError("MQTT Ping Keep Alive Error: %s (%d)",
-                                        MqttClient_ReturnCodeToString(rc), rc);
+                                             MqttClient_ReturnCodeToString(rc), rc);
                                 ctx->timeoutCount = 0;
                         }
                         ctx->timeoutCount = 0;
+                } else if (rc == MQTT_CODE_ERROR_TIMEOUT) {
+                        rc = MQTT_CODE_SUCCESS;
                 }
         }
-	pthread_mutex_unlock(&_pInstance->listMutex);
-	usleep(10000);
+        pthread_mutex_unlock(&_pInstance->listMutex);
+        usleep(10000);
         if (rc != MQTT_CODE_SUCCESS && rc != MQTT_CODE_ERROR_TIMEOUT) {
-		LinkLogError("MQTT WaitMessage error %d", rc);
+                LinkLogError("MQTT WaitMessage error %d", rc);
         }
 	return MqttErrorStatusChange(rc);
 }
