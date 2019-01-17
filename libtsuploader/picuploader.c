@@ -11,7 +11,10 @@ enum LinkPicUploadSignalType {
         LinkPicUploadSignalIgnore = 0,
         LinkPicUploadSignalStop,
         LinkPicUploadGetPicSignalCallback,
-        LinkPicUploadSignalUpload
+        LinkPicUploadSignalUpload,
+        LinkPicSetTsType,
+        LinkPicSetTsOneShotType,
+        LinkPicClearTsType,
 };
 
 typedef struct {
@@ -19,6 +22,7 @@ typedef struct {
         pthread_t workerId_;
         LinkCircleQueue *pSignalQueue_;
         int nQuit_;
+        int tsType_; // may control pic upload. 0 notype. -1 oneshot type. 1 persistent type
         int64_t nCount_;
         LinkPicUploadFullArg picUpSettings_;
 }PicUploader;
@@ -74,6 +78,34 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
         return LINK_SUCCESS;
 }
 
+static int linkPicSendTsTypeInfo(PicUploader *pPicUp, enum LinkPicUploadSignalType sigType) {
+        LinkPicUploadSignal sig;
+        memset(&sig, 0, sizeof(LinkPicUploadSignal));
+        
+        sig.pPicUploader = pPicUp;
+        sig.signalType_ = sigType;
+        
+        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+        if (ret <= 0) {
+                LinkLogError("pic push queue ts type(%d) error:%d",sigType, ret);
+                return ret;
+        }
+        return LINK_SUCCESS;
+}
+
+int LinkPicSendTsType(PictureUploader *pPicUploader, int isOneShot) {
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        enum LinkPicUploadSignalType sigType = LinkPicSetTsType;
+        if (isOneShot)
+                sigType = LinkPicSetTsOneShotType;
+        return linkPicSendTsTypeInfo(pPicUp, sigType);
+}
+
+int LinkPicSendClearTsType(PictureUploader *pPicUploader) {
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        return linkPicSendTsTypeInfo(pPicUp, LinkPicClearTsType);
+}
+
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
@@ -100,6 +132,15 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadSignalIgnore:
                                         LinkLogWarn("ignore signal");
                                         continue;
+                                case LinkPicSetTsType:
+                                        pPicUploader->tsType_ = 1;
+                                        continue;
+                                case LinkPicSetTsOneShotType:
+                                        pPicUploader->tsType_ = -1;
+                                         continue;
+                                case LinkPicClearTsType:
+                                        pPicUploader->tsType_ = 0;
+                                         continue;
                                 case LinkPicUploadSignalStop:
                                         return NULL;
                                 case LinkPicUploadSignalUpload:
@@ -108,7 +149,8 @@ static void * listenPicUpload(void *_pOpaque)
                                                 LinkLogWarn("upload picture:%"PRId64" no memory", sig.nTimestamp);
                                         } else {
                                                 memcpy(pUpInfo, &sig, sizeof(sig));
-                                                ret = pthread_create(&pUpInfo->uploadPicThread, NULL, uploadPicture, pUpInfo);
+                                                uploadPicture(pUpInfo);
+                                                //ret = pthread_create(&pUpInfo->uploadPicThread, NULL, uploadPicture, pUpInfo);
                                         }
                                 
                                         break;
@@ -170,7 +212,7 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         }
         memset(pPicUploader, 0, sizeof(PicUploader));
         
-        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 50);
+        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 64);
         if (ret != 0) {
                 free(pPicUploader);
                 return ret;
@@ -201,7 +243,7 @@ static int waitUploadThread(void * _pOpaque) {
 
 static void * uploadPicture(void *_pOpaque) {
         LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
-        pSig->asyncWait_.function = waitUploadThread;
+        //pSig->asyncWait_.function = waitUploadThread;
         
         if (pSig->pFileName == NULL) {
                 LinkLogError("picuploader pFileName not exits");
@@ -240,7 +282,7 @@ static void * uploadPicture(void *_pOpaque) {
                                 LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
                                 sleep(3);
                         } else {
-                                LinkPushFunction(pSig);
+                                //LinkPushFunction(pSig);
                                 return NULL;
                         }
                 } else {
@@ -288,7 +330,10 @@ static void * uploadPicture(void *_pOpaque) {
                 pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
         
-        LinkPushFunction(pSig);
+        //LinkPushFunction(pSig);
+        
+        if (pSig->pPicUploader->tsType_ < 0)
+                pSig->pPicUploader->tsType_ = 0;
         
         return NULL;
 }

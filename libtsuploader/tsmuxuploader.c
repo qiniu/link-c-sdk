@@ -1228,6 +1228,10 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
                 LinkSetSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pDup2);
         }
         
+        if (pFFTsMuxUploader->pPicUploader) {
+                LinkPicSendTsType(pFFTsMuxUploader->pPicUploader, metas->isOneShot);
+        }
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return LINK_SUCCESS;
@@ -1248,6 +1252,10 @@ void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
                 LinkClearSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
+        }
+        
+        if (pFFTsMuxUploader->pPicUploader) {
+                LinkPicSendClearTsType(pFFTsMuxUploader->pPicUploader);
         }
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1416,6 +1424,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         if (ret != LINK_SUCCESS) {
                 return ret;
         }
+        LinkLogInfo("remote config:%s", buf);
         
         cJSON * pJsonRoot = cJSON_Parse(buf);
         if (pJsonRoot == NULL) {
