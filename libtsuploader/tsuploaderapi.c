@@ -164,13 +164,10 @@ void LinkCleanup()
 }
 
 
-int LinkGetUploadToken(char *pTokenBuf, int nTokenBufLen, int *pDeadline, OUT char *pFnamePrefix, IN int nFnamePrefixLen,
-                       const char *pUrl, const char *pReqToken, int nReqTokenLen)
+int LinkGetUploadToken(cJSON ** pJsonRoot,const char *pUrl, const char *pReqToken, int nReqTokenLen)
 {
         
-        if (pUrl == NULL || pTokenBuf == NULL || pFnamePrefix == NULL || nTokenBufLen <= 10)
-                return LINK_ARG_ERROR;
-        char httpResp[2048]={0};
+        char httpResp[2560]={0};
         int nHttpRespLen = sizeof(httpResp);
         int nRespLen = 0;
         int ret = LinkSimpleHttpGetWithToken(pUrl, httpResp, nHttpRespLen, &nRespLen, pReqToken, nReqTokenLen);
@@ -181,48 +178,13 @@ int LinkGetUploadToken(char *pTokenBuf, int nTokenBufLen, int *pDeadline, OUT ch
                 }
                 return ret;
         }
-        
-        memset(pTokenBuf, 0, nTokenBufLen);
 
         assert(nRespLen <= sizeof(httpResp) - 1);
         httpResp[nRespLen] = 0;
-        cJSON * pJsonRoot = cJSON_Parse(httpResp);
-        if (pJsonRoot == NULL) {
+        cJSON * pJRoot = cJSON_Parse(httpResp);
+        if (pJRoot == NULL) {
                 return LINK_JSON_FORMAT;
         }
-        
-        cJSON *pNode = cJSON_GetObjectItem(pJsonRoot, "ttl");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
-        }
-        *pDeadline = pNode->valueint;
-        
-        pNode = cJSON_GetObjectItem(pJsonRoot, "token");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
-        }
-        int nCpyLen = strlen(pNode->valuestring);
-        if (nTokenBufLen < nCpyLen) {
-                return LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pTokenBuf, pNode->valuestring, nCpyLen);
-        pTokenBuf[nCpyLen] = 0;
-        
-        pNode = cJSON_GetObjectItem(pJsonRoot, "fnamePrefix");
-        if (pNode == NULL) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_JSON_FORMAT;
-        }
-        nCpyLen = strlen(pNode->valuestring);
-        if (nFnamePrefixLen < nCpyLen) {
-                cJSON_Delete(pJsonRoot);
-                return LINK_BUFFER_IS_SMALL;
-        }
-        memcpy(pFnamePrefix, pNode->valuestring, nCpyLen);
-        pFnamePrefix[nCpyLen] = 0;
-        
-        cJSON_Delete(pJsonRoot);
+        *pJsonRoot = (void *)pJRoot;
         return LINK_SUCCESS;
 }

@@ -149,7 +149,7 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
-                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
+                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
                                                         break;

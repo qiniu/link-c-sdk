@@ -220,7 +220,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 
         ret = pKodoUploader->uploadArg.uploadParamCallback(
                                         pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
-                                        &param, LINK_UPLOAD_CB_GETPARAM);
+                                        &param, LINK_UPLOAD_CB_GETTSPARAM);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
                         LinkLogError("param buffer is too small. drop file");
