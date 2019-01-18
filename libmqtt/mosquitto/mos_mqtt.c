@@ -123,7 +123,6 @@ void OnPublishCallback(struct mosquitto* _pMosq, void* _pObj, int mid)
         int last_mid_sent = mid;
 }
 
-
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info)
 {
         int rc = 0;
@@ -142,6 +141,11 @@ int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info)
                 printf("ClientOptSet error %d\n", rc);
         }
         return MqttErrorStatusChange(rc);
+}
+
+int ReConnect(struct MqttInstance *instance, int error_code)
+{
+        return MqttErrorStatusChange(MOSQ_ERR_SUCCESS);
 }
 
 int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _nPayloadlen, IN const void* _pPayload)

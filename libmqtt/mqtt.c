@@ -131,6 +131,9 @@ void * LinkMqttThread(void* _pData)
                 if (rc >= MQTT_ERR_NOMEM) {
                          sleep(1);
                 }
+                if (rc == MQTT_ERR_CONN_LOST) {
+                        ReConnect(pInstance, MQTT_ERR_CONN_LOST);
+                }
         } while (!pInstance->isDestroying);
         printf("quite !!! \n");
         if (pInstance->connected) {
