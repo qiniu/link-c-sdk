@@ -1,10 +1,26 @@
 #include "tsuploader.h"
 #include "cJSON/cJSON.h"
 #include "b64/urlsafe_b64.h"
-#include <openssl/hmac.h>
+#include <wolfssl/options.h>
+#include <wolfssl/wolfcrypt/hmac.h>
 
-int LinkVerify(char *ak, char *sk, char* token)
+
+int LinkVerify(const char *_ak, size_t _akLen, char *_sk, size_t _skLen, char* _token, size_t _tokenLen)
 {
+        if (_ak == NULL || _sk == NULL || _token == NULL) {
+                return LINK_ERROR;
+        }
+        if (_akLen > 512 || _skLen > 512 || _tokenLen > 4096) {
+                return LINK_ERROR;
+        }
+        char ak[512] = {0};
+        strncpy(ak, _ak, _akLen);
+        char sk[512] = {0};
+        strncpy(sk, _sk, _skLen);
+        char token[4096] = {0};
+        strncpy(token, _token, _tokenLen);
+
+
         char* EncodedSign = NULL;
         char* encodedPutPolicy = NULL;
         char *delim = ":";
@@ -31,10 +47,24 @@ int LinkVerify(char *ak, char *sk, char* token)
                 printf("DAK is not correct\n");
                 return LINK_ERROR;
         }
+
         unsigned char md[20] = {0};
         unsigned int len = 20;
+        Hmac hmac;
+        memset(&hmac, 0, sizeof(hmac));
 
-        unsigned char* digest = HMAC(EVP_sha1(), sk, strlen(sk), (const unsigned char*)encodedPutPolicy, strlen(encodedPutPolicy), md, &len);
+        ret = wc_HmacSetKey(&hmac, SHA, (byte*)sk, strlen(sk));
+        if (ret != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
+
+        if( (ret = wc_HmacUpdate(&hmac, (byte*)encodedPutPolicy, strlen(encodedPutPolicy))) != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
+
+        if ((ret = wc_HmacFinal(&hmac, (byte*)md)) != 0) {
+                return LINK_WOLFSSL_ERR;
+        }
 
         char test[100] = {0};
         int testlen = 100;
@@ -42,21 +72,8 @@ int LinkVerify(char *ak, char *sk, char* token)
         ret = memcmp(test, EncodedSign, realsize);
         if (ret != 0) {
                 printf("token is not correct\n");
-                return LINK_ERROR;
+                return LINK_FALSE;
         }
-        return LINK_SUCCESS;
+        return LINK_TRUE;
 }
 
-#if 0
-int testLinkVerify() {
-        char key[] = "";
-        char Pwd[1000] = "";
-        int ret = LinkVerify("", key, Pwd);
-        if (ret == 0) {
-                printf("token is not correct\n");
-        } else {
-                printf("token is correct\n");
-        }
-	return ret;
-}
-#endif

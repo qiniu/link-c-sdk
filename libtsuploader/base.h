@@ -189,6 +189,9 @@ typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMed
 
 #define LINK_STREAM_UPLOAD 1
 
+#define LINK_TRUE 1
+#define LINK_FALSE 0
+
 #define LINK_NO_MEMORY       -1000
 #define LINK_MUTEX_ERROR     -1100
 #define LINK_COND_ERROR      -1101
