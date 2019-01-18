@@ -149,9 +149,11 @@ static void getReqidAndResponse(ghttp_request * pRequest, LinkPutret *put_ret) {
  * @return 0 on success, -1 on failure
  * */
 static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
-                      const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret, int isTypeFile) {
+                      const char **customMeta, int nCustomMetaLen,
+                      const char **customMagic, int nCustomMagicLen,
+                      const char *mime_type, LinkPutret *put_ret, int isTypeFile) {
         
-        if (file_key == NULL || upload_token == NULL || filepathOrBufer == NULL) {
+        if (upload_token == NULL || filepathOrBufer == NULL) {
                 return -1;
         }
         memset(put_ret, 0, sizeof(LinkPutret));
@@ -193,7 +195,8 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
                                       strlen(upload_token), NULL, &form_data_len, 0);
         
         //add file key
-        form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "key", (char *) file_key,
+        if (file_key != NULL)
+                form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, "key", (char *) file_key,
                                       strlen(file_key),
                                       NULL, &form_data_len, 0);
         
@@ -205,6 +208,14 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
                         snprintf(mkey + nKeyPreLen, sizeof(mkey) - nKeyPreLen, "%s", customMeta[i]);
                         form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, mkey,
                                                       customMeta[i+1], strlen(customMeta[i+1]), NULL, &form_data_len, 0);
+                }
+        }
+        
+        if (nCustomMagicLen > 0) {
+                int i = 0;
+                for (i = 0; i < nCustomMagicLen; i+=2) {
+                        form_data_p = qn_addformfield(form_data_p, form_boundary, form_boundary_len, customMagic[i],
+                                                      customMagic[i+1], strlen(customMagic[i+1]), NULL, &form_data_len, 0);
                 }
         }
         
@@ -281,13 +292,16 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
 }
 
 int LinkUploadBuffer(const char *buffer, int bufferLen, const char * upHost, const char *upload_token, const char *file_key,
-                     const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret) {
-        return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen, mime_type, put_ret, 0);
+                     const char **customMeta, int nCustomMetaLen,
+                     const char **customMagic, int nCustomMagicLen,
+                     const char *mime_type, LinkPutret *put_ret) {
+        return linkUpload(buffer, bufferLen,upHost, upload_token, file_key, customMeta, nCustomMetaLen,
+                          customMagic, nCustomMagicLen, mime_type, put_ret, 0);
 }
 
 int LinkUploadFile(const char *local_path, const char * upHost, const char *upload_token, const char *file_key, const char *mime_type,
                    LinkPutret *put_ret) {
-        return linkUpload(local_path, 0 ,upHost, upload_token, file_key, NULL, 0,  mime_type, put_ret, 1);
+        return linkUpload(local_path, 0 ,upHost, upload_token, file_key, NULL, 0,  NULL, 0, mime_type, put_ret, 1);
 }
 
 void LinkFreePutret(LinkPutret *put_ret) {

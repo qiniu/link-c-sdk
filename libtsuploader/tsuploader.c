@@ -99,7 +99,9 @@ static void inttoBCD(int64_t m, char *buf)
 }
 
 static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize,
-                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen, int64_t duration, int64_t seqnum, int isDiscontinuity) {
+                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen,
+                         const char **customMagic, int nCustomMagicLen,
+                         int64_t duration, int64_t seqnum, int isDiscontinuity) {
        
         char metaValue[200];
         char metaBuf[250];
@@ -124,7 +126,8 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8, /*mimetype*/NULL, &putret);
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8,
+                                   customMagic, nCustomMagicLen, /*mimetype*/NULL, &putret);
 
         
 
@@ -260,11 +263,22 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
-
-                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
                 
-                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
-                                           tsDuration, pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
+                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
+                char startTs[14]={0};
+                char endTs[14]={0};
+                snprintf(startTs, sizeof(startTs), "%"PRId64"", tsStartTime / 1000000);
+                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsDuration);
+                const char *cusMagics[6];
+                cusMagics[0]="x:start";
+                cusMagics[1]=startTs;
+                cusMagics[2]="x:end";
+                cusMagics[3]=endTs;
+                cusMagics[4]="x:session";
+                cusMagics[5] = pSession->sessionId;
+                int putRet = linkPutBuffer(upHost, uptoken, NULL, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
+                                           cusMagics, 6,
+                                           tsDuration,pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         pKodoUploader->state = LINK_UPLOAD_OK;

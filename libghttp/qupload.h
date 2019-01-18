@@ -12,7 +12,8 @@ int LinkMoveFile(const char *pMoveUrl, const char *pMoveToken, LinkPutret *put_r
 int LinkUploadFile(const char *local_path, const char* upHost, const char *upload_token, const char *file_key, const char *mime_type,
                 LinkPutret *put_ret);
 int LinkUploadBuffer(const char *buffer, int bufferLen, const char* upHost, const char *upload_token, const char *file_key,
-	       	const char **customMeta, int nCustomMetaLen, const char *mime_type, LinkPutret *put_ret);
+	       	const char **customMeta, int nCustomMetaLen,
+                const char **customMagic, int nCustomMagicLen, const char *mime_type, LinkPutret *put_ret);
 void LinkFreePutret(LinkPutret *put_ret);
 
 #endif

@@ -262,7 +262,7 @@ static void * uploadPicture(void *_pOpaque) {
                                 LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
                                 sleep(3);
                         } else {
-                                return NULL;
+                                goto END;
                         }
                 } else {
                         if (!isFirst)
@@ -281,7 +281,30 @@ static void * uploadPicture(void *_pOpaque) {
 
         LinkPutret putret;
 
-        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, key, NULL, 0, NULL, &putret);
+        const char *cusMagics[4];
+        cusMagics[0]="x:start";
+        cusMagics[1]= pFile;
+        while (*pFile != '-' && *pFile != 0) {
+                pFile++;
+        }
+        if (*pFile == 0) {
+                LinkLogError("wrong picture name:%s", key);
+                goto END;
+        }
+        
+        *pFile++ = 0;
+        cusMagics[2]="x:session";
+        cusMagics[3]=pFile;
+        while (*pFile != '.' && *pFile != 0) {
+                pFile++;
+        }
+        if (*pFile == 0) {
+                LinkLogError("wrong picture name:%s", key);
+                goto END;
+        }
+        *pFile++ = 0;
+        
+        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, NULL, NULL, 0, cusMagics, 4, NULL, &putret);
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
@@ -311,6 +334,7 @@ static void * uploadPicture(void *_pOpaque) {
         
         if (pSig->pPicUploader->tsType_ < 0)
                 pSig->pPicUploader->tsType_ = 0;
+END:
         if (pSig->pFileName) {
                 free(pSig->pFileName);
         }
