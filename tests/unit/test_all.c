@@ -4,13 +4,14 @@
 #include "link_config.h"
 
 extern CuSuite *test_link_queue();
-
+extern CuSuite *test_link_api();
 
 static const struct testlist {
     const char *testname;
     CuSuite *(*func)();
 } tests[] = {
     {"test_link_queue", test_link_queue},
+    {"test_link_api", test_link_api},
     {"LastTest", NULL}
 };
 

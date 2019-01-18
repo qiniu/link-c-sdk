@@ -177,10 +177,13 @@ void LinkCleanup();
  * 验证七牛凭证合法性。
  *
  * @param[in] pAk 设备端的 accessKey
+ * @param[in] nAkLen accessKey 长度，最大长度 512 字节
  * @param[in] pSk 设备端的 secretKey
+ * @param[in] nSkLen secretKey 长度，最大长度 512 字节
  * @param[in] pToken 访问凭证， 格式为  " ak + ':' + encodedSign + ':' + encodedPutPolicy "
- * @return LINK_SUCCESS 成功; 其它值 失败
+ * @param[in] nTokenLen Token 长度，最大长度 4096 字节
+ * @return LINK_TRUE: 验证成功; LINK_FALSE: 验证失败; LINK_ERROR: 参数错误
  */
-int LinkVerify(char *pAk, char *pSk, char* pToken);
+int LinkVerify(const char *pAk, size_t nAkLen, char *pSk, size_t nSkLen, char* pToken, size_t nTokenLen);
 
 #endif
