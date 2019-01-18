@@ -250,7 +250,7 @@ static void * uploadPicture(void *_pOpaque) {
         int isFirst = 0, tryCount = 2;
         while(tryCount-- > 0) {
                 ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
-                                                                                    &param, LINK_UPLOAD_CB_GETPARAM);
+                                                                                    &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
                 if (ret != LINK_SUCCESS) {
                         if (ret == LINK_BUFFER_IS_SMALL) {
                                 LinkLogError("param buffer is too small. drop file:");

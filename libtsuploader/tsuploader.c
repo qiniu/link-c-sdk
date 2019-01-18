@@ -210,7 +210,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
         
-        char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
+        char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32]={0};
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
 
