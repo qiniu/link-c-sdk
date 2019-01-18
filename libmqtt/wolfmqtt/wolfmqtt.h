@@ -36,5 +36,5 @@ typedef struct MQTTCtx {
 } MQTTCtx;
 
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info);
-
+int ReConnect(struct MqttInstance *instance, int error_code);
 #endif

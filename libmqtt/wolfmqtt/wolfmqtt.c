@@ -36,7 +36,7 @@ static int MqttErrorStatusChange(int nStatus)
         case MQTT_CODE_ERROR_TLS_CONNECT:
                 return MQTT_ERR_TLS;
         case MQTT_CODE_ERROR_TIMEOUT:
-                return MQTT_ERR_ERRNO;
+                return MQTT_ERR_CONN_LOST;
         case MQTT_CODE_ERROR_NETWORK:
                 return MQTT_ERR_ERRNO;
         case MQTT_CODE_ERROR_MEMORY:
@@ -189,6 +189,13 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         return 0;
 }
 
+int ReConnect(struct MqttInstance *instance, int error_code)
+{
+        struct MQTTCtx *mqttCtx = instance->mosq;
+        int ret = OnDisconnectCallback(&mqttCtx->client, MQTT_CODE_ERROR_NETWORK, NULL);
+
+        return ret;
+}
 
 static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage, byte msg_new, byte msg_done)
 {
