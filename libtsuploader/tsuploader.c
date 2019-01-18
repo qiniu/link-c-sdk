@@ -99,10 +99,13 @@ static void inttoBCD(int64_t m, char *buf)
 }
 
 static int linkPutBuffer(const char * uphost, const char *token, const char * key, const char *data, int datasize,
-                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen, int64_t duration, int64_t seqnum, int isDiscontinuity) {
+                         LinkKeyFrameMetaInfo *pMetas, int nMetaLen,
+                         const char **customMagic, int nCustomMagicLen,
+                         int64_t duration, int64_t seqnum, int isDiscontinuity) {
        
         char metaValue[200];
         char metaBuf[250];
+        const char *realKey = key;
         int i = 0;
         for(i = 0; i < nMetaLen; i++) {
                 inttoBCD(pMetas[i].nTimestamp90Khz, metaBuf + 15 * i);
@@ -124,7 +127,10 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8, /*mimetype*/NULL, &putret);
+        if (nCustomMagicLen > 0)
+                realKey = NULL;
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
+                                   customMagic, nCustomMagicLen, /*mimetype*/NULL, &putret);
 
         
 
@@ -204,7 +210,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         param.pUpHost = upHost;
         param.nUpHostLen = sizeof(upHost);
         
-        char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32];
+        char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32]={0};
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
 
@@ -217,7 +223,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
 
         ret = pKodoUploader->uploadArg.uploadParamCallback(
                                         pKodoUploader->uploadArg.pGetUploadParamCallbackArg,
-                                        &param, LINK_UPLOAD_CB_GETPARAM);
+                                        &param, LINK_UPLOAD_CB_GETTSPARAM);
         if (ret != LINK_SUCCESS) {
                 if (ret == LINK_BUFFER_IS_SMALL) {
                         LinkLogError("param buffer is too small. drop file");
@@ -260,11 +266,25 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
                         tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
-
-                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
                 
+                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
+                char startTs[14]={0};
+                char endTs[14]={0};
+                snprintf(startTs, sizeof(startTs), "%"PRId64"", tsStartTime / 1000000);
+                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsDuration);
+                const char *cusMagics[6];
+                int nCusMagics = 6;
+                cusMagics[0]="x:start";
+                cusMagics[1]=startTs;
+                cusMagics[2]="x:end";
+                cusMagics[3]=endTs;
+                cusMagics[4]="x:session";
+                cusMagics[5] = pSession->sessionId;
+                if(param.nFilePrefix > 0)
+                        nCusMagics = 0;
                 int putRet = linkPutBuffer(upHost, uptoken, key, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
-                                           tsDuration, pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
+                                           cusMagics, nCusMagics,
+                                           tsDuration,pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         pKodoUploader->state = LINK_UPLOAD_OK;

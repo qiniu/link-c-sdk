@@ -36,18 +36,19 @@ typedef struct _FFTsMuxContext{
         LinkTsMuxUploader * pTsMuxUploader;
 }FFTsMuxContext;
 
-typedef struct _Token {
-        char * pToken_;
-        int nTokenLen_;
-        char *pFnamePrefix_;
-        int nFnamePrefixLen_;
-}Token;
-
 typedef struct _Buffer {
         char *pData;
         int nLen;
         int nCap;
 }Buffer;
+
+typedef struct _Token {
+        Buffer pToken_;
+        Buffer pFrameToken_;
+        Buffer pTsToken_;
+        Buffer pFnamePrefix_;
+        int isCompatableMode;
+}Token;
 
 typedef struct  {
         int updateConfigInterval;
@@ -665,13 +666,21 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
                         if (pFFTsMuxUploader->pAACBuf) {
                                 free(pFFTsMuxUploader->pAACBuf);
                         }
-                        if (pFFTsMuxUploader->token_.pToken_) {
-                                free(pFFTsMuxUploader->token_.pToken_);
-                                pFFTsMuxUploader->token_.pToken_ = NULL;
+                        if (pFFTsMuxUploader->token_.pToken_.pData) {
+                                free(pFFTsMuxUploader->token_.pToken_.pData);
+                                pFFTsMuxUploader->token_.pToken_.pData = NULL;
                         }
-                        if (pFFTsMuxUploader->token_.pFnamePrefix_) {
-                                free(pFFTsMuxUploader->token_.pFnamePrefix_);
-                                pFFTsMuxUploader->token_.pFnamePrefix_ = NULL;
+                        if (pFFTsMuxUploader->token_.pFrameToken_.pData) {
+                                free(pFFTsMuxUploader->token_.pFrameToken_.pData);
+                                pFFTsMuxUploader->token_.pFrameToken_.pData = NULL;
+                        }
+                        if (pFFTsMuxUploader->token_.pTsToken_.pData) {
+                                free(pFFTsMuxUploader->token_.pTsToken_.pData);
+                                pFFTsMuxUploader->token_.pTsToken_.pData = NULL;
+                        }
+                        if (pFFTsMuxUploader->token_.pFnamePrefix_.pData) {
+                                free(pFFTsMuxUploader->token_.pFnamePrefix_.pData);
+                                pFFTsMuxUploader->token_.pFnamePrefix_.pData = NULL;
                         }
                         freeRemoteConfig(&pFFTsMuxUploader->remoteConfig);
                         freeRemoteConfig(&pFFTsMuxUploader->tmpRemoteConfig);
@@ -732,25 +741,33 @@ static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, 
         return LINK_SUCCESS;
 }
 
-static void setToken(FFTsMuxUploader* _PTsMuxUploader, char *_pToken, int _nTokenLen,
-                     char *_pFnamePrefix, int nFnamePrefix)
+static void setToken(FFTsMuxUploader* _PTsMuxUploader, Buffer token, Buffer ttoken, Buffer ftoken,
+                     Buffer prefix, int isCompatableMode)
 {
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_PTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        if (pFFTsMuxUploader->token_.pToken_ != NULL) {
-                
-                free(pFFTsMuxUploader->token_.pToken_);
+        if (pFFTsMuxUploader->token_.pToken_.pData != NULL) {
+                free(pFFTsMuxUploader->token_.pToken_.pData);
         }
-        pFFTsMuxUploader->token_.pToken_ = _pToken;
-        pFFTsMuxUploader->token_.nTokenLen_ = _nTokenLen;
+        pFFTsMuxUploader->token_.pToken_ = token;
+        
+        if (pFFTsMuxUploader->token_.pFrameToken_.pData != NULL) {
+                free(pFFTsMuxUploader->token_.pFrameToken_.pData);
+        }
+        pFFTsMuxUploader->token_.pFrameToken_ = ftoken;
+        
+        if (pFFTsMuxUploader->token_.pTsToken_.pData != NULL) {
+                free(pFFTsMuxUploader->token_.pTsToken_.pData);
+        }
+        pFFTsMuxUploader->token_.pTsToken_ = ttoken;
         
         
-        if (pFFTsMuxUploader->token_.pFnamePrefix_ != NULL) {
+        if (pFFTsMuxUploader->token_.pFnamePrefix_.pData != NULL) {
                 
-                free(pFFTsMuxUploader->token_.pFnamePrefix_);
+                free(pFFTsMuxUploader->token_.pFnamePrefix_.pData);
         }
-        pFFTsMuxUploader->token_.pFnamePrefix_ = _pFnamePrefix;
-        pFFTsMuxUploader->token_.nFnamePrefixLen_ = nFnamePrefix;
+        pFFTsMuxUploader->token_.pFnamePrefix_ = prefix;
+        pFFTsMuxUploader->token_.isCompatableMode = isCompatableMode;
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         return ;
@@ -985,9 +1002,24 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         
-        if (pFFTsMuxUploader->token_.pToken_ == NULL) {
+        const char *pSrcToken = pFFTsMuxUploader->token_.pToken_.pData;
+        int nSrcToken = pFFTsMuxUploader->token_.pToken_.nLen;
+        if (pFFTsMuxUploader->token_.isCompatableMode && pFFTsMuxUploader->token_.pToken_.pData == NULL) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
+        }
+        if (!pFFTsMuxUploader->token_.isCompatableMode) {
+                if (pFFTsMuxUploader->token_.pTsToken_.pData == NULL || pFFTsMuxUploader->token_.pFrameToken_.pData == NULL ) {
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return LINK_NOT_INITED;
+                }
+                if (cbtype == LINK_UPLOAD_CB_GETFRAMEPARAM) {
+                        pSrcToken = pFFTsMuxUploader->token_.pFrameToken_.pData;
+                        nSrcToken = pFFTsMuxUploader->token_.pFrameToken_.nLen;
+                } else {
+                        pSrcToken = pFFTsMuxUploader->token_.pTsToken_.pData;
+                        nSrcToken = pFFTsMuxUploader->token_.pTsToken_.nLen;
+                }
         }
         
         if (pParam->sessionId[0] == 0) {
@@ -995,25 +1027,29 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         }
         
         if (pParam->pTokenBuf != NULL) {
-                if (pParam->nTokenBufLen - 1 < pFFTsMuxUploader->token_.nTokenLen_) {
-                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nTokenLen_, pParam->nTokenBufLen);
+                if (pParam->nTokenBufLen - 1 < nSrcToken) {
+                        LinkLogError("get token buffer is small:%d %d", nSrcToken, pParam->nTokenBufLen);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return LINK_BUFFER_IS_SMALL;
                 }
-                memcpy(pParam->pTokenBuf, pFFTsMuxUploader->token_.pToken_, pFFTsMuxUploader->token_.nTokenLen_);
-                pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
-                pParam->pTokenBuf[pFFTsMuxUploader->token_.nTokenLen_] = 0;
+                memcpy(pParam->pTokenBuf, pSrcToken, nSrcToken);
+                pParam->nTokenBufLen = nSrcToken;
+                pParam->pTokenBuf[nSrcToken] = 0;
         }
         
-        if (pParam->pFilePrefix != NULL) {
-                if (pParam->nFilePrefix - 1 < pFFTsMuxUploader->token_.nFnamePrefixLen_) {
-                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.nFnamePrefixLen_, pParam->nFilePrefix);
-                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                        return LINK_BUFFER_IS_SMALL;
+        if (pFFTsMuxUploader->token_.isCompatableMode) {
+                if (pParam->pFilePrefix != NULL) {
+                        if (pParam->nFilePrefix - 1 < pFFTsMuxUploader->token_.pFnamePrefix_.nLen) {
+                                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.pFnamePrefix_.nLen, pParam->nFilePrefix);
+                                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                                return LINK_BUFFER_IS_SMALL;
+                        }
+                        memcpy(pParam->pFilePrefix, pFFTsMuxUploader->token_.pFnamePrefix_.pData, pFFTsMuxUploader->token_.pFnamePrefix_.nLen);
+                        pParam->nFilePrefix = pFFTsMuxUploader->token_.pFnamePrefix_.nLen;
+                        pParam->pFilePrefix[pFFTsMuxUploader->token_.pFnamePrefix_.nLen] = 0;
                 }
-                memcpy(pParam->pFilePrefix, pFFTsMuxUploader->token_.pFnamePrefix_, pFFTsMuxUploader->token_.nFnamePrefixLen_);
-                pParam->nFilePrefix = pFFTsMuxUploader->token_.nFnamePrefixLen_;
-                pParam->pFilePrefix[pFFTsMuxUploader->token_.nFnamePrefixLen_] = 0;
+        } else {
+                pParam->nFilePrefix = 0;
         }
         
         
@@ -1067,7 +1103,7 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->nSkLen = nSkLen;
                 pParam->pSk[nSkLen] = 0;
         }
-        pParam->nTokenBufLen = pFFTsMuxUploader->token_.nTokenLen_;
+        pParam->nTokenBufLen = nSrcToken;
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return LINK_SUCCESS;
@@ -1513,6 +1549,13 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         }
         memset(pBuf, 0, nBufLen);
         
+        Buffer bufToken ={0};
+        bufToken.nCap = nBufLen;
+        bufToken.pData = pBuf;
+        Buffer bufFrameToken={0};
+        Buffer bufTsToken={0};
+        Buffer bufPrefix={0};
+        
         int nPrefixLen = 256;
         char *pPrefix = (char *)malloc(nPrefixLen);
         memset(pPrefix, 0, nPrefixLen);
@@ -1520,6 +1563,8 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
                 free(pBuf);
                 return LINK_NO_MEMORY;
         }
+        bufPrefix.pData = pPrefix;
+        bufPrefix.nCap = nPrefixLen;
         
         
         int nUrlLen = snprintf(pBuf, nBufLen, "%s?session=%s&sequence=%"PRId64"", pFFTsMuxUploader->remoteConfig.upTokenRequestUrl.pData,
@@ -1537,21 +1582,73 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
                 return ret;
         }
         
-        
-        ret = LinkGetUploadToken(pBuf, 1024, pDeadline, pPrefix, nPrefixLen, pBuf, pToken, nTokenOffset+nOutputLen);
+        cJSON *pJsonRoot = NULL;
+        ret = LinkGetUploadToken(&pJsonRoot, pBuf, pToken, nTokenOffset+nOutputLen);
         if (ret != LINK_SUCCESS) {
                 free(pBuf);
                 free(pPrefix);
                 LinkLogError("LinkGetUploadToken fail:%d [%s]", ret, pFFTsMuxUploader->remoteConfig.upTokenRequestUrl.pData);
                 return ret;
         }
-        int nPreLen = strlen(pPrefix);
-        if (pPrefix[nPreLen-1] == '/') {
-                pPrefix[nPreLen-1] = 0;
+        
+        // pBuf, 1024, pDeadline, pPrefix, nPrefixLen,
+        cJSON *pNode = cJSON_GetObjectItem(pJsonRoot, "ttl");
+        if (pNode == NULL) {
+                cJSON_Delete(pJsonRoot);
+                return LINK_JSON_FORMAT;
         }
-        setToken(pFFTsMuxUploader, pBuf, strlen(pBuf), pPrefix, strlen(pPrefix));
-        LinkLogInfo("gettoken:%s", pBuf);
-        LinkLogInfo("fnameprefix:%s", pPrefix);
+        *pDeadline = pNode->valueint;
+        
+        int getTsToken = getJsonString(&bufTsToken, "tsToken", pJsonRoot);
+        if (getTsToken == LINK_SUCCESS) {
+                LinkLogInfo("tsToken:%s", bufTsToken.pData);
+        }
+        
+        int getFrameToken = getJsonString(&bufFrameToken, "frameToken", pJsonRoot);
+        if (getFrameToken == LINK_SUCCESS) {
+                LinkLogInfo("frameToken:%s", bufFrameToken.pData);
+        }
+        
+        ret = getJsonString(&bufToken, "token", pJsonRoot);
+        if (ret == LINK_SUCCESS) {
+                LinkLogInfo("token:%s", bufToken.pData);
+        } else if (ret == LINK_NO_MEMORY) {
+                if(getTsToken != LINK_SUCCESS || getFrameToken != LINK_SUCCESS)
+                        goto END;
+        }
+        
+        ret = getJsonString(&bufPrefix, "fnamePrefix", pJsonRoot);
+        if (ret == LINK_SUCCESS) {
+                LinkLogInfo("fnamePrefix:%s", bufPrefix.pData);
+        } else if (ret == LINK_NO_MEMORY) {
+                if(getTsToken != LINK_SUCCESS || getFrameToken != LINK_SUCCESS)
+                        goto END;
+        }
+        ret = LINK_SUCCESS;
+
+        if (bufPrefix.pData) {
+                if (bufPrefix.pData[bufPrefix.nLen-1] == '/') {
+                        bufPrefix.pData[bufPrefix.nLen-1] = 0;
+                        bufPrefix.nLen--;
+                }
+        }
+        int isCompatableMode = 0;
+        if(getTsToken != LINK_SUCCESS || getFrameToken != LINK_SUCCESS)
+                isCompatableMode = 1;
+        setToken(pFFTsMuxUploader, bufToken, bufTsToken, bufFrameToken, bufPrefix, isCompatableMode);
+END:
+        if (ret != LINK_SUCCESS) {
+                if (bufTsToken.pData)
+                        free(bufTsToken.pData);
+                if (bufFrameToken.pData)
+                        free(bufFrameToken.pData);
+                if (bufToken.pData)
+                        free(bufToken.pData);
+                if (bufPrefix.pData)
+                        free(bufPrefix.pData);
+        }
+        
+        cJSON_Delete(pJsonRoot);
         return LINK_SUCCESS;
 }
 

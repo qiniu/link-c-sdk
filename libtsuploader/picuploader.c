@@ -149,7 +149,7 @@ static void * listenPicUpload(void *_pOpaque)
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 LinkUploadParam param;
                                                 memset(&param, 0, sizeof(param));
-                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETPARAM);
+                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
                                                 if (r != LINK_SUCCESS) {
                                                         LinkLogError("getUploadParamCallback fail:%d", r);
                                                         break;
@@ -231,6 +231,7 @@ static void * uploadPicture(void *_pOpaque) {
         }
         
         char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
+        char *realKey = key;
         memset(key, 0, sizeof(key));
         
         char uptoken[1024] = {0};
@@ -249,7 +250,7 @@ static void * uploadPicture(void *_pOpaque) {
         int isFirst = 0, tryCount = 2;
         while(tryCount-- > 0) {
                 ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
-                                                                                    &param, LINK_UPLOAD_CB_GETPARAM);
+                                                                                    &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
                 if (ret != LINK_SUCCESS) {
                         if (ret == LINK_BUFFER_IS_SMALL) {
                                 LinkLogError("param buffer is too small. drop file:");
@@ -262,7 +263,7 @@ static void * uploadPicture(void *_pOpaque) {
                                 LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
                                 sleep(3);
                         } else {
-                                return NULL;
+                                goto END;
                         }
                 } else {
                         if (!isFirst)
@@ -281,7 +282,34 @@ static void * uploadPicture(void *_pOpaque) {
 
         LinkPutret putret;
 
-        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, key, NULL, 0, NULL, &putret);
+        const char *cusMagics[4];
+        int nCusMagics = 4;
+        cusMagics[0]="x:start";
+        cusMagics[1]= pFile;
+        while (*pFile != '-' && *pFile != 0) {
+                pFile++;
+        }
+        if (*pFile == 0) {
+                LinkLogError("wrong picture name:%s", key);
+                goto END;
+        }
+        
+        *pFile++ = 0;
+        cusMagics[2]="x:session";
+        cusMagics[3]=pFile;
+        while (*pFile != '.' && *pFile != 0) {
+                pFile++;
+        }
+        if (*pFile == 0) {
+                LinkLogError("wrong picture name:%s", key);
+                goto END;
+        }
+        *pFile++ = 0;
+        if(param.nFilePrefix == 0)
+                realKey = NULL;
+        else
+                nCusMagics = 0;
+        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
@@ -311,6 +339,7 @@ static void * uploadPicture(void *_pOpaque) {
         
         if (pSig->pPicUploader->tsType_ < 0)
                 pSig->pPicUploader->tsType_ = 0;
+END:
         if (pSig->pFileName) {
                 free(pSig->pFileName);
         }

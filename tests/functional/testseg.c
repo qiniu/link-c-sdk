@@ -19,6 +19,7 @@ static int segGetUploadParamCallback(void *pOpaque, IN OUT LinkUploadParam *pPar
 }
 
 void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
+        /*
         int ret = LinkInitTime();
         assert(ret == LINK_SUCCESS);
         int nDeadline;
@@ -65,4 +66,5 @@ void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl) {
                 count--;
                 sleep(8);
         }
+        */
 }

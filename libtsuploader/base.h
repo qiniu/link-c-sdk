@@ -60,7 +60,9 @@ typedef struct {
 
 typedef enum {
         LINK_UPLOAD_CB_GETPARAM = 1,
-        LINK_UPLOAD_CB_UPREMOTECONFIG = 2
+        LINK_UPLOAD_CB_UPREMOTECONFIG = 2,
+        LINK_UPLOAD_CB_GETFRAMEPARAM = 3,
+        LINK_UPLOAD_CB_GETTSPARAM = 4,
 } LinkUploadCbType;
 
 typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);
