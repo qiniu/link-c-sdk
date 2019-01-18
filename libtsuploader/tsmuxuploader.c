@@ -1037,15 +1037,19 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
                 pParam->pTokenBuf[nSrcToken] = 0;
         }
         
-        if (pParam->pFilePrefix != NULL) {
-                if (pParam->nFilePrefix - 1 < pFFTsMuxUploader->token_.pFnamePrefix_.nLen) {
-                        LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.pFnamePrefix_.nLen, pParam->nFilePrefix);
-                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                        return LINK_BUFFER_IS_SMALL;
+        if (pFFTsMuxUploader->token_.isCompatableMode) {
+                if (pParam->pFilePrefix != NULL) {
+                        if (pParam->nFilePrefix - 1 < pFFTsMuxUploader->token_.pFnamePrefix_.nLen) {
+                                LinkLogError("get token buffer is small:%d %d", pFFTsMuxUploader->token_.pFnamePrefix_.nLen, pParam->nFilePrefix);
+                                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                                return LINK_BUFFER_IS_SMALL;
+                        }
+                        memcpy(pParam->pFilePrefix, pFFTsMuxUploader->token_.pFnamePrefix_.pData, pFFTsMuxUploader->token_.pFnamePrefix_.nLen);
+                        pParam->nFilePrefix = pFFTsMuxUploader->token_.pFnamePrefix_.nLen;
+                        pParam->pFilePrefix[pFFTsMuxUploader->token_.pFnamePrefix_.nLen] = 0;
                 }
-                memcpy(pParam->pFilePrefix, pFFTsMuxUploader->token_.pFnamePrefix_.pData, pFFTsMuxUploader->token_.pFnamePrefix_.nLen);
-                pParam->nFilePrefix = pFFTsMuxUploader->token_.pFnamePrefix_.nLen;
-                pParam->pFilePrefix[pFFTsMuxUploader->token_.pFnamePrefix_.nLen] = 0;
+        } else {
+                pParam->nFilePrefix = 0;
         }
         
         
@@ -1625,6 +1629,7 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         if (bufPrefix.pData) {
                 if (bufPrefix.pData[bufPrefix.nLen-1] == '/') {
                         bufPrefix.pData[bufPrefix.nLen-1] = 0;
+                        bufPrefix.nLen--;
                 }
         }
         int isCompatableMode = 0;

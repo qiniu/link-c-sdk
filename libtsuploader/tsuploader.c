@@ -105,6 +105,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
        
         char metaValue[200];
         char metaBuf[250];
+        const char *realKey = key;
         int i = 0;
         for(i = 0; i < nMetaLen; i++) {
                 inttoBCD(pMetas[i].nTimestamp90Khz, metaBuf + 15 * i);
@@ -126,7 +127,9 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
         LinkPutret putret;
-        int ret = LinkUploadBuffer(data, datasize, uphost, token, key, (const char **)pp, 8,
+        if (nCustomMagicLen > 0)
+                realKey = NULL;
+        int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
                                    customMagic, nCustomMagicLen, /*mimetype*/NULL, &putret);
 
         
@@ -270,14 +273,17 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 snprintf(startTs, sizeof(startTs), "%"PRId64"", tsStartTime / 1000000);
                 snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsDuration);
                 const char *cusMagics[6];
+                int nCusMagics = 6;
                 cusMagics[0]="x:start";
                 cusMagics[1]=startTs;
                 cusMagics[2]="x:end";
                 cusMagics[3]=endTs;
                 cusMagics[4]="x:session";
                 cusMagics[5] = pSession->sessionId;
-                int putRet = linkPutBuffer(upHost, uptoken, NULL, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
-                                           cusMagics, 6,
+                if(param.nFilePrefix > 0)
+                        nCusMagics = 0;
+                int putRet = linkPutBuffer(upHost, uptoken, key, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
+                                           cusMagics, nCusMagics,
                                            tsDuration,pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;

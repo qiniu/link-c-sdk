@@ -231,6 +231,7 @@ static void * uploadPicture(void *_pOpaque) {
         }
         
         char key[160+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
+        char *realKey = key;
         memset(key, 0, sizeof(key));
         
         char uptoken[1024] = {0};
@@ -282,6 +283,7 @@ static void * uploadPicture(void *_pOpaque) {
         LinkPutret putret;
 
         const char *cusMagics[4];
+        int nCusMagics = 4;
         cusMagics[0]="x:start";
         cusMagics[1]= pFile;
         while (*pFile != '-' && *pFile != 0) {
@@ -303,8 +305,11 @@ static void * uploadPicture(void *_pOpaque) {
                 goto END;
         }
         *pFile++ = 0;
-        
-        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, NULL, NULL, 0, cusMagics, 4, NULL, &putret);
+        if(param.nFilePrefix == 0)
+                realKey = NULL;
+        else
+                nCusMagics = 0;
+        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
