@@ -170,7 +170,7 @@ int LinkGetUploadToken(char *pTokenBuf, int nTokenBufLen, int *pDeadline, OUT ch
         
         if (pUrl == NULL || pTokenBuf == NULL || pFnamePrefix == NULL || nTokenBufLen <= 10)
                 return LINK_ARG_ERROR;
-        char httpResp[1024+256]={0};
+        char httpResp[2048]={0};
         int nHttpRespLen = sizeof(httpResp);
         int nRespLen = 0;
         int ret = LinkSimpleHttpGetWithToken(pUrl, httpResp, nHttpRespLen, &nRespLen, pReqToken, nReqTokenLen);
