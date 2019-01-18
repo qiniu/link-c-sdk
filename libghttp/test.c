@@ -146,7 +146,7 @@ void testupbuf(char * file, char * token) {
         }
         fclose(fp);
 
-	ret = LinkUploadBuffer(buf, file_len, "http://upload.qiniup.com",  token, file, NULL, 0, NULL, &putret);
+	ret = LinkUploadBuffer(buf, file_len, "http://upload.qiniup.com",  token, file, NULL, 0, NULL, 0, NULL, &putret);
 	printf("%d %d [%s] [%s]\n", ret, putret.code, putret.error, putret.body);
 }
 
