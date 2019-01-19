@@ -663,6 +663,8 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         uploadCommand.nCommandType = LINK_TSU_QUIT;
         uploadCommand.time.nSystimestamp = LinkGetCurrentNanosecond();
         int ret = 0;
+        LinkLogInfo("tsuploader required to quit:%d", ret);
+        pKodoUploader->nQuit_ = 1;
         while(ret <= 0) {
                 ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
                 if (ret <= 0) {
@@ -670,8 +672,6 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
                         sleep(1);
                 }
         }
-        LinkLogInfo("tsuploader required to quit:%d", ret);
-        pKodoUploader->nQuit_ = 1;
         
         if (pKodoUploader->isThreadStarted_) {
                 pthread_join(pKodoUploader->workerId_, NULL);
