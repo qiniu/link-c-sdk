@@ -1247,7 +1247,7 @@ void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *_pTsMuxUploader,
 }
 
 int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *metas) {
-        if (_pTsMuxUploader == NULL || metas == NULL || metas->len <= 0) {
+        if (_pTsMuxUploader == NULL || metas == NULL) {
                 return LINK_ARG_ERROR;
         }
         
