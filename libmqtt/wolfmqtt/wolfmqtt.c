@@ -197,6 +197,27 @@ int ReConnect(struct MqttInstance *instance, int error_code)
         return ret;
 }
 
+static int RecoverSub(IN struct MqttInstance *_pInstance)
+{
+        int rc = MQTT_CODE_SUCCESS;
+        struct MqttInstance *pInstance = _pInstance;
+        struct MQTTCtx *mqttCtx = pInstance->mosq;
+        Node *p = pInstance->pSubsribeList.pNext;
+
+        mqttCtx->subscribe.packet_id = mqtt_get_packetid();
+        mqttCtx->subscribe.topic_count = 1;
+        mqttCtx->topics[0].qos = pInstance->options.nQos;
+        pthread_mutex_lock(&pInstance->listMutex);
+        while (p) {
+                mqttCtx->topics[0].topic_filter = p->topic;
+                mqttCtx->subscribe.topics = &mqttCtx->topics[0];
+                rc = MqttClient_Subscribe(&mqttCtx->client, &mqttCtx->subscribe);
+                p = p->pNext;
+        }
+        pthread_mutex_unlock(&pInstance->listMutex);
+        return MqttErrorStatusChange(rc);
+}
+
 static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage, byte msg_new, byte msg_done)
 {
         struct MqttInstance *pInstance = client->ctx;
@@ -364,6 +385,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
                (rc == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(rc),
                (rc == 0) ? "on connect success" : MqttClient_ReturnCodeToString(rc));
 	LinkLogError("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+	RecoverSub(_pInstance);
 	return MqttErrorStatusChange(rc);
 }
 
@@ -419,7 +441,7 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                 }
         }
         pthread_mutex_unlock(&_pInstance->listMutex);
-        usleep(10000);
+        usleep(1000);
         if (rc != MQTT_CODE_SUCCESS && rc != MQTT_CODE_ERROR_TIMEOUT) {
                 LinkLogError("MQTT WaitMessage error %d", rc);
         }

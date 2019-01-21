@@ -121,7 +121,6 @@ void * LinkMqttThread(void* _pData)
                          }
                          if (rc != MQTT_SUCCESS) {
                                  OnEventCallback(pInstance, rc, "STATUS_CONNECT_ERROR");
-                                 printf("connecting pInstance->status = STATUS_CONNECT_ERROR \n");
                                  pInstance->status = STATUS_CONNECT_ERROR;
                          }
                 } else if (pInstance->status == STATUS_CONNECTING) {
