@@ -404,7 +404,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
                 free(uploadCommand.ts.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
-                LinkLogError("drop ts file due to ts queue is full");
+                LinkLogError("drop ts file due to ts cache reatch max limit");
         } else {
                 LinkLogDebug("-------->push a queue\n", nCurCacheNum);
                 int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
