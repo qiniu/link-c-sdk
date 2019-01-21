@@ -309,36 +309,38 @@ static void * uploadPicture(void *_pOpaque) {
                 realKey = NULL;
         else
                 nCusMagics = 0;
-        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
-        
-        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
-        
-        if (ret != 0) { //http error
-                LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
-        } else {
-                if (putret.code / 100 == 2) {
-                        uploadResult = LINK_UPLOAD_RESULT_OK;
-                        LinkLogDebug("upload picture: %s success", key);
+        if (pSig->pPicUploader->tsType_ != 0) {
+                ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
+                
+                LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+                
+                if (ret != 0) { //http error
+                        LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
                 } else {
-                        if (putret.body != NULL) {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
-                                             key, putret.code, putret.reqid, putret.body);
+                        if (putret.code / 100 == 2) {
+                                uploadResult = LINK_UPLOAD_RESULT_OK;
+                                LinkLogDebug("upload picture: %s success", key);
                         } else {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
-                                             key, putret.code, putret.reqid);
+                                if (putret.body != NULL) {
+                                        LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
+                                                     key, putret.code, putret.reqid, putret.body);
+                                } else {
+                                        LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
+                                                     key, putret.code, putret.reqid);
+                                }
                         }
                 }
+                
+                LinkFreePutret(&putret);
+                
+                
+                if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
+                        pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
+                }
+                
+                if (pSig->pPicUploader->tsType_ < 0)
+                        pSig->pPicUploader->tsType_ = 0;
         }
-        
-        LinkFreePutret(&putret);
-        
-        
-        if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
-                pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
-        }
-        
-        if (pSig->pPicUploader->tsType_ < 0)
-                pSig->pPicUploader->tsType_ = 0;
 END:
         if (pSig->pFileName) {
                 free(pSig->pFileName);
