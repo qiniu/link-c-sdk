@@ -114,23 +114,23 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         return LINK_SUCCESS;
 }
 
-int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart)
+int LinkPushVideo(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int _nIsKeyFrame, int _nIsSegStart, int64_t nFrameSysTime)
 {
         if (_pTsMuxUploader == NULL || _pData == NULL || _nDataLen == 0) {
                 return LINK_ARG_ERROR;
         }
         int ret = 0;
-        ret = _pTsMuxUploader->PushVideo(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp, _nIsKeyFrame, _nIsSegStart);
+        ret = _pTsMuxUploader->PushVideo(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp, _nIsKeyFrame, _nIsSegStart, nFrameSysTime);
         return ret;
 }
 
-int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp)
+int LinkPushAudio(LinkTsMuxUploader *_pTsMuxUploader, char * _pData, int _nDataLen, int64_t _nTimestamp, int64_t nFrameSysTime)
 {
         if (_pTsMuxUploader == NULL || _pData == NULL || _nDataLen == 0) {
                 return LINK_ARG_ERROR;
         }
         int ret = 0;
-        ret = _pTsMuxUploader->PushAudio(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp);
+        ret = _pTsMuxUploader->PushAudio(_pTsMuxUploader, _pData, _nDataLen, _nTimestamp, nFrameSysTime);
         return ret;
 }
 

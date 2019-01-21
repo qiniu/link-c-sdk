@@ -590,7 +590,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
         pAvuploader->nByteCount += nDataLen;
         if (nFlag == THIS_IS_AUDIO){
                 //fprintf(stderr, "push audio ts:%"PRId64"\n", timestamp);
-                ret = LinkPushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime);
+                ret = LinkPushAudio(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseAudioTime, 0);
         } else {
                 if (pAvuploader->firstTimeStamp == -1){
                         pAvuploader->firstTimeStamp = timestamp;
@@ -629,7 +629,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         cmdArg.nKeyFrameCount++;
                 }
                 
-                ret = LinkPushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent);
+                ret = LinkPushVideo(pAvuploader->pTsMuxUploader, pData, nDataLen, timestamp + cmdArg.nBaseVideoTime, nIsKeyFrame, nNewSegMent, 0);
         }
         if (ret == LINK_NOT_INITED) {
                 return LINK_SUCCESS;

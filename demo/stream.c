@@ -50,16 +50,16 @@ int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
         if (  gIpc.detectMoving == ALARM_MOTION_DETECT  ) {
             count = STREAM_CACHE_SIZE;
             if ( _nStreamType == TYPE_VIDEO ) {
-                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , 0);
             } else {
-                LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+                LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp , 0);
             }
         } else if ( gIpc.detectMoving == ALARM_MOTION_DETECT_DISAPPEAR ) {
             if ( count-- > 0 ) {
                 if ( _nStreamType == TYPE_VIDEO ) {
-                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 );
+                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , 0);
                 } else {
-                    LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp );
+                    LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, 0);
                 }
             } else {
                 DbgReportLog( STREAM_MAIN, TYPE_VIDEO, "use cache, not detect moving" );
@@ -93,9 +93,9 @@ int StreamCommonHandle( int _nStreamType, int _nStream, char *_pFrame, int _nLen
             CacheHandle( cache, pUploader, _nStreamType, _pFrame, _nLen, _nIskey,  _dTimeStamp );
         } else if ( gIpc.detectMoving == ALARM_MOTION_DETECT ) {
             if ( _nStreamType == TYPE_VIDEO ) {
-                LinkPushVideo( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+                LinkPushVideo( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0, 0);
             } else {
-                LinkPushAudio( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp );
+                LinkPushAudio( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, 0);
             }
         } else if (gIpc.detectMoving == ALARM_MOTION_DETECT_DISAPPEAR )  {
             DbgReportLog( _nStream, TYPE_VIDEO, "not detect moving" );
@@ -104,9 +104,9 @@ int StreamCommonHandle( int _nStreamType, int _nStream, char *_pFrame, int _nLen
         }
     } else {
         if ( _nStreamType == TYPE_VIDEO ) {
-            LinkPushVideo( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0 );
+            LinkPushVideo( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, _nIskey, 0, 0);
         } else {
-            LinkPushAudio( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp );
+            LinkPushAudio( pUploader,  _pFrame, _nLen, (int64_t)_dTimeStamp, 0);
         }
     }
 
