@@ -833,6 +833,9 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 pSession->isNewSessionStarted = 0;
                 
                 pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nCurSystime;
+                if (nCurSystime == 0) {
+                        pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nTsStartSystime;
+                }
                 pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
                 pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
                 

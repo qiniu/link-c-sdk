@@ -548,6 +548,7 @@ static void handleSegTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo
 static void * listenTsUpload(void *_pOpaque)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pOpaque;
+        handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 1);
         LinkUploaderStatInfo info = {0};
         while(!pKodoUploader->nQuit_ || info.nLen_ != 0) {
                 TsUploaderCommand cmd;
