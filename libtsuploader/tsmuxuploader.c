@@ -59,6 +59,7 @@ typedef struct  {
         Buffer upTokenRequestUrl;
         Buffer upHostUrl;
         int isValid;
+        LinkPlanType planType;
         
         //not use now
         int   nUploaderBufferSize;
@@ -928,6 +929,7 @@ static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
         pFFTsMuxUploader->remoteConfig = pFFTsMuxUploader->tmpRemoteConfig;
         pFFTsMuxUploader->tmpRemoteConfig = rc;
         pFFTsMuxUploader->remoteConfig.isValid = 1;
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
 }
 
@@ -1486,6 +1488,10 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         pRc->updateConfigInterval = pNode->valueint;
         *pUpdateConfigInterval = pNode->valueint;
         
+        pNode = cJSON_GetObjectItem(pJsonRoot, "planType");
+        if (pNode != NULL) {
+                pRc->planType = pNode->valueint;
+        }
         
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
         if (pSeg == NULL) {

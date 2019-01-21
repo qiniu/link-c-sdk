@@ -23,7 +23,8 @@ enum LinkTsuCmdType {
         LINK_TSU_END_TIME = 4,
         LINK_TSU_SEG_TIME = 5,
         LINK_TSU_SET_META = 6,
-        LINK_TSU_CLR_META = 7
+        LINK_TSU_CLR_META = 7,
+        LINK_TSU_SET_PLAN_TYPE = 8
 };
 
 typedef struct _TsUploaderMeta {
@@ -54,6 +55,7 @@ typedef struct _KodoUploader{
         LinkEndUploadCallback pTsEndUploadCallback;
         void *pTsEndUploadCallbackArg;
         int nQuit_;
+        LinkPlanType planType;
         LinkSession session;
         
         // for discontinuity
@@ -80,7 +82,8 @@ typedef struct _TsUploaderCommand {
         union{
                 TsUploaderCommandTs ts;
                 LinkReportTimeInfo time;
-                LinkSessionMeta *pSessionMeta
+                LinkSessionMeta *pSessionMeta;
+                LinkPlanType planType;
         };
 }TsUploaderCommand;
 
@@ -263,7 +266,8 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         memset(key, 0, sizeof(key));
         
         getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
-        if (getBufDataRet > 0 && pKodoUploader->pSessionMeta && getUploadParamOk) {
+
+        if (pKodoUploader->planType == LINK_PLAN_TYPE_24 || (getBufDataRet > 0 && pKodoUploader->pSessionMeta && getUploadParamOk)) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
@@ -593,6 +597,8 @@ static void * listenTsUpload(void *_pOpaque)
                                 }
                                 pKodoUploader->pSessionMeta = NULL;
                                 break;
+                        case LINK_TSU_SET_PLAN_TYPE:
+                                pKodoUploader->planType = cmd.planType;
                         default:
                                 break;
                 }
@@ -746,6 +752,21 @@ void LinkClearSessionMeta(IN LinkTsUploader * _pUploader) {
         
         TsUploaderCommand uploadCommand;
         uploadCommand.nCommandType = LINK_TSU_CLR_META;
+        
+        int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+        if (ret <= 0) {
+                LinkLogError("ts queue error. clr meta", ret);
+                return;
+        }
+        return;
+}
+
+void LinkTsUploaderSetPlanType(IN LinkTsUploader * _pUploader, LinkPlanType planType) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        TsUploaderCommand uploadCommand;
+        uploadCommand.nCommandType = LINK_TSU_SET_PLAN_TYPE;
+        uploadCommand.planType = planType;
         
         int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
         if (ret <= 0) {
