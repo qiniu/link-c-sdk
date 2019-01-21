@@ -1,6 +1,6 @@
 #ifndef __SDK_VERSION_H__
 #define __SDK_VERSION_H__
 
-#define LINK_SDK_VERSION "v0.0.13"
+#define LINK_SDK_VERSION "v0.0.14"
 
 #endif
