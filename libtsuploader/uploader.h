@@ -129,6 +129,7 @@ void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] nTimestamp 视频时间戳
  * @param[in] nIsKeyFrame 是否是关键帧
  * @param[in] nIsSegStart 是否是新的片段开始
+ * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。平时填写0，开启运动侦测时候，送入预录数据关键帧时候填写该预录视频关键帧对应的系统时间
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
@@ -136,7 +137,8 @@ int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
                   IN int nDataLen,
                   IN int64_t nTimestamp,
                   IN int nIsKeyFrame,
-                  IN int nIsSegStart
+                  IN int nIsSegStart,
+                  IN int64_t nFrameSysTime
                   );
 
 /**
@@ -146,12 +148,14 @@ int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in] pData 音频数据
  * @param[in] nDataLen 音频数据大小
  * @param[in] nTimestamp 音频时间戳
+ * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。目前值填固定的0
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkPushAudio(IN LinkTsMuxUploader *pTsMuxUploader,
                   IN char * pData,
                   IN int nDataLen,
-                  IN int64_t nTimestamp
+                  IN int64_t nTimestamp,
+                  IN int64_t nFrameSysTime
                   );
 
 /**

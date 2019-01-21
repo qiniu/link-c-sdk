@@ -536,9 +536,13 @@ static int checkSwitch(LinkTsMuxUploader *_pTsMuxUploader, int64_t _nTimestamp, 
         return 0;
 }
 
-static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart)
+static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int nIsKeyFrame, int _nIsSegStart, int64_t _nFrameSysTime)
 {
-        int64_t nSysNanotime = LinkGetCurrentNanosecond();
+        int64_t nSysNanotime = 0;
+        if (_nFrameSysTime > 1548064836000)
+                nSysNanotime = _nFrameSysTime * 1000000LL;
+        else
+                nSysNanotime = LinkGetCurrentNanosecond();
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->nLastVideoFrameTsForCheck > 0){
@@ -592,9 +596,13 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         return ret;
 }
 
-static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp)
+static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int64_t _nFrameSysTime)
 {
-        int64_t nSysNanotime = LinkGetCurrentNanosecond();
+        int64_t nSysNanotime = 0;
+        if (_nFrameSysTime > 1548064836000)
+                nSysNanotime = _nFrameSysTime * 1000000LL;
+        else
+                nSysNanotime = LinkGetCurrentNanosecond();
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         if (pFFTsMuxUploader->nLastAudioFrameTsForCheck > 0){
