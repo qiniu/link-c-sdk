@@ -20,58 +20,43 @@
 char *gpPictureBuf = NULL;
 int gnPictureBufLen = 0;
 
-void JustTestSegmentMgr(const char *pUpToken, const char *pMgrUrl);
-void justTestSyncUploadPicture(const char *pTokenUrl);
-void justTestAsyncUploadPicture(const char *pTokenUrl);
-
 typedef struct {
+#ifdef TEST_WITH_FFMPEG
         bool IsInputFromFFmpeg;
+#endif
         bool IsTestAAC;
         bool IsTestAACWithoutAdts;
         bool IsTestTimestampRollover;
         bool IsTestH265;
-        bool IsLocalToken;;
         bool IsNoAudio;
         bool IsNoVideo;
         bool IsTestMove;
-        bool IsTwoUpload;
         bool IsTwoFileUpload;
         bool IsWriteVideoFrame;
         bool IsEnableTsCb;
         int nSleeptime;
         int nFirstFrameSleeptime;
         int64_t nRolloverTestBase;
-        int nUptokenInterval;
-        int nQbufSize;
-        int nNewSegIntval;
         const char *pAFilePath;
         const char *pVFilePath;
-        const char *pTokenUrl;
         const char *pConfigUrl;
         const char *pAk;
         const char *pSk;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
-        bool InvalidToken;
         bool IsQuit;
         bool IsDropFirstKeyFrame;
         int64_t nKeyFrameCount;
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
         
-        bool IsJustTestSyncUploadPicture;
-        bool IsJustTestAsyncUploadPicture;
         bool IsWithPicUpload;
         bool IsPicUploadSyncMode;
         
-        bool IsJustTestSegment;
-        const char *pMgrToken;
         LinkTsMuxUploader * pFirstUploader;
         LinkTsMuxUploader * pSecondUploader;
         int nSigQuitTimes;
-        
-        bool IsJustTestAuth;
 }CmdArg;
 
 typedef struct {
@@ -87,7 +72,6 @@ typedef struct {
         
 }AVuploader;
 
-#define VERSION "v1.0.0"
 CmdArg cmdArg;
 
 typedef int (*DataCallback)(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
@@ -747,23 +731,14 @@ static void checkCmdArg(const char * name)
                         cmdArg.nSleeptime = 2000;
                 }
         }
-#ifndef TEST_WITH_FFMPEG
-        if (cmdArg.IsInputFromFFmpeg || cmdArg.IsTwoUpload) {
-                LinkLogError("not enable TEST_WITH_FFMPEG");
-                exit(2);
-        }
-#endif
-#ifdef DISABLE_OPENSSL
-        if (cmdArg.IsLocalToken) {
-                LinkLogError("cannot from calc token from local. not enable OPENSSL");
-                exit(3);
-        }
-#endif
+
+#ifdef TEST_WITH_FFMPEG
         if (cmdArg.IsInputFromFFmpeg) {
                 cmdArg.IsTestAAC = true;
                 cmdArg.IsTestAACWithoutAdts = false;
                 LinkLogError("input from ffmpeg");
         }
+#endif
         if (cmdArg.IsTestTimestampRollover) {
                 cmdArg.nRolloverTestBase = 95437000;
 	}
@@ -775,27 +750,10 @@ static void checkCmdArg(const char * name)
                 LinkLogError("no audio and video");
                 exit(5);
         }
-        if (cmdArg.nUptokenInterval == 0) {
-                cmdArg.nUptokenInterval = 3550;
-        }
-        
-        if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture || cmdArg.IsJustTestSegment) {
-                if (cmdArg.IsJustTestSyncUploadPicture || cmdArg.IsJustTestAsyncUploadPicture){
-                        if (cmdArg.pTokenUrl == NULL) {
-                                LinkLogError("jtestpic muset spcecify tokenurl");
-                                exit(7);
-                        }
-                } else {
-                        if (cmdArg.pTokenUrl == NULL || cmdArg.pMgrToken == NULL) {
-                                LinkLogError("jtestseg muset spcecify tokenurl and mgrtoken");
-                                exit(7);
-                        }
-                }
-        } else {
-                if (cmdArg.pConfigUrl == NULL || cmdArg.pSk == NULL || cmdArg.pAk == NULL) {
-                        LinkLogError("must specify confurl ak and sk");
-                        exit(8);
-                }
+       
+        if (cmdArg.pConfigUrl == NULL) {
+                LinkLogError("must specify confurl ak and sk");
+                exit(8);
         }
 
         return;
@@ -813,9 +771,6 @@ static void * second_test(void * opaque) {
 
         avuploader.userUploadArg.pToken_ = gtestToken;
         avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.pDeviceName = cmdArg.pUa2;
-        avuploader.userUploadArg.nDeviceNameLen = strlen(cmdArg.pUa2);
-        avuploader.userUploadArg.nUploaderBufferSize = cmdArg.nQbufSize;
         avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
         
         int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
@@ -880,50 +835,36 @@ static void uploadStatisticCallback(void *pUserOpaque, LinkUploadKind uploadKind
         }
 }
 
+extern const char *gVersionAgent;
 int main(int argc, const char** argv)
 {
+#ifdef TEST_WITH_FFMPEG
         flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
+#endif
         flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
         flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
         flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
         flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
-        flag_bool(&cmdArg.IsLocalToken, "localtoken", "use kodo server mode");
         flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
         flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
         flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
-        flag_bool(&cmdArg.IsJustTestSyncUploadPicture, "jpicsync", "just test upload picture with sync mode");
-        flag_bool(&cmdArg.IsJustTestAsyncUploadPicture, "jpicasync", "just test upload picture with async mode");
         flag_bool(&cmdArg.IsWithPicUpload, "withpic", "with picture upload start");
         flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
-        flag_bool(&cmdArg.IsJustTestSegment, "jseg", "just test segment manager");
-        flag_bool(&cmdArg.IsJustTestAuth, "jauth", "just test http(s) auth");
         flag_bool(&cmdArg.IsEnableTsCb, "tscb", "enable ts callback");
         
-        flag_str(&cmdArg.pMgrToken, "mgrtoken", "where to get move token");
-        
-        
-#ifdef TEST_WITH_FFMPEG
-        flag_bool(&cmdArg.IsTwoUpload, "two", "test two instance upload. ffmpeg and file. must set ua1 nad ua2");
-#endif
-        flag_bool(&cmdArg.IsTwoFileUpload, "twofile", "test two file instance upload. must set ua1 nad ua2");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
-        flag_int(&cmdArg.nQbufSize, "qbufsize", "upload queue buffer size");
-        flag_int(&cmdArg.nNewSegIntval, "segint", "new segment interval");
-        flag_int(&cmdArg.nUptokenInterval, "uptokenint", "update token interval. default(3550s)");
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
-        flag_str(&cmdArg.pTokenUrl, "tokenurl", "url where to send token request");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
         flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
         flag_str(&cmdArg.pSk, "sk", "device secret token(not kodo sk)");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
-        flag_bool(&cmdArg.InvalidToken, "invalidtoken", "use invalid token");
         flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
 
-        flag_parse(argc, argv, VERSION);
+        flag_parse(argc, argv, gVersionAgent);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
                 flag_write_usage(argv[0]);
                 return 0;
@@ -936,11 +877,8 @@ int main(int argc, const char** argv)
         printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
         printf("cmdArg.pAFilePath=%s\n", cmdArg.pAFilePath);
         printf("cmdArg.pVFilePath=%s\n", cmdArg.pVFilePath);
-        printf("cmdArg.pTokenUrl=%s\n", cmdArg.pTokenUrl);
         printf("cmdArg.pConfigUrl=%s\n", cmdArg.pConfigUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
-        printf("cmdArg.pAk=%s\n", cmdArg.pAk);
-        printf("cmdArg.psk=%s\n", cmdArg.pSk);
 
         checkCmdArg(argv[0]);
         
@@ -955,22 +893,6 @@ int main(int argc, const char** argv)
         
         LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         //LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
-        if (cmdArg.IsJustTestSyncUploadPicture) {
-                justTestSyncUploadPicture(cmdArg.pTokenUrl);
-                return 0;
-        }else if (cmdArg.IsJustTestAsyncUploadPicture) {
-                justTestAsyncUploadPicture(cmdArg.pTokenUrl);
-                return 0;
-        } else if (cmdArg.IsJustTestSegment) {
-                if (cmdArg.pMgrToken == NULL) {
-                        printf("IsJustTestSegment need to set mgrtoken\n");
-                        return -1;
-                }
-                JustTestSegmentMgr(cmdArg.pTokenUrl, cmdArg.pMgrToken);
-                return 0;
-        } else if (cmdArg.IsJustTestAuth) {
-                //TODO test security sign
-        }
 
         const char *pVFile = NULL;
         const char *pAFile = NULL;
@@ -1078,7 +1000,7 @@ int main(int argc, const char** argv)
         
         sleep(1);
         LinkFreeUploader(&avuploader.pTsMuxUploader);
-        if (cmdArg.IsTwoUpload || cmdArg.IsTwoFileUpload) {
+        if (cmdArg.IsTwoFileUpload) {
                 pthread_join(secondUploadThread, NULL);
         }
         LinkCleanup();
