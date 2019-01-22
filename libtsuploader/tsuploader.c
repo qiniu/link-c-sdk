@@ -619,9 +619,8 @@ static void * listenTsUpload(void *_pOpaque)
                                 break;
                         case LINK_TSU_CLR_META:
                                 if (pKodoUploader->pSessionMeta) {
-                                        free(pKodoUploader->pSessionMeta);
+                                        pKodoUploader->pSessionMeta->isOneShot = 1;
                                 }
-                                pKodoUploader->pSessionMeta = NULL;
                                 break;
                         case LINK_TSU_SET_PLAN_TYPE:
                                 pKodoUploader->planType = cmd.planType;

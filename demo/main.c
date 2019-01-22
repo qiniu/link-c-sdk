@@ -103,17 +103,36 @@ int RemoveFile( char *_pFileName )
 int AlarmCallback( int alarm, void *data )
 {
     static char lastPicName[256] = { 0 };
+        
+    LinkSessionMeta metas = {0};
+    metas.len = 1;
+    char *keys[1] = {"type"};
+    metas.keys = (const char **)keys;
+    int keylens[1] = {4};
+    metas.keylens = keylens;
+        
+    char *values[1] = {"move"};
+    metas.values = (const char **)values;
+    int valuelens[1] = {4};
+    metas.valuelens = valuelens;
 
     if ( alarm == ALARM_MOTION_DETECT ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT\n");
+        if ( gIpc.stream[STREAM_MAIN].uploader ) {
+            LinkSetTsType(gIpc.stream[STREAM_MAIN].uploader, &metas);
+        }if ( gIpc.stream[STREAM_SUB].uploader ) {
+            LinkSetTsType(gIpc.stream[STREAM_SUB].uploader, &metas);
+        }
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
-        if ( gIpc.stream[STREAM_MAIN].uploader )
+        if ( gIpc.stream[STREAM_MAIN].uploader ) {
+            LinkClearTsType(gIpc.stream[STREAM_MAIN].uploader);
             LinkFlushUploader( gIpc.stream[STREAM_MAIN].uploader );
-        if ( gIpc.stream[STREAM_SUB].uploader ) {
-            LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
+        }if ( gIpc.stream[STREAM_SUB].uploader ) {
+            LinkClearTsType(gIpc.stream[STREAM_SUB].uploader);
+            LinkSetTsType(gIpc.stream[STREAM_SUB].uploader, &metas);
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         void *pBuf = NULL;
