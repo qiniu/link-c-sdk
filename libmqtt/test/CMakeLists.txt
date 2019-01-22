@@ -4,6 +4,7 @@ project(testmqtt)
 SET(GCC_COVERAGE_COMPILE_FLAGS "-std=gnu99 -Wall -Wno-unused -g")
 SET(GCC_INCLUDE_PATH "-I../ ")
 SET(CMAKE_C_FLAGS "${GCC_INCLUDE_PATH} ${GCC_COVERAGE_COMPILE_FLAGS}")
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../../b64)
 
 option(WITH_THREADING "Include client library threading support?" ON)
 if (DEFINED ${WITH_THREADING} AND ${WITH_THREADING} STREQUAL ON)
@@ -23,7 +24,8 @@ endif()
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 aux_source_directory(. LIB_MOSQUITTO_TEST)
-add_executable(mqtt_test-${HOST} ${LIB_MOSQUITTO_TEST})
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/../../b64 B64_SOURCE_LIST)
+add_executable(mqtt_test-${HOST} ${LIB_MOSQUITTO_TEST} ${B64_SOURCE_LIST})
 
 if (DEFINED $ENV{WITH_MOSQUITTO} AND $ENV{WITH_MOSQUITTO} STREQUAL "ON")
 	if (DEFINED ${WITH_TLS} AND ${WITH_TLS} STREQUAL ON)
@@ -38,3 +40,4 @@ else()
 	 target_link_libraries(mqtt_test-${HOST} mqtt pthread libwolfmqtt.a libwolfssl.a m)
         endif()
 endif()
+
