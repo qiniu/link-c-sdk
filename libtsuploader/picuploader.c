@@ -123,10 +123,9 @@ static void * listenPicUpload(void *_pOpaque)
                 LinkPicUploadSignal sig;
                 int ret = pPicUploader->pSignalQueue_->PopWithTimeout(pPicUploader->pSignalQueue_, (char *)(&sig),
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60 * 1000000LL);
-                LinkLogTrace("----->pu receive a signal:%d %d", sig.signalType_, ret);
                 memset(&info, 0, sizeof(info));
                 pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
-                LinkLogDebug("pic queue:%d", info.nLen_);
+                LinkLogDebug("----->pu receive a signal:%d %d qlen:%d", sig.signalType_, ret, info.nLen_);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("pic queue error. pop:%d", ret);

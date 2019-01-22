@@ -58,6 +58,10 @@ typedef struct _KodoUploader{
         LinkPlanType planType;
         LinkSession session;
         
+        // for restoreDuration
+        int64_t nAudioDuration;
+        int64_t nVideoDuration;
+        
         // for discontinuity
         int64_t nLastSystime;
         int64_t nFirstSystime;
@@ -88,6 +92,7 @@ typedef struct _TsUploaderCommand {
 }TsUploaderCommand;
 
 static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession);
+static void restoreDuration (KodoUploader * pKodoUploader);
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
@@ -196,7 +201,7 @@ static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t n
         return;
 }
 
-static void * streamUpload(TsUploaderCommand *pUploadCmd) {
+static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         char uptoken[1024] = {0};
         char upHost[192] = {0};
@@ -305,12 +310,17 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
                 LinkLogDebug("not upload:getbuffer:%d, meta:%p param:%d", getBufDataRet, pKodoUploader->pSessionMeta, getUploadParamOk);
         }
 
-        resetSessionReportScope(pSession);
-        resetSessionCurrentTsScope(pSession);
         if (pKodoUploader->uploadArg.pUploadStatisticCb) {
                 pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
+        if (uploadResult == LINK_UPLOAD_RESULT_OK) {
+                handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0);
+        } else {
+                restoreDuration(pKodoUploader);
+        }
+        resetSessionReportScope(pSession);
+        resetSessionCurrentTsScope(pSession);
         if (pKodoUploader->pTsEndUploadCallback) {
                 pKodoUploader->pTsEndUploadCallback(pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
@@ -416,7 +426,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 LinkLogError("drop ts file due to ts cache reatch max limit");
         } else {
-                LinkLogDebug("-------->push a queue\n", nCurCacheNum);
+                LinkLogTrace("-------->push ts to  queue\n", nCurCacheNum);
                 int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
                 if (ret > 0)
                         pKodoUploader->nTsCacheNum++;
@@ -527,6 +537,18 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
         //handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0);
 }
 
+static void restoreDuration (KodoUploader * pKodoUploader) {
+        
+        pKodoUploader->session.nAccSessionVideoDuration -= pKodoUploader->nVideoDuration;
+        pKodoUploader->session.nAccSessionAudioDuration -= pKodoUploader->nAudioDuration;
+        pKodoUploader->session.nVideoGapFromLastReport -= pKodoUploader->nVideoDuration;
+        pKodoUploader->session.nAudioGapFromLastReport -= pKodoUploader->nAudioDuration;
+        pKodoUploader->session.nAccSessionDuration -= pKodoUploader->session.nTsDuration;
+        pKodoUploader->session.nTsDuration = 0;
+        pKodoUploader->nVideoDuration = 0;
+        pKodoUploader->nAudioDuration = 0;
+}
+
 static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
         
         if (pKodoUploader->nFirstSystime <= 0)
@@ -538,6 +560,10 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         pKodoUploader->session.nAudioGapFromLastReport += pTi->nAudioDuration;
         pKodoUploader->session.nAccSessionDuration += pTi->nMediaDuation;
         pKodoUploader->session.nTsDuration = pTi->nMediaDuation;
+        
+        pKodoUploader->nAudioDuration = pTi->nAudioDuration;
+        pKodoUploader->nVideoDuration = pTi->nVideoDuration;
+        
         
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         
@@ -569,7 +595,7 @@ static void * listenTsUpload(void *_pOpaque)
                 
                 switch (cmd.nCommandType) {
                         case LINK_TSU_UPLOAD:
-                                streamUpload(&cmd);
+                                bufferUpload(&cmd);
                                 break;
                         case LINK_TSU_QUIT:
                                 LinkLogInfo("tsuploader required to quit");
