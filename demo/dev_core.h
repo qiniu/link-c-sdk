@@ -1,4 +1,4 @@
-// Last Update:2018-10-29 16:02:34
+// Last Update:2019-01-16 11:21:53
 /**
  * @file dev_core.h
  * @brief 
@@ -50,6 +50,7 @@ typedef struct {
     int (*registerAlarmCb)( int (*alarmCb)( int alarm, void *data ) );
     int (*alarmCallback)(int alarm, void *data );
     int (*captureJpeg)( int stream, int quality, char *path, char *filename);
+    int (*getAudioEncodeType)();
 } CaptureDevice;
 
 typedef struct {
@@ -61,6 +62,7 @@ typedef struct {
     int (*isAudioEnable)();
     int (*registerAlarmCb)( int (*alarmCb)( int alarm, void *data ) );
     int (*captureJpeg)( int stream, int quality, char *path, char *filename);
+    int (*getAudioEncodeType)();
 } CoreDevice;
 
 CoreDevice * NewCoreDevice();

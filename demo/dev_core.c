@@ -1,4 +1,4 @@
-// Last Update:2018-10-29 16:01:59
+// Last Update:2019-01-16 12:00:11
 /**
  * @file dev_core.c
  * @brief 
@@ -90,6 +90,13 @@ int CoreDeviceCaptureJpeg( int stream, int quality, char *path, char *filename)
     return 0;
 }
 
+int CoreDeviceGetAudioEncodeType()
+{
+    if ( pCoreDevice->pCaptureDevice 
+         && pCoreDevice->pCaptureDevice->getAudioEncodeType )
+        return pCoreDevice->pCaptureDevice->getAudioEncodeType();
+}
+
 CoreDevice * NewCoreDevice()
 {
     pCoreDevice->pCaptureDevice = GetCaptureDevice();
@@ -100,6 +107,7 @@ CoreDevice * NewCoreDevice()
     pCoreDevice->isAudioEnable = CoreDeviceIsAudioEnable;
     pCoreDevice->registerAlarmCb = CoreDeviceRegisterAlarmCb;
     pCoreDevice->captureJpeg = CoreDeviceCaptureJpeg;
+    pCoreDevice->getAudioEncodeType = CoreDeviceGetAudioEncodeType;
 
     return pCoreDevice;
 }

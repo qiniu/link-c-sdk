@@ -368,13 +368,13 @@ void CfgGetIntItem( char *item, int *out )
 static CfgItem cfg_items[] =
 {
     { CFG_MEMBER(logFile), "LOG_FILE", 1 },
+    { CFG_MEMBER(audioType), "AUDIO_ENCODE_TYPE", 1 },
     { CFG_MEMBER(h264_file), "H264_FILE", 1 },
     { CFG_MEMBER(aac_file), "AAC_FILE", 1 },
-    { CFG_MEMBER(ak), "AK", 1 },
-    { CFG_MEMBER(sk), "SK", 1 },
+    { CFG_MEMBER(ak), "DAK", 1 },
+    { CFG_MEMBER(sk), "DSK", 1 },
     { CFG_MEMBER(url), "NETWORK_CHECK_URL", 1 },
-    { CFG_MEMBER(tokenUrl), "TOKEN_GET_URL", 1 },
-    { CFG_MEMBER(renameTokenUrl), "RENAME_TOKEN_URL", 1 },
+    { CFG_MEMBER(tokenUrl), "GET_CONFIG_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
     { CFG_MEMBER(ota_url), "OTA_URL", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },

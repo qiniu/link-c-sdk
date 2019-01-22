@@ -1,4 +1,4 @@
-// Last Update:2018-12-20 15:49:33
+// Last Update:2018-12-25 09:46:33
 /**
  * @file func_trace.c
  * @brief 
@@ -6,6 +6,8 @@
  * @version 0.1.00
  * @date 2018-12-20
  */
+
+#ifdef DEBUG_TRACE_FUNCTION
 
 #include <stdio.h>
 #include <signal.h>
@@ -21,7 +23,6 @@ typedef struct {
     int count;
 } func_trace_t;
 
-#ifdef DEBUG_TRACE_FUNCTION
 
 static func_trace_t funcs[1024];
 

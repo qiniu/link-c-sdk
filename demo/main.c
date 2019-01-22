@@ -118,6 +118,19 @@ int AlarmCallback( int alarm, void *data )
 
     if ( alarm == ALARM_MOTION_DETECT ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT\n");
+        LinkSessionMeta metas = {0};
+        metas.len = 1;
+        char *keys[1] = {"type"};
+        metas.keys = (const char **)keys;
+        int keylens[1] = {4};
+        metas.keylens = keylens;
+        char *values[1] = {"move"};
+        metas.values = (const char **)values;
+        int valuelens[1] = {4};
+        metas.valuelens = valuelens;
+
+        LinkSetTsType( gIpc.stream[STREAM_MAIN].uploader, &metas);
+
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
             LinkSetTsType(gIpc.stream[STREAM_MAIN].uploader, &metas);
         }if ( gIpc.stream[STREAM_SUB].uploader ) {
@@ -125,6 +138,7 @@ int AlarmCallback( int alarm, void *data )
         }
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
+        LinkClearTsType(gIpc.stream[STREAM_MAIN].uploader);
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
@@ -186,12 +200,21 @@ int AlarmCallback( int alarm, void *data )
 
 static int CaptureDevInit( )
 {
+    int audioType = AUDIO_AAC;
+
     gIpc.dev = NewCoreDevice();
-    gIpc.audioType = AUDIO_AAC;
 
     DBG_LOG("start to init ipc...\n");
-    printf("start to init ipc...\n");
-    gIpc.dev->init( gIpc.audioType, gIpc.config.multiChannel, VideoGetFrameCb, AudioGetFrameCb );
+
+    DBG_LOG("gIpc.config.audioType = %s\n", gIpc.config.audioType );
+    if ( gIpc.config.audioType ) {
+        if ( strcmp( gIpc.config.audioType, "aac" ) == 0 ) {
+            audioType = AUDIO_AAC;
+        } else {
+            audioType = AUDIO_G711;
+        }
+    }
+    gIpc.dev->init( audioType, gIpc.config.multiChannel, VideoGetFrameCb, AudioGetFrameCb );
     gIpc.dev->getDevId( gIpc.devId );
 //    DbgSendFileName( gIpc.devId );
     gIpc.stream[STREAM_MAIN].videoCache = NewQueue();
@@ -261,8 +284,10 @@ int _TsUploaderSdkInit( StreamChannel ch )
     }
     userUploadArg.nChannels = 1;
     userUploadArg.nVideoFormat = LINK_VIDEO_H264;
-    userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
-    userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
+    if ( gIpc.config.tokenUrl ) {
+        userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
+        userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
+    }
     if ( gIpc.config.ak ) {
         userUploadArg.pDeviceAk = gIpc.config.ak;
         userUploadArg.nDeviceAkLen = strlen( gIpc.config.ak );
