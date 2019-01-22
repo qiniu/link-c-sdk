@@ -267,7 +267,7 @@ static void * streamUpload(TsUploaderCommand *pUploadCmd) {
         
         getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
 
-        if (pKodoUploader->planType == LINK_PLAN_TYPE_24 || (getBufDataRet > 0 && pKodoUploader->pSessionMeta && getUploadParamOk)) {
+        if ((pKodoUploader->pSessionMeta || pKodoUploader->planType == LINK_PLAN_TYPE_24) && (getBufDataRet > 0 && getUploadParamOk)) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
