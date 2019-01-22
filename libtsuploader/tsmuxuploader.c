@@ -59,6 +59,7 @@ typedef struct  {
         Buffer upTokenRequestUrl;
         Buffer upHostUrl;
         int isValid;
+        LinkPlanType planType;
         
         //not use now
         int   nUploaderBufferSize;
@@ -833,6 +834,9 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 pSession->isNewSessionStarted = 0;
                 
                 pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nCurSystime;
+                if (nCurSystime == 0) {
+                        pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nTsStartSystime;
+                }
                 pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
                 pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
                 
@@ -925,6 +929,7 @@ static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
         pFFTsMuxUploader->remoteConfig = pFFTsMuxUploader->tmpRemoteConfig;
         pFFTsMuxUploader->tmpRemoteConfig = rc;
         pFFTsMuxUploader->remoteConfig.isValid = 1;
+        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
 }
 
@@ -1242,7 +1247,7 @@ void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *_pTsMuxUploader,
 }
 
 int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *metas) {
-        if (_pTsMuxUploader == NULL || metas == NULL || metas->len <= 0) {
+        if (_pTsMuxUploader == NULL || metas == NULL) {
                 return LINK_ARG_ERROR;
         }
         
@@ -1483,6 +1488,10 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         pRc->updateConfigInterval = pNode->valueint;
         *pUpdateConfigInterval = pNode->valueint;
         
+        pNode = cJSON_GetObjectItem(pJsonRoot, "planType");
+        if (pNode != NULL) {
+                pRc->planType = pNode->valueint;
+        }
         
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
         if (pSeg == NULL) {
