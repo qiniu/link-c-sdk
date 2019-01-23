@@ -1694,14 +1694,17 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 int nWaitToken = tokenSleepUntilTime - now;
                 int nWait = nWaitRc;
                 int nRcTimeout = 1;
-                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
+                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken > 0 && nWaitToken < nWait) {
                         nRcTimeout = 0;
                         nWait = nWaitToken;
                 }
                 //fprintf(stderr, "sleep:%d\n", nWait);
                 SessionUpdateParam param;
                 memset(&param, 0, sizeof(param));
-                
+                if (nWait < 0) {
+                        LinkLogWarn("nWait abnormal. set to 0:%d", nWait);
+                        nWait = 0;
+                }
                 ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
                                                                       sizeof(SessionUpdateParam), nWait * 1000000LL);
                 memset(&info, 0, sizeof(info));
@@ -1709,6 +1712,9 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 if (ret <= 0) {
                         if (ret == LINK_TIMEOUT) {
                                 LinkLogDebug("update queue timeout:%d", nWait);
+                        } else if (ret == 0) { //due to time error
+                                LinkLogWarn("time error. set to timeout state");
+                                ret = LINK_TIMEOUT;
                         } else {
                                 LinkLogError("update queue error. popqueue fail:%d wait:%d", ret, nWait);
                                 continue;
