@@ -31,7 +31,7 @@ typedef struct {
         void *pUploadStatArg;
         int64_t nNextUpdateSegTimeInSecond;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
-        const LinkSessionMeta* pSessionMeta;
+        LinkSessionMeta* pSessionMeta;
 }Seg;
 
 typedef struct {
@@ -250,8 +250,7 @@ static void handleClearSessionMeta(SegInfo *pSegInfo) {
                 return;
         }
         if (segmentMgr.handles[idx].pSessionMeta) {
-                free((void *)segmentMgr.handles[idx].pSessionMeta);
-                segmentMgr.handles[idx].pSessionMeta = NULL;
+                segmentMgr.handles[idx].pSessionMeta->isOneShot = 1;
         }
         return;
 }
