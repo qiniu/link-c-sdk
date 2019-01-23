@@ -162,6 +162,7 @@ typedef struct _LinkSession { // seg report info
         int64_t nSessionStartTime;
         int64_t nTsSequenceNumber;
         int64_t nSessionEndTime;
+        int64_t nLastTsEndTime;
         int nSessionEndResonCode;
         int isNewSessionStarted;
         

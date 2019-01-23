@@ -788,7 +788,10 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         
         // report current session end
         pSession->nSessionEndResonCode = lastSessionEndReasonCode;
-        pSession->nSessionEndTime = nNewSessionId;
+        if (pSession->nLastTsEndTime > 0)
+                pSession->nSessionEndTime = pSession->nLastTsEndTime;
+        else
+                pSession->nSessionEndTime = nNewSessionId;
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         
         // update session
@@ -1254,7 +1257,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         
-        LinkSessionMeta *pDup;
+        LinkSessionMeta *pDup = NULL;
         int ret = dupSessionMeta(metas, &pDup);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1268,7 +1271,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
         }
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
-                LinkSessionMeta *pDup2;
+                LinkSessionMeta *pDup2 = NULL;
                 ret = dupSessionMeta(metas, &pDup2);
                 if (ret != LINK_SUCCESS) {
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
@@ -1694,21 +1697,28 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 int nWaitToken = tokenSleepUntilTime - now;
                 int nWait = nWaitRc;
                 int nRcTimeout = 1;
-                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken < nWait) {
+                if (!shouldUpdateRc && shouldUpdateToken && nWaitToken > 0 && nWaitToken < nWait) {
                         nRcTimeout = 0;
                         nWait = nWaitToken;
                 }
                 //fprintf(stderr, "sleep:%d\n", nWait);
                 SessionUpdateParam param;
                 memset(&param, 0, sizeof(param));
-                
+                if (nWait < 0) {
+                        LinkLogWarn("nWait abnormal. set to 0:%d", nWait);
+                        nWait = 0;
+                }
                 ret = pFFTsMuxUploader->pUpdateQueue_->PopWithTimeout(pFFTsMuxUploader->pUpdateQueue_, (char *)(&param),
                                                                       sizeof(SessionUpdateParam), nWait * 1000000LL);
                 memset(&info, 0, sizeof(info));
                 pFFTsMuxUploader->pUpdateQueue_->GetStatInfo(pFFTsMuxUploader->pUpdateQueue_, &info);
+                LinkLogDebug("pUpdateQueue_ %d :%d",ret, info.nLen_);
                 if (ret <= 0) {
                         if (ret == LINK_TIMEOUT) {
                                 LinkLogDebug("update queue timeout:%d", nWait);
+                        } else if (ret == 0) { //due to time error
+                                LinkLogWarn("time error. set to timeout state");
+                                ret = LINK_TIMEOUT;
                         } else {
                                 LinkLogError("update queue error. popqueue fail:%d wait:%d", ret, nWait);
                                 continue;
@@ -1743,6 +1753,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
     
                                 continue;
                         }
+                        LinkLogDebug("updateRemoteConfig");
                         updateRemoteConfig(pFFTsMuxUploader);
                         nNextTryRcTime = 1;
                         shouldUpdateRc = 0;
@@ -1767,6 +1778,7 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                                  memcpy(param.sessionId, sessionIdBak, sizeof(sessionIdBak));
                         }
                         param.nSeqNum = pFFTsMuxUploader->uploadArgBak.nSegSeqNum;
+                        LinkLogDebug("updateToken");
                         ret = updateToken(pFFTsMuxUploader, &tokenSleepUntilTime, &param);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         if (ret != LINK_SUCCESS) {
