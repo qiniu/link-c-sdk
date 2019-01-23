@@ -81,7 +81,7 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  */
 static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         char buffer[1280];
-        int nReportHostLen = 512;
+        int nReportHostLen = 640;
         char *body = buffer + nReportHostLen;
         int nBodyLen = 0;
         LinkSession *s = &pSegInfo->session;
@@ -98,14 +98,14 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
                         " %"PRId64", \"endReason\": \"%s\"",
-                        s->sessionId, s->nSessionStartTime/1000000LL, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000LL, reason);
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason);
 
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"",
-                        s->sessionId, s->nSessionStartTime/1000000LL, LinkGetCurrentNanosecond()/1000000LL, s->nTsSequenceNumber,
+                        s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
                         s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
         }
@@ -122,13 +122,13 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         body[nBodyLen++] = '}';
         
         assert(nBodyLen <= sizeof(buffer) - nReportHostLen);
-        LinkLogDebug("%s\n", body);
+        LinkLogDebug("body:%s", body);
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         char *reportHost = buffer;
-        char ak[41];
-        char sk[41];
+        char ak[41] = {0};
+        char sk[41] = {0};
         
         param.pSegUrl = reportHost;
         param.nSegUrlLen = nReportHostLen;
@@ -146,6 +146,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         char * pToken = reportHost + nUrlLen + 1;
         int nTokenOffset = snprintf(pToken, nReportHostLen-nUrlLen-1, "%s:", param.pAk);
         int nOutputLen = 30;
+        //fprintf(stderr, "-------->%s:%d %s body:%s:%d\n", param.pSk, param.nSkLen,reportHost, body,nBodyLen);
         ret = GetHttpRequestSign(param.pSk, param.nSkLen, "POST", reportHost, "application/json", body,
                                      nBodyLen, pToken+nTokenOffset, &nOutputLen);
         if (ret != LINK_SUCCESS) {
@@ -158,6 +159,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         memset(resp, 0, sizeof(resp));
         int respLen = sizeof(resp);
 
+        //fprintf(stderr, "-------->body:%s:%d token:%s\n", body,nBodyLen, pToken);
         ret = LinkSimpleHttpPostWithToken(reportHost, resp, sizeof(resp), &respLen, body, nBodyLen, "application/json",
                                     pToken, nTokenOffset+nOutputLen);
         if(smeta && smeta->isOneShot) {
@@ -237,7 +239,7 @@ static void handleUpdateSessionMeta(SegInfo *pSegInfo) {
                 free((void *)segmentMgr.handles[idx].pSessionMeta);
                 segmentMgr.handles[idx].pSessionMeta = NULL;
         }
-        segmentMgr.handles[idx].pSessionMeta = pSegInfo->pSessionMeta;
+        segmentMgr.handles[idx].pSessionMeta = (const LinkSessionMeta*)pSegInfo->pSessionMeta;
 }
 
 static void handleClearSessionMeta(SegInfo *pSegInfo) {
