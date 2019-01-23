@@ -316,6 +316,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         }
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
                 handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0);
+                pSession->nLastTsEndTime = tsEndTime;
         } else {
                 restoreDuration(pKodoUploader);
         }

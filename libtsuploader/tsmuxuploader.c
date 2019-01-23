@@ -788,7 +788,10 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         
         // report current session end
         pSession->nSessionEndResonCode = lastSessionEndReasonCode;
-        pSession->nSessionEndTime = nNewSessionId;
+        if (pSession->nLastTsEndTime > 0)
+                pSession->nSessionEndTime = pSession->nLastTsEndTime;
+        else
+                pSession->nSessionEndTime = nNewSessionId;
         LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         
         // update session

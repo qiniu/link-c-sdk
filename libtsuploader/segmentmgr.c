@@ -208,6 +208,9 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
         if (!checkShouldReport(&segmentMgr.handles[idx], &pSegInfo->session)) {
                 return;
         }
+        if (pSegInfo->session.nAccSessionDuration <= 0) {
+                LinkLogInfo("not report due to session duration is 0");
+        }
 
         int ret = reportSegInfo(pSegInfo, idx);
         if (ret == LINK_SUCCESS)
