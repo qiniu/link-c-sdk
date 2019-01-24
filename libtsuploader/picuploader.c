@@ -167,7 +167,7 @@ static void * listenPicUpload(void *_pOpaque)
                                         pPicUploader->tsType_ = -1;
                                          continue;
                                 case LinkPicClearTsType:
-                                        pPicUploader->tsType_ = 0;
+                                        pPicUploader->tsType_ = -1;
                                          continue;
                                 case LinkPicUploadSignalStop:
                                         return NULL;
