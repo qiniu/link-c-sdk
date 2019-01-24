@@ -109,6 +109,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] metas 自定义的元数据，key->value结构
  *                metas->isOneShot 非0，仅上报一次后便不在上报
+ * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas);
 
@@ -116,7 +117,6 @@ int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas
  * @brief 清空段上报的元数据，通常使用场景为摄像头检查到移动侦测消失后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
- * @return LINK_SUCCESS 成功; 其它值 失败
  */
 void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
 
@@ -186,7 +186,7 @@ void LinkCleanup();
  * @param[in] nAkLen accessKey 长度，最大长度 512 字节
  * @param[in] pSk 设备端的 secretKey
  * @param[in] nSkLen secretKey 长度，最大长度 512 字节
- * @param[in] pToken 访问凭证， 格式为  " ak + ':' + encodedSign + ':' + encodedPutPolicy "
+ * @param[in] pToken 访问凭证， 格式为 "ak + ':' + encodedSign + ':' + encodedPutPolicy"
  * @param[in] nTokenLen Token 长度，最大长度 4096 字节
  * @return LINK_TRUE: 验证成功; LINK_FALSE: 验证失败; LINK_ERROR: 参数错误
  */
