@@ -815,7 +815,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         return;
 }
 
-static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime)
+static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime, int64_t nCurTsDuration)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
@@ -862,8 +862,8 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                         isSegIdChange = 1;
                 }
                 
-                int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
-                if (pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
+                int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000 + nCurTsDuration * 1000000;
+                if (nCurTsDuration > 0 && pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
                     nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
                         LinkLogWarn("timeout: update remote config");
                         isSegIdChange = 2;

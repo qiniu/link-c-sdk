@@ -6,7 +6,7 @@
 #include "queue.h"
 #include "base.h"
 
-typedef void (*LinkTsUploadArgUpadater)(void *pOpaque, LinkSession *pSession,int64_t nNow, int64_t nEnd);
+typedef void (*LinkTsUploadArgUpadater)(void *pOpaque, LinkSession *pSession,int64_t nNow, int64_t nEnd, int64_t nCurTsDuration);
 typedef void (*LinkEndUploadCallback)(void *pOpaque, int64_t nTimestamp);
 
 typedef struct _LinkTsUploadArg {

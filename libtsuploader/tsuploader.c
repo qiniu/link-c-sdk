@@ -91,7 +91,7 @@ typedef struct _TsUploaderCommand {
         };
 }TsUploaderCommand;
 
-static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession);
+static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration);
 static void restoreDuration (KodoUploader * pKodoUploader);
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
@@ -256,7 +256,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         pKodoUploader->nLastTsEndTime = tsEndTime;
         
         if (getUploadParamOk)
-                handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0);
+                handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration);
         
         int isDiscontinuity = 0;
         if (pKodoUploader->nLastSystimeBak > 0 && getUploadParamOk) {
@@ -315,7 +315,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
-                handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0);
+                handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
                 pSession->nLastTsEndTime = tsEndTime;
         } else {
                 restoreDuration(pKodoUploader);
@@ -510,16 +510,16 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         pSession->nAccSessionVideoDuration = 0;
 }
 
-static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession) {
+static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration) {
 
         if (pKodoUploader->uploadArg.UploadUpdateSegmentId) {
                 if (isForceNewSession)
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
-                                                                       &pKodoUploader->session, nSysTimestamp, 0);
+                                                                       &pKodoUploader->session, nSysTimestamp, 0, nCurTsDuration);
                 else
                         pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
                                                                        &pKodoUploader->session,
-                                                                       pKodoUploader->session.nTsStartTime, nSysTimestamp);
+                                                                       pKodoUploader->session.nTsStartTime, nSysTimestamp, nCurTsDuration);
         }
 }
 
@@ -568,18 +568,18 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0);
+        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0);
 }
 
 static void handleSegTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 1);
+        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 1, 0);
 }
 
 static void * listenTsUpload(void *_pOpaque)
 {
         KodoUploader * pKodoUploader = (KodoUploader *)_pOpaque;
-        handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 1);
+        handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 1, 0);
         LinkUploaderStatInfo info = {0};
         while(!pKodoUploader->nQuit_ || info.nLen_ != 0) {
                 TsUploaderCommand cmd;
