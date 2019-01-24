@@ -100,7 +100,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         " %"PRId64", \"endReason\": \"%s\"",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason);
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
 
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","

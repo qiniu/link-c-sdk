@@ -129,8 +129,6 @@ int AlarmCallback( int alarm, void *data )
         int valuelens[1] = {4};
         metas.valuelens = valuelens;
 
-        LinkSetTsType( gIpc.stream[STREAM_MAIN].uploader, &metas);
-
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
             LinkSetTsType(gIpc.stream[STREAM_MAIN].uploader, &metas);
         }if ( gIpc.stream[STREAM_SUB].uploader ) {
@@ -138,7 +136,6 @@ int AlarmCallback( int alarm, void *data )
         }
         gIpc.detectMoving = alarm;
     } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
-        LinkClearTsType(gIpc.stream[STREAM_MAIN].uploader);
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
@@ -146,7 +143,7 @@ int AlarmCallback( int alarm, void *data )
             LinkFlushUploader( gIpc.stream[STREAM_MAIN].uploader );
         }if ( gIpc.stream[STREAM_SUB].uploader ) {
             LinkClearTsType(gIpc.stream[STREAM_SUB].uploader);
-            LinkSetTsType(gIpc.stream[STREAM_SUB].uploader, &metas);
+            LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         void *pBuf = NULL;

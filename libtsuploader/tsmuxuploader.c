@@ -643,8 +643,23 @@ int LinkPushPicture(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
                                 int nFilenameLen, const char *_pBuf, int _nBuflen) {
         
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        if (pFFTsMuxUploader->pPicUploader == NULL || pFFTsMuxUploader->pTsMuxCtx == NULL ||
+            pFFTsMuxUploader->pTsMuxCtx->pTsUploader_ == NULL) {
+                return LINK_NOT_INITED;
+        }
         assert(pFFTsMuxUploader->pPicUploader != NULL);
-        return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, pFilename, nFilenameLen, _pBuf, _nBuflen);
+        
+        LinkPicture pic;
+        pic.pOpaque = pFFTsMuxUploader->pPicUploader;
+        pic.pFilename = pFilename;
+        pic.nFilenameLen = nFilenameLen;
+        pic.pBuf = _pBuf;
+        pic.nBuflen = _nBuflen;
+        
+        return LinkTsUploaderPushPic(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pic);
+        
+        //return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, pFilename, nFilenameLen, _pBuf, _nBuflen);
 }
 
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
@@ -815,7 +830,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         return;
 }
 
-static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime)
+static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime, int64_t nCurTsDuration)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
@@ -847,6 +862,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 return;
         } else {
                 if (nCurSystime == 0) {
+                        pFFTsMuxUploader->uploadArgBak.nLastCheckTime = LinkGetCurrentNanosecond();
                         handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, 3);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return;
@@ -860,18 +876,19 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
                         LinkLogDebug("normal: update remote config");
                         isSegIdChange = 1;
-                }
-                
-                int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000LL;
-                if (pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
-                    nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
-                        LinkLogWarn("timeout: update remote config");
-                        isSegIdChange = 2;
                 } else {
-                        if (pFFTsMuxUploader->uploadArgBak.nSegSeqNum < pSession->nTsSequenceNumber) {
-                                LinkLogDebug("seqnum: report segment:%"PRId64" %"PRId64"",
-                                        pFFTsMuxUploader->uploadArgBak.nSegSeqNum, pSession->nTsSequenceNumber);
-                                isSeqNumChange = 1;
+                        
+                        int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * (int64_t)1000000 + nCurTsDuration * 1000000;
+                        if (pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
+                            nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
+                                LinkLogWarn("timeout: update remote config");
+                                isSegIdChange = 2;
+                        } else {
+                                if (pFFTsMuxUploader->uploadArgBak.nSegSeqNum < pSession->nTsSequenceNumber) {
+                                        LinkLogDebug("seqnum: report segment:%"PRId64" %"PRId64"",
+                                                     pFFTsMuxUploader->uploadArgBak.nSegSeqNum, pSession->nTsSequenceNumber);
+                                        isSeqNumChange = 1;
+                                }
                         }
                 }
         }
@@ -1204,35 +1221,52 @@ static int dupSessionMeta(LinkSessionMeta *metas, LinkSessionMeta **pDst) {
         if (tmp == NULL) {
                 return -1;
         }
+        memset(tmp, 0, total + sizeof(LinkSessionMeta));
         memcpy(tmp, metas, sizeof(LinkSessionMeta));
         
         LinkSessionMeta *dst = (LinkSessionMeta *)tmp;
+        
         tmp += sizeof(LinkSessionMeta);
-        char **pp = (char **)tmp;
-        dst->keys = (const char **)pp;
-        int *pl = (int *)(tmp + sizeof(void*) * metas->len);
-        dst->keylens = pl;
-        tmp = (char *)pl + sizeof(int) * metas->len;
+        
+        char *keysAddr = tmp;
+        tmp += metas->len * sizeof(void *);
+        dst->keys = (const char **)keysAddr;
+        
+        char *keylensAddr = tmp;
+        tmp += metas->len * sizeof(int);
+        dst->keylens = (int *)keylensAddr;
+        
+        char *valuesAddr = tmp;
+        tmp += metas->len * sizeof(void *);
+        dst->values = (const char **)valuesAddr;
+        
+        char *valuelensAddr = tmp;
+        tmp += metas->len * sizeof(int);
+        dst->valuelens = (int *)valuelensAddr;
+        
         for (idx =0; idx < metas->len; idx++) {
-                pl[idx] = metas->keylens[idx];
-                pp[idx] = tmp;
-                memcpy(tmp, metas->keys[idx],metas->keylens[idx]);
+                memcpy(keylensAddr, &metas->keylens[idx], sizeof(int));
+                keylensAddr += sizeof(int);
+                memcpy(valuelensAddr, &metas->valuelens[idx], sizeof(int));
+                valuelensAddr += sizeof(int);
+        }
+        for (idx =0; idx < metas->len; idx++) {
+                memcpy(keysAddr, &tmp, sizeof(void*));
+                keysAddr += sizeof(void *);
+                
+                memcpy(tmp, metas->keys[idx], metas->keylens[idx]);
                 tmp[metas->keylens[idx]] = 0;
-                tmp += metas->keylens[idx] + 1;
+                tmp += (metas->keylens[idx]+1);
+                
+                
+                memcpy(valuesAddr, &tmp, sizeof(void*));
+                valuesAddr += sizeof(void *);
+                
+                memcpy(tmp, metas->values[idx], metas->valuelens[idx]);
+                tmp[metas->valuelens[idx]] = 0;
+                tmp += (metas->valuelens[idx]+1);
         }
         
-        pp = (char **)tmp;
-        dst->values = (const char **)pp;
-        pl = (int *)(tmp + sizeof(void*) * metas->len);
-        dst->valuelens = pl;
-        tmp = (char *)pl + sizeof(int) * metas->len;
-        for (idx =0; idx < metas->len; idx++) {
-                pl[idx] = metas->valuelens[idx];
-                pp[idx] = tmp;
-                memcpy(tmp, metas->values[idx],metas->valuelens[idx]);
-                tmp[metas->valuelens[idx]] = 0;
-                tmp += metas->valuelens[idx] + 1;
-        }
         dst->isOneShot = metas->isOneShot;
         dst->len = metas->len;
         *pDst = dst;

@@ -81,6 +81,27 @@ int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const 
         return LINK_SUCCESS;
 }
 
+int LinkSendPictureToPictureUploader(PictureUploader *pPicUploader, LinkPicture pic) {
+        
+        PicUploader *pPicUp = (PicUploader *)pPicUploader;
+        
+        LinkPicUploadSignal sig;
+        memset(&sig, 0, sizeof(LinkPicUploadSignal));
+        
+        sig.pPicUploader = pPicUp;
+        sig.signalType_ = LinkPicUploadSignalUpload;
+        
+        sig.nDataLen = pic.nBuflen;
+        sig.pFileName = (char *)pic.pFilename;
+        sig.pData = (char *)pic.pBuf;
+        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
+        if (ret <= 0) {
+                LinkLogError("pic2 push queue error:%d", ret);
+        }
+        
+        return LINK_SUCCESS;
+}
+
 static int linkPicSendTsTypeInfo(PicUploader *pPicUp, enum LinkPicUploadSignalType sigType, LinkPlanType ptype) {
         LinkPicUploadSignal sig;
         memset(&sig, 0, sizeof(LinkPicUploadSignal));
@@ -125,7 +146,7 @@ static void * listenPicUpload(void *_pOpaque)
                                                                        sizeof(LinkPicUploadSignal), 24 * 60 * 60 * 1000000LL);
                 memset(&info, 0, sizeof(info));
                 pPicUploader->pSignalQueue_->GetStatInfo(pPicUploader->pSignalQueue_, &info);
-                LinkLogDebug("----->pu receive a signal:%d %d qlen:%d", sig.signalType_, ret, info.nLen_);
+                LinkLogDebug("----->pu receive a signal:%d %d qlen:%d cmd:%d", sig.signalType_, ret, info.nLen_, sig.signalType_);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("pic queue error. pop:%d", ret);
@@ -146,7 +167,7 @@ static void * listenPicUpload(void *_pOpaque)
                                         pPicUploader->tsType_ = -1;
                                          continue;
                                 case LinkPicClearTsType:
-                                        pPicUploader->tsType_ = 0;
+                                        pPicUploader->tsType_ = -1;
                                          continue;
                                 case LinkPicUploadSignalStop:
                                         return NULL;
@@ -157,18 +178,9 @@ static void * listenPicUpload(void *_pOpaque)
                                         pPicUploader->planType_ = sig.planType;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
-                                                LinkUploadParam param;
-                                                memset(&param, 0, sizeof(param));
-                                                int r = pPicUploader->picUpSettings_.getUploadParamCallback(pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque, &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
-                                                if (r != LINK_SUCCESS) {
-                                                        LinkLogError("getUploadParamCallback fail:%d", r);
-                                                        break;
-                                                }
-                                                
                                                 char key[64];
                                                 memset(key, 0, sizeof(key));
-
-                                                int keyLen = snprintf(key, sizeof(key), "%"PRId64"-%s.jpg", sig.nTimestamp, param.sessionId);
+                                                int keyLen = snprintf(key, sizeof(key), "%"PRId64".jpg", sig.nTimestamp);
 
                                                 pPicUploader->picUpSettings_.getPicCallback(
                                                                                             pPicUploader->picUpSettings_.pGetPicCallbackOpaque,
@@ -350,6 +362,8 @@ static void * uploadPicture(void *_pOpaque) {
                 
                 if (pSig->pPicUploader->tsType_ < 0)
                         pSig->pPicUploader->tsType_ = 0;
+        } else {
+                LinkLogDebug("not upload pic:%d %d",pSig->pPicUploader->planType_ == LINK_PLAN_TYPE_24, pSig->pPicUploader->tsType_);
         }
 END:
         if (pSig->pFileName) {
