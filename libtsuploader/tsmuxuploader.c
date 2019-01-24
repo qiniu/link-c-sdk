@@ -862,6 +862,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 return;
         } else {
                 if (nCurSystime == 0) {
+                        pFFTsMuxUploader->uploadArgBak.nLastCheckTime = LinkGetCurrentNanosecond();
                         handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, 3);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return;
@@ -875,18 +876,19 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
                         LinkLogDebug("normal: update remote config");
                         isSegIdChange = 1;
-                }
-                
-                int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * 1000000 + nCurTsDuration * 1000000;
-                if (nCurTsDuration > 0 && pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
-                    nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
-                        LinkLogWarn("timeout: update remote config");
-                        isSegIdChange = 2;
                 } else {
-                        if (pFFTsMuxUploader->uploadArgBak.nSegSeqNum < pSession->nTsSequenceNumber) {
-                                LinkLogDebug("seqnum: report segment:%"PRId64" %"PRId64"",
-                                        pFFTsMuxUploader->uploadArgBak.nSegSeqNum, pSession->nTsSequenceNumber);
-                                isSeqNumChange = 1;
+                        
+                        int64_t nDiff = pFFTsMuxUploader->remoteConfig.nSessionTimeout * (int64_t)1000000 + nCurTsDuration * 1000000;
+                        if (pFFTsMuxUploader->remoteConfig.nSessionTimeout > 0 &&
+                            nCurSystime - pFFTsMuxUploader->uploadArgBak.nLastCheckTime >= nDiff) {
+                                LinkLogWarn("timeout: update remote config");
+                                isSegIdChange = 2;
+                        } else {
+                                if (pFFTsMuxUploader->uploadArgBak.nSegSeqNum < pSession->nTsSequenceNumber) {
+                                        LinkLogDebug("seqnum: report segment:%"PRId64" %"PRId64"",
+                                                     pFFTsMuxUploader->uploadArgBak.nSegSeqNum, pSession->nTsSequenceNumber);
+                                        isSeqNumChange = 1;
+                                }
                         }
                 }
         }

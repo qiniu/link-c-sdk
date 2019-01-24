@@ -325,7 +325,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                         LinkSendPictureToPictureUploader(pKodoUploader->picture.pOpaque, pKodoUploader->picture);
                         pKodoUploader->picture.pFilename = NULL;
                 }
-                handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
+                //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
                 pSession->nLastTsEndTime = tsEndTime;
         } else {
                 restoreDuration(pKodoUploader);
@@ -545,7 +545,7 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         
-        //handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0);
+        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0);
 }
 
 static void restoreDuration (KodoUploader * pKodoUploader) {
@@ -578,7 +578,7 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0);
+        //handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0);
 }
 
 static void handleSegTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {

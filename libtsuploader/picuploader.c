@@ -362,6 +362,8 @@ static void * uploadPicture(void *_pOpaque) {
                 
                 if (pSig->pPicUploader->tsType_ < 0)
                         pSig->pPicUploader->tsType_ = 0;
+        } else {
+                LinkLogDebug("not upload pic:%d %d",pSig->pPicUploader->planType_ == LINK_PLAN_TYPE_24, pSig->pPicUploader->tsType_);
         }
 END:
         if (pSig->pFileName) {
