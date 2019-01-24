@@ -10,6 +10,7 @@
 #include "b64/urlsafe_b64.h"
 #include "libghttp/qupload.h"
 #include "httptools.h"
+#include "picuploader.h"
 
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
@@ -24,7 +25,8 @@ enum LinkTsuCmdType {
         LINK_TSU_SEG_TIME = 5,
         LINK_TSU_SET_META = 6,
         LINK_TSU_CLR_META = 7,
-        LINK_TSU_SET_PLAN_TYPE = 8
+        LINK_TSU_SET_PLAN_TYPE = 8,
+        LINK_TSU_PICTURE = 9
 };
 
 typedef struct _TsUploaderMeta {
@@ -73,6 +75,7 @@ typedef struct _KodoUploader{
         void *pOutputUserArg;
         LinkMediaArg mediaArg;
         LinkSessionMeta *pSessionMeta;
+        LinkPicture picture;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -88,6 +91,7 @@ typedef struct _TsUploaderCommand {
                 LinkReportTimeInfo time;
                 LinkSessionMeta *pSessionMeta;
                 LinkPlanType planType;
+                LinkPicture pic;
         };
 }TsUploaderCommand;
 
@@ -315,6 +319,12 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
+                if (pKodoUploader->picture.pFilename) {
+                        snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
+                                 "-%s.jpg", pKodoUploader->session.sessionId);
+                        LinkSendPictureToPictureUploader(pKodoUploader->picture.pOpaque, pKodoUploader->picture);
+                        pKodoUploader->picture.pFilename = NULL;
+                }
                 handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
                 pSession->nLastTsEndTime = tsEndTime;
         } else {
@@ -586,7 +596,7 @@ static void * listenTsUpload(void *_pOpaque)
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
                                                                       sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-                //LinkLogDebug("ts queue:%d", info.nLen_);
+                LinkLogDebug("ts queue:%d cmd:%d", info.nLen_, cmd.nCommandType);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("tscmd queue error. pop:%d", ret);
@@ -597,6 +607,13 @@ static void * listenTsUpload(void *_pOpaque)
                 switch (cmd.nCommandType) {
                         case LINK_TSU_UPLOAD:
                                 bufferUpload(&cmd);
+                                break;
+                        case LINK_TSU_PICTURE:
+                                if (pKodoUploader->picture.pFilename) {
+                                        free((void*)pKodoUploader->picture.pFilename);
+                                        pKodoUploader->picture.pFilename = NULL;
+                                }
+                                pKodoUploader->picture = cmd.pic;
                                 break;
                         case LINK_TSU_QUIT:
                                 LinkLogInfo("tsuploader required to quit");
@@ -785,6 +802,34 @@ void LinkClearSessionMeta(IN LinkTsUploader * _pUploader) {
                 return;
         }
         return;
+}
+
+int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        TsUploaderCommand uploadCommand;
+        uploadCommand.nCommandType = LINK_TSU_PICTURE;
+        
+        char *pFileName = (char *)malloc(pic.nFilenameLen + 5+LINK_MAX_SESSION_ID_LEN + pic.nBuflen);
+        if (pFileName == NULL) {
+                return LINK_NO_MEMORY;
+        }
+        memset(pFileName, 0, pic.nFilenameLen + 5+LINK_MAX_SESSION_ID_LEN);
+        memcpy(pFileName, pic.pFilename, pic.nFilenameLen);
+
+        char *pData = pFileName + pic.nFilenameLen + 5+LINK_MAX_SESSION_ID_LEN;
+        memcpy(pData, pic.pBuf, pic.nBuflen);
+        
+        pic.pFilename = (const char *)pFileName;
+        pic.pBuf = (const char *)pData;
+        uploadCommand.pic = pic;
+        
+        int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+        if (ret <= 0) {
+                LinkLogError("ts queue error. push pic meta", ret);
+                return ret;
+        }
+        return LINK_SUCCESS;
 }
 
 void LinkTsUploaderSetPlanType(IN LinkTsUploader * _pUploader, LinkPlanType planType) {

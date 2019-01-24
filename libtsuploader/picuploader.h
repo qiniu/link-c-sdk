@@ -29,6 +29,7 @@ int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysT
 
 //  getPicCallback return , should invoke this function to notify picuploader to upload picture
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const char *pFileName, int nFileNameLen, const char *pBuf, int nBuflen);
+int LinkSendPictureToPictureUploader(PictureUploader *pPicUploader, LinkPicture pic);
 int LinkPicSendTsType(PictureUploader *pPicUploader, int isOneShot);
 int LinkPicSendClearTsType(PictureUploader *pPicUploader);
 int LinkPicSetPlanType(PictureUploader *pPicUploader, LinkPlanType ptype);

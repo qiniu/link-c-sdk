@@ -643,8 +643,23 @@ int LinkPushPicture(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
                                 int nFilenameLen, const char *_pBuf, int _nBuflen) {
         
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
+        
+        if (pFFTsMuxUploader->pPicUploader == NULL || pFFTsMuxUploader->pTsMuxCtx == NULL ||
+            pFFTsMuxUploader->pTsMuxCtx->pTsUploader_ == NULL) {
+                return LINK_NOT_INITED;
+        }
         assert(pFFTsMuxUploader->pPicUploader != NULL);
-        return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, pFilename, nFilenameLen, _pBuf, _nBuflen);
+        
+        LinkPicture pic;
+        pic.pOpaque = pFFTsMuxUploader->pPicUploader;
+        pic.pFilename = pFilename;
+        pic.nFilenameLen = nFilenameLen;
+        pic.pBuf = _pBuf;
+        pic.nBuflen = _nBuflen;
+        
+        return LinkTsUploaderPushPic(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pic);
+        
+        //return LinkSendUploadPictureToPictureUploader(pFFTsMuxUploader->pPicUploader, pFilename, nFilenameLen, _pBuf, _nBuflen);
 }
 
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
@@ -1204,6 +1219,7 @@ static int dupSessionMeta(LinkSessionMeta *metas, LinkSessionMeta **pDst) {
         if (tmp == NULL) {
                 return -1;
         }
+        memset(tmp, 0, total + sizeof(LinkSessionMeta));
         memcpy(tmp, metas, sizeof(LinkSessionMeta));
         
         LinkSessionMeta *dst = (LinkSessionMeta *)tmp;

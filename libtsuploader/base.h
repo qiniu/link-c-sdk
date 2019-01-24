@@ -25,6 +25,14 @@
 #define LINK_MAX_SESSION_ID_LEN 20
 
 typedef struct {
+	void *pOpaque;
+        const char *pFilename;
+        int nFilenameLen;
+        const char *pBuf;
+        int nBuflen;
+}LinkPicture;
+ 
+typedef struct {
         const char **keys;
         int *keylens;
         const char **values;

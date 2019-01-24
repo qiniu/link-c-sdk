@@ -49,6 +49,7 @@ void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
 void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessionMeta);
 void LinkClearSessionMeta(IN LinkTsUploader * _pUploader);
+int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic);
 void LinkTsUploaderSetPlanType(IN LinkTsUploader * _pUploader, LinkPlanType planType);
 
 void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput, IN void * pUserArg, IN LinkMediaArg mediaArg);
