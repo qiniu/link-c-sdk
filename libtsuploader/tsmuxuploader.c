@@ -1223,32 +1223,48 @@ static int dupSessionMeta(LinkSessionMeta *metas, LinkSessionMeta **pDst) {
         memcpy(tmp, metas, sizeof(LinkSessionMeta));
         
         LinkSessionMeta *dst = (LinkSessionMeta *)tmp;
+        
         tmp += sizeof(LinkSessionMeta);
-        char **pp = (char **)tmp;
-        dst->keys = (const char **)pp;
-        int *pl = (int *)(tmp + sizeof(void*) * metas->len);
-        dst->keylens = pl;
-        tmp = (char *)pl + sizeof(int) * metas->len;
+        
+        char *keysAddr = tmp;
+        tmp += metas->len * sizeof(void *);
+        dst->keys = (const char **)keysAddr;
+        
+        char *keylensAddr = tmp;
+        tmp += metas->len * sizeof(int);
+        dst->keylens = (int *)keylensAddr;
+        
+        char *valuesAddr = tmp;
+        tmp += metas->len * sizeof(void *);
+        dst->values = (const char **)valuesAddr;
+        
+        char *valuelensAddr = tmp;
+        tmp += metas->len * sizeof(int);
+        dst->valuelens = (int *)valuelensAddr;
+        
         for (idx =0; idx < metas->len; idx++) {
-                pl[idx] = metas->keylens[idx];
-                pp[idx] = tmp;
-                memcpy(tmp, metas->keys[idx],metas->keylens[idx]);
+                memcpy(keylensAddr, &metas->keylens[idx], sizeof(int));
+                keylensAddr += sizeof(int);
+                memcpy(valuelensAddr, &metas->valuelens[idx], sizeof(int));
+                valuelensAddr += sizeof(int);
+        }
+        for (idx =0; idx < metas->len; idx++) {
+                memcpy(keysAddr, &tmp, sizeof(void*));
+                keysAddr += sizeof(void *);
+                
+                memcpy(tmp, metas->keys[idx], metas->keylens[idx]);
                 tmp[metas->keylens[idx]] = 0;
-                tmp += metas->keylens[idx] + 1;
+                tmp += (metas->keylens[idx]+1);
+                
+                
+                memcpy(valuesAddr, &tmp, sizeof(void*));
+                valuesAddr += sizeof(void *);
+                
+                memcpy(tmp, metas->values[idx], metas->valuelens[idx]);
+                tmp[metas->valuelens[idx]] = 0;
+                tmp += (metas->valuelens[idx]+1);
         }
         
-        pp = (char **)tmp;
-        dst->values = (const char **)pp;
-        pl = (int *)(tmp + sizeof(void*) * metas->len);
-        dst->valuelens = pl;
-        tmp = (char *)pl + sizeof(int) * metas->len;
-        for (idx =0; idx < metas->len; idx++) {
-                pl[idx] = metas->valuelens[idx];
-                pp[idx] = tmp;
-                memcpy(tmp, metas->values[idx],metas->valuelens[idx]);
-                tmp[metas->valuelens[idx]] = 0;
-                tmp += metas->valuelens[idx] + 1;
-        }
         dst->isOneShot = metas->isOneShot;
         dst->len = metas->len;
         *pDst = dst;
