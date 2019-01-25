@@ -12,4 +12,9 @@ int HmacSha1(const char* pKey,  int nKeyLen, const char* pInput,  int pInputLen,
 int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlWithPathAndQuery, char *pContentType,
                               char *pData, int nDataLen, char *pOutput, int *pOutputLen);
 
+int GetMqttPasswordSign(IN const char *pInput, IN int nInLen,
+                OUT char *pOutput, OUT int *pOutLen, IN const char *pDsk);
+
+int GetMqttUsernameSign(OUT char *_pUsername, OUT int *_pLen, IN const char *_pDak);
+
 #endif

@@ -178,3 +178,39 @@ int HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         return LINK_SUCCESS;
 #endif
 }
+
+
+int GetMqttPasswordSign(IN const char *_pInput, IN int _nInLen,
+                OUT char *_pOutput, OUT int *_pOutLen, IN const char *_pDsk)
+{
+        int ret = 0;
+        int sha1Len = 20;
+        char sha1[256] = {0};
+
+        if (!_pInput || !_pDsk) {
+                return LINK_ERROR;
+        }
+        ret = HmacSha1(_pDsk, strlen(_pDsk), _pInput, _nInLen, sha1, &sha1Len);
+        if (ret != 0) {
+                return LINK_ERROR;
+        }
+        int outlen = urlsafe_b64_encode(sha1, 20, _pOutput, _pOutLen);
+        *_pOutLen = outlen;
+        return LINK_SUCCESS;
+}
+
+
+int GetMqttUsernameSign(OUT char *_pUsername, OUT int *_pLen, IN const char *_pDak)
+{
+        char query[256] = {0};
+        long timestamp = 0.0;
+        timestamp = (long)time(NULL);
+        if (!_pDak) {
+                return LINK_ERROR;
+        }
+        sprintf(query, "dak=%s&timestamp=%ld&version=v1", _pDak, timestamp);
+        *_pLen = strlen(query);
+        memcpy(_pUsername, query, *_pLen);
+        return LINK_SUCCESS;
+}
+
