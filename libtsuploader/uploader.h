@@ -77,7 +77,7 @@ int LinkPushPicture(IN LinkTsMuxUploader *pTsMuxUploader,
                                 );
 
 /**
- * 通知当前没有可上传数据
+ * @brief 通知当前没有可上传数据,通常使用场景为摄像头检查到移动侦测后消失调用该接口，以通知上传缓冲的数据
  *
  * 此函数用于当上传结束时，将当前已缓存的资源完成进行上传
  * 例如当移动侦测结束时，暂时不再上传资源，调用函数后会将已缓存的资源完成切片上传
@@ -104,7 +104,7 @@ int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
- * 设置片段上报的元数据
+ * @brief 设置片段上报的元数据,通常使用场景为摄像头检查到移动侦测后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] metas 自定义的元数据，key->value结构
@@ -113,7 +113,7 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas);
 
 /**
- * 清空段上报的元数据
+ * @brief 清空段上报的元数据，通常使用场景为摄像头检查到移动侦测消失后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @return LINK_SUCCESS 成功; 其它值 失败
@@ -126,11 +126,13 @@ void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] pData 视频数据
  * @param[in] nDataLen 视频数据大小
- * @param[in] nTimestamp 视频时间戳
+ * @param[in] nTimestamp 视频时间戳, 如果存在音频，和音频时间戳一定要对应同一个基点
  * @param[in] nIsKeyFrame 是否是关键帧
  * @param[in] nIsSegStart 是否是新的片段开始
- * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。平时填写0，开启运动侦测时候，送入预录数据关键帧时候填写该预录视频关键帧对应的系统时间
+ * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。通常的使用场景是：开启运动侦测时候，送入预录数据关键帧时候填写该预录视频关键帧对应的系统时间,其它情况可以填0
+ *                          就是说，如果这个值大于1548064836000，则使用传入的时间，否则取系统时间
  * @return LINK_SUCCESS 成功; 其它值 失败
+ *
  */
 int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
                   IN char * pData,
@@ -147,7 +149,7 @@ int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] pData 音频数据
  * @param[in] nDataLen 音频数据大小
- * @param[in] nTimestamp 音频时间戳
+ * @param[in] nTimestamp 音频时间戳，必须和视频时间戳对应同一个基点
  * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。目前值填固定的0
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
