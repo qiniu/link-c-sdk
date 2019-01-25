@@ -17,6 +17,7 @@ if (WITH_OPENSSL OR WITH_WOLFSSL)
     )
     if (WITH_MQTT)
         ExternalProject_Add(external-wolfMQTT
+                DEPENDS external-wolfssl
                 SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT
                 CONFIGURE_COMMAND ./autogen.sh &&
                     ./configure
