@@ -9,6 +9,8 @@ message( "line-8 HOST is " ${HOST} )
 message( "line-8 HOST is " ${CFLAGS} )
 
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/wolfssl/output/${HOST}/lib")
+link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../third_party/wolfMQTT/output/${HOST}/lib")
+link_directories("${CMAKE_CURRENT_BINARY_DIR}/../../libmqtt")
 
 add_executable(link_unit_test
     CuTest.c
@@ -19,5 +21,5 @@ add_executable(link_unit_test
     test_link_api.c
 )
 
-target_link_libraries(link_unit_test tsuploader ghttp wolfssl m pthread)
+target_link_libraries(link_unit_test tsuploader ghttp mqtt wolfmqtt wolfssl m pthread)
 

@@ -7,11 +7,15 @@
 #include "segmentmgr.h"
 #include "httptools.h"
 #include "cJSON/cJSON.h"
+#include "libmqtt/mqtt.h"
 #include <signal.h>
 
 extern const char *gVersionAgent;
 
 static int volatile nProcStatus = 0;
+
+static bool gMQTTInitialized = false;
+static void *gMQTTInstance = NULL;
 
 int LinkInit()
 {
@@ -47,6 +51,9 @@ int LinkInit()
         nProcStatus = 1;
         LinkLogDebug("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
         
+        /* Init libmqtt */
+        LinkMqttLibInit();
+
         return LINK_SUCCESS;
 
 }
@@ -111,6 +118,26 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         *_pTsMuxUploader = pTsMuxUploader;
         
+        /* Create mqtt instance */
+        if (!gMQTTInitialized) {
+                struct MqttOptions mqttOpt;
+                memset(&mqttOpt, 0, sizeof(MqttOptions));
+                mqttOpt.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+                mqttOpt.userInfo.pHostname = LINK_MQTT_SERVER;
+                mqttOpt.userInfo.nPort = LINK_MQTT_PORT;
+                mqttOpt.userInfo.pUsername = userUploadArg.pDeviceAk;
+                mqttOpt.userInfo.pPassword = userUploadArg.pDeviceSk;
+                mqttOpt.nKeepalive = LINK_MQTT_KEEPALIVE;
+                mqttOpt.nQos = 0;
+                mqttOpt.pId = userUploadArg.pDeviceAk;
+                mqttOpt.bRetain = false;
+                mqttOpt.bCleanSession = false;
+                gMQTTInstance = LinkMqttCreateInstance(&mqttOpt);
+                if (gMQTTInstance) {
+                        gMQTTInitialized = true;
+                }
+        }
+
         return LINK_SUCCESS;
 }
 
@@ -142,6 +169,12 @@ int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
         LinkDestroyTsMuxUploader(pTsMuxUploader);
+
+        /* Destroy mqtt instance */
+        if (gMQTTInitialized && gMQTTInstance) {
+                LinkMqttDestroy(gMQTTInstance);
+        }
+
 }
 
 int LinkIsProcStatusQuit()
@@ -160,6 +193,9 @@ void LinkCleanup()
         LinkUninitSegmentMgr();
         LinkStopMgr();
         
+        /* Uninitial libmqtt */
+        LinkMqttLibCleanup();
+
         return;
 }
 
