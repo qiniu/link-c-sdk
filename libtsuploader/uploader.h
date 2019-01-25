@@ -27,14 +27,12 @@ int LinkInit();
  * 此函数不是线程安全函数。
  *
  * @param[out] pTsMuxUploader 切片上传实例
- * @param[in]  pAvArg 上传的 audio/video 的格式参数
  * @param[in]  pUserUploadArg 上传需要的参数，用来设置 token,deviceName
- * @param[in]  pPicArg 图片上传参数
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkNewUploader(OUT LinkTsMuxUploader **pTsMuxUploader,
-                          IN LinkUploadArg *pUserUploadArg
-                          );
+int LinkNewUploader(LinkTsMuxUploader **pTsMuxUploader,
+                    LinkUploadArg *pUserUploadArg
+                    );
 
 /**
  * 设置日志回调函数
@@ -54,9 +52,10 @@ void LinkSetLogCallback(IN LinkLogFunc pLogCb);
  * @param[in]  pTsDataCb 回调函数
  * @param[in]  pUserArg 作为pTsDataCb函数的userCtx参数，返回给用户
  */
-void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *pTsMuxUploader,
-                               IN LinkTsOutput pTsDataCb, IN void * pUserArg
-                               );
+void LinkUploaderSetTsOutputCallback(LinkTsMuxUploader *pTsMuxUploader,
+                                     LinkTsOutput pTsDataCb,
+                                     void * pUserArg
+                                     );
 
 
 /**
@@ -69,14 +68,16 @@ void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in] type 上传类型，文件上传 或者 缓存上传
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkPushPicture(IN LinkTsMuxUploader *pTsMuxUploader,
-                                const char *pFilename,
-                                int nFilenameLen,
-                                const char *pBuf,
-                                int nBuflen
-                                );
+int LinkPushPicture(LinkTsMuxUploader *pTsMuxUploader,
+                    const char *pFilename,
+                    int nFilenameLen,
+                    const char *pBuf,
+                    int nBuflen
+                    );
 
 /**
+ * 刷新缓存数据
+ *
  * @brief 通知当前没有可上传数据,通常使用场景为摄像头检查到移动侦测后消失调用该接口，以通知上传缓冲的数据
  *
  * 此函数用于当上传结束时，将当前已缓存的资源完成进行上传
@@ -104,6 +105,8 @@ int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
+ * 设置片段上报的元数据
+ *
  * @brief 设置片段上报的元数据,通常使用场景为摄像头检查到移动侦测后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
@@ -111,9 +114,13 @@ int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
  *                metas->isOneShot 非0，仅上报一次后便不在上报
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkSetTsType(IN LinkTsMuxUploader *pTsMuxUploader,IN LinkSessionMeta *metas);
+int LinkSetTsType(LinkTsMuxUploader *pTsMuxUploader,
+                  LinkSessionMeta *metas
+                  );
 
 /**
+ * 清空段上报的元数据
+ *
  * @brief 清空段上报的元数据，通常使用场景为摄像头检查到移动侦测消失后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
@@ -132,19 +139,18 @@ void LinkClearTsType(IN LinkTsMuxUploader *pTsMuxUploader);
  * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。通常的使用场景是：开启运动侦测时候，送入预录数据关键帧时候填写该预录视频关键帧对应的系统时间,其它情况可以填0
  *                          就是说，如果这个值大于1548064836000，则使用传入的时间，否则取系统时间
  * @return LINK_SUCCESS 成功; 其它值 失败
- *
  */
-int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
-                  IN char * pData,
-                  IN int nDataLen,
-                  IN int64_t nTimestamp,
-                  IN int nIsKeyFrame,
-                  IN int nIsSegStart,
-                  IN int64_t nFrameSysTime
+int LinkPushVideo(LinkTsMuxUploader *pTsMuxUploader,
+                  char * pData,
+                  int nDataLen,
+                  int64_t nTimestamp,
+                  int nIsKeyFrame,
+                  int nIsSegStart,
+                  int64_t nFrameSysTime
                   );
 
 /**
- * 推送音频流数据。
+ * 推送音频流数据
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] pData 音频数据
@@ -153,11 +159,11 @@ int LinkPushVideo(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in] nFrameSysTime 帧对应的系统时间,单位为m毫秒。目前值填固定的0
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
-int LinkPushAudio(IN LinkTsMuxUploader *pTsMuxUploader,
-                  IN char * pData,
-                  IN int nDataLen,
-                  IN int64_t nTimestamp,
-                  IN int64_t nFrameSysTime
+int LinkPushAudio(LinkTsMuxUploader *pTsMuxUploader,
+                  char * pData,
+                  int nDataLen,
+                  int64_t nTimestamp,
+                  int64_t nFrameSysTime
                   );
 
 /**
@@ -168,12 +174,12 @@ int LinkPushAudio(IN LinkTsMuxUploader *pTsMuxUploader,
  * @param[in,out] pTsMuxUploader 切片上传实例
  * @return NULL
  */
-void LinkFreeUploader(IN OUT LinkTsMuxUploader **pTsMuxUploader);
+void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader);
 
 /**
- * 销毁释放 sdk 资源。
+ * 销毁释放 sdk 资源
  *
- * 此函数不是线程安全函数。
+ * 此函数不是线程安全函数
  *
  * @return NULL
  */
@@ -190,6 +196,12 @@ void LinkCleanup();
  * @param[in] nTokenLen Token 长度，最大长度 4096 字节
  * @return LINK_TRUE: 验证成功; LINK_FALSE: 验证失败; LINK_ERROR: 参数错误
  */
-int LinkVerify(const char *pAk, size_t nAkLen, char *pSk, size_t nSkLen, char* pToken, size_t nTokenLen);
+int LinkVerify(const char *pAk,
+               size_t nAkLen,
+               const char *pSk,
+               size_t nSkLen,
+               const char* pToken,
+               size_t nTokenLen
+               );
 
 #endif
