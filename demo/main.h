@@ -35,6 +35,7 @@ typedef struct {
     unsigned char isKey;
     double timeStamp;
     int len;
+    int64_t nCurSysTime;
 } Frame;
 
 typedef struct {

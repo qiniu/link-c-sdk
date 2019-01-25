@@ -37,6 +37,9 @@ int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
     frame.len = _nLen;
     frame.timeStamp = _dTimeStamp;
     frame.isKey = _nIskey;
+    if (_nIskey) {
+        frame.nCurSysTime = LinkGetCurrentNanosecond();	    
+    }
     pQueue->enqueue( pQueue, (void *)&frame, sizeof(frame) );
 
     if (  pQueue->getSize( pQueue ) == gIpc.config.cacheSize ) {
@@ -50,14 +53,14 @@ int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
         if (  gIpc.detectMoving == ALARM_MOTION_DETECT  ) {
             count = STREAM_CACHE_SIZE;
             if ( _nStreamType == TYPE_VIDEO ) {
-                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , 0);
+                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , frame.nCurSysTime);
             } else {
                 LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp , 0);
             }
         } else if ( gIpc.detectMoving == ALARM_MOTION_DETECT_DISAPPEAR ) {
             if ( count-- > 0 ) {
                 if ( _nStreamType == TYPE_VIDEO ) {
-                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , 0);
+                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , frame.nCurSysTime);
                 } else {
                     LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, 0);
                 }

@@ -250,11 +250,12 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nTsDuration;
+        int64_t tsPhysicalDuration = (pKodoUploader->nLastSystime - tsStartTime)/1000000 - 40;
         
-        int64_t tsEndTime = tsStartTime / 1000000 + tsDuration;
+        int64_t tsEndTime = tsStartTime + tsDuration*1000000;
         if (pKodoUploader->nLastTsEndTime > 0) {
-                if (tsEndTime <= pKodoUploader->nLastTsEndTime) {
-                        LinkLogWarn("ts timestamp not monotonical:%"PRId64" %"PRId64"",tsEndTime, pKodoUploader->nLastTsEndTime);
+                if (tsStartTime < pKodoUploader->nLastTsEndTime) {
+                        LinkLogWarn("ts timestamp not monotonical: le:%"PRId64" ns:%"PRId64"",tsEndTime/1000000, pKodoUploader->nLastTsEndTime/1000000);
                 }
         }
         pKodoUploader->nLastTsEndTime = tsEndTime;
@@ -280,13 +281,13 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
-                        tsStartTime / 1000000, tsStartTime / 1000000 + tsDuration, pSession->sessionId);
+                        tsStartTime / 1000000, tsStartTime / 1000000 + tsPhysicalDuration, pSession->sessionId);
                 
                 LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
                 char startTs[14]={0};
                 char endTs[14]={0};
                 snprintf(startTs, sizeof(startTs), "%"PRId64"", tsStartTime / 1000000);
-                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsDuration);
+                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsPhysicalDuration);
                 const char *cusMagics[6];
                 int nCusMagics = 6;
                 cusMagics[0]="x:start";
@@ -326,7 +327,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                         pKodoUploader->picture.pFilename = NULL;
                 }
                 //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
-                pSession->nLastTsEndTime = tsEndTime;
         } else {
                 restoreDuration(pKodoUploader);
         }
