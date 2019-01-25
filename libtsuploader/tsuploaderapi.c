@@ -16,6 +16,9 @@ static int volatile nProcStatus = 0;
 
 static bool gMQTTInitialized = false;
 static void *gMQTTInstance = NULL;
+static struct MqttOptions gMqttOpt;
+static char gDAK[64] = {0};
+static char gDSK[64] = {0};
 
 int LinkInit()
 {
@@ -120,24 +123,31 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         /* Create mqtt instance */
         if (!gMQTTInitialized) {
-                struct MqttOptions mqttOpt;
-                memset(&mqttOpt, 0, sizeof(MqttOptions));
-                mqttOpt.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-                mqttOpt.userInfo.pHostname = LINK_MQTT_SERVER;
-                mqttOpt.userInfo.nPort = LINK_MQTT_PORT;
-                mqttOpt.userInfo.pUsername = userUploadArg.pDeviceAk;
-                mqttOpt.userInfo.pPassword = userUploadArg.pDeviceSk;
-                mqttOpt.nKeepalive = LINK_MQTT_KEEPALIVE;
-                mqttOpt.nQos = 0;
-                mqttOpt.pId = userUploadArg.pDeviceAk;
-                mqttOpt.bRetain = false;
-                mqttOpt.bCleanSession = false;
-                gMQTTInstance = LinkMqttCreateInstance(&mqttOpt);
-                if (gMQTTInstance) {
-                        gMQTTInitialized = true;
+                strncpy(gDAK, userUploadArg.pDeviceAk, userUploadArg.nDeviceAkLen);
+                strncpy(gDSK, userUploadArg.pDeviceSk, userUploadArg.nDeviceSkLen);
+                memset(&gMqttOpt, 0, sizeof(MqttOptions));
+                gMqttOpt.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
+                gMqttOpt.userInfo.pHostname = LINK_MQTT_SERVER;
+                gMqttOpt.userInfo.nPort = LINK_MQTT_PORT;
+                gMqttOpt.nKeepalive = LINK_MQTT_KEEPALIVE;
+                gMqttOpt.nQos = 0;
+                gMqttOpt.pId = userUploadArg.pDeviceAk;
+                gMqttOpt.bRetain = false;
+                gMqttOpt.bCleanSession = false;
+                char MQTTusername[256] = {0};
+                int nMQTTUsernameLen;
+                char MQTTpassword[256] = {0};
+                int nMQTTPasswordLen;
+                if (LINK_SUCCESS == GetMqttUsernameSign(MQTTusername, &nMQTTUsernameLen, gDAK)
+                                && LINK_SUCCESS == GetMqttPasswordSign(MQTTusername, nMQTTUsernameLen, MQTTpassword, &nMQTTPasswordLen, gDSK)) {
+                        gMqttOpt.userInfo.pUsername = MQTTusername;
+                        gMqttOpt.userInfo.pPassword = MQTTpassword;
+                        gMQTTInstance = LinkMqttCreateInstance(&gMqttOpt);
+                        if (gMQTTInstance) {
+                                gMQTTInitialized = true;
+                        }
                 }
         }
-
         return LINK_SUCCESS;
 }
 
