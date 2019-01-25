@@ -76,6 +76,8 @@ int LinkPushPicture(LinkTsMuxUploader *pTsMuxUploader,
                     );
 
 /**
+ * 刷新缓存数据
+ *
  * @brief 通知当前没有可上传数据,通常使用场景为摄像头检查到移动侦测后消失调用该接口，以通知上传缓冲的数据
  *
  * 此函数用于当上传结束时，将当前已缓存的资源完成进行上传
@@ -103,6 +105,8 @@ int LinkPauseUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 int LinkResumeUpload(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
+ * 设置片段上报的元数据
+ *
  * @brief 设置片段上报的元数据,通常使用场景为摄像头检查到移动侦测后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
@@ -115,6 +119,8 @@ int LinkSetTsType(LinkTsMuxUploader *pTsMuxUploader,
                   );
 
 /**
+ * 清空段上报的元数据
+ *
  * @brief 清空段上报的元数据，通常使用场景为摄像头检查到移动侦测消失后调用该接口
  *
  * @param[in] pTsMuxUploader 切片上传实例
@@ -144,7 +150,7 @@ int LinkPushVideo(LinkTsMuxUploader *pTsMuxUploader,
                   );
 
 /**
- * 推送音频流数据。
+ * 推送音频流数据
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] pData 音频数据
@@ -171,9 +177,9 @@ int LinkPushAudio(LinkTsMuxUploader *pTsMuxUploader,
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader);
 
 /**
- * 销毁释放 sdk 资源。
+ * 销毁释放 sdk 资源
  *
- * 此函数不是线程安全函数。
+ * 此函数不是线程安全函数
  *
  * @return NULL
  */
