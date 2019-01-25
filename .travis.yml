@@ -13,7 +13,7 @@ branches:
 install:
   - mkdir build-travis
   - cd build-travis
-  - cmake .. -DWITH_WOLFSSL=ON
+  - cmake .. -DWITH_WOLFSSL=ON -DWITH_MQTT=ON
   - make
 
 before_script:
