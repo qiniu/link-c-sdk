@@ -14,8 +14,8 @@ extern const char *gVersionAgent;
 
 static int volatile nProcStatus = 0;
 
-bool gMQTTInitialized = false;
-void *gMQTTInstance = NULL;
+static bool gMQTTInitialized = false;
+static void *gMQTTInstance = NULL;
 
 int LinkInit()
 {
