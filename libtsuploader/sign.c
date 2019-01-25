@@ -5,7 +5,7 @@
 #include <wolfssl/wolfcrypt/hmac.h>
 
 
-int LinkVerify(const char *_ak, size_t _akLen, char *_sk, size_t _skLen, char* _token, size_t _tokenLen)
+int LinkVerify(const char *_ak, size_t _akLen, const char *_sk, size_t _skLen, const char* _token, size_t _tokenLen)
 {
         if (_ak == NULL || _sk == NULL || _token == NULL) {
                 return LINK_ERROR;
