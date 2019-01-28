@@ -100,7 +100,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                         " %"PRId64", \"endReason\": \"%s\"",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime, reason);
+			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason);
 
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
@@ -212,6 +212,7 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
         }
         if (pSegInfo->session.nAccSessionDuration <= 0) {
                 LinkLogInfo("not report due to session duration is 0");
+                return;
         }
 
         int ret = reportSegInfo(pSegInfo, idx);

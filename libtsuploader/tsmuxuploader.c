@@ -219,7 +219,7 @@ static void resetTimeInfo(FFTsMuxUploader *pFFTsMuxUploader) {
         pFFTsMuxUploader->nLastAudioFrameTimestamp = 0;
         pFFTsMuxUploader->nFirstVideoFrameTimestamp = 0;
         pFFTsMuxUploader->nLastVideoFrameTimestamp = 0;
-        pFFTsMuxUploader->nFirstFrameTimestamp = -1;
+        pFFTsMuxUploader->nFirstFrameTimestamp = 0;
         pFFTsMuxUploader->nLastFrameTimestamp = 0;
 }
 
