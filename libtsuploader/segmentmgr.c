@@ -47,10 +47,18 @@ static int segMgrStarted = 0;
 
 static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
         int64_t nNow = LinkGetCurrentNanosecond() / 1000000000LL;
+        if (pCurSession->isNewSessionStarted != 0) {
+                memcpy(&pSeg->tmpSession, pCurSession, sizeof(LinkSession));
+                return 0;
+        }
+        if (pSeg->pSessionMeta == NULL) {
+                LinkLogDebug("not report segment");
+                return 0;
+        }
         if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
                 pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
                 pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
-                if (pCurSession->isNewSessionStarted == 0 && pCurSession->nSessionEndResonCode == 0 &&
+                if (pCurSession->nSessionEndResonCode == 0 &&
                     pSeg->segReportOk) {
                         return 0;
                 }
@@ -282,7 +290,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                 int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60 * 1000000LL);
                 
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
-                LinkLogDebug("segment queue:%d", info.nLen_);
+                LinkLogDebug("segment queue:%d cmd:%d", info.nLen_, segInfo.nOperation);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("seg queue error. pop:%d", ret);
@@ -300,6 +308,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                                                 linkReleaseSegmentHandle(segInfo.handle);
                                                 break;
                                         case SEGMENT_UPDATE:
+                                                LinkLogDebug("segment %s", segInfo.session.sessionId);
                                                 handleReportSegInfo(&segInfo);
                                                 break;
                                         case  SEGMENT_UPDATE_META:

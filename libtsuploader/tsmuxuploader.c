@@ -219,7 +219,7 @@ static void resetTimeInfo(FFTsMuxUploader *pFFTsMuxUploader) {
         pFFTsMuxUploader->nLastAudioFrameTimestamp = 0;
         pFFTsMuxUploader->nFirstVideoFrameTimestamp = 0;
         pFFTsMuxUploader->nLastVideoFrameTimestamp = 0;
-        pFFTsMuxUploader->nFirstFrameTimestamp = 0;
+        pFFTsMuxUploader->nFirstFrameTimestamp = -1;
         pFFTsMuxUploader->nLastFrameTimestamp = 0;
 }
 
@@ -818,12 +818,13 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         assert(nSLen < sizeof(upparam.sessionId));
         
         // update upload token
-        LinkLogInfo("force: update remote token:%"PRId64"\n", pSession->nSessionStartTime);
+        LinkLogInfo("force: update remote token:%"PRId64" %s\n", pSession->nSessionStartTime, pSession->sessionId);
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
         pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
         
+        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         pSession->isNewSessionStarted = 0;
         pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nNewSessionId;
         
