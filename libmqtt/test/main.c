@@ -256,12 +256,12 @@ static struct MqttOptions *NewMqttOptions(const char *dak,
         mqttOpt->userInfo.pCertfile = NULL;
         mqttOpt->userInfo.pKeyfile = NULL;
         mqttOpt->nKeepalive = cfg.nKeepAlive == 0 ? DEFAULT_MQTT_KEEPALIVE : cfg.nKeepAlive;
-        mqttOpt->nQos = 0;
+        mqttOpt->nQos = 1;
         mqttOpt->bRetain = false;
         mqttOpt->callbacks.OnMessage = &OnMessage;
         mqttOpt->callbacks.OnEvent = &OnEvent;
-        mqttOpt->pId = (char *)DevMalloc(strlen(DEFAULT_MQTT_PID) + 1);
-        memcpy(mqttOpt->pId, DEFAULT_MQTT_PID, sizeof(DEFAULT_MQTT_PID));
+        mqttOpt->pId = (char *)DevMalloc(strlen(dak) + 1);
+        memcpy(mqttOpt->pId, dak, sizeof(dak));
 
         int unlen = 0;
         char username[256] = {};
@@ -317,7 +317,7 @@ int main(int argc, char *argv[])
                 }
                 DevicePrint(DEV_LOG_ERR, "==============pub============\n");
                 LinkMqttPublish(pubInstance,
-                                "linking/v1/${appid}/${device}/rpc/request/test001/", 10, "test_pub");
+                                "linking/v1/${appid}/${device}/stats/", sizeof("test_pub"), "test_pub");
                         sleep(1);
         }
 
