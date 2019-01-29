@@ -65,7 +65,7 @@ static struct MqttOptions *NewMqttOptions(const char *dak, const char *dsk, stru
     mqttOpt->userInfo.pCertfile = NULL;
     mqttOpt->userInfo.pKeyfile = NULL;
     mqttOpt->nKeepalive = cfg.nKeepAlive <= 0 ? DEFAULT_MQTT_KEEPALIVE : cfg.nKeepAlive;
-    mqttOpt->nQos = 0;
+    mqttOpt->nQos = 1;
     mqttOpt->bRetain = false;
     mqttOpt->callbacks.OnMessage = &MessageCallback;
     mqttOpt->callbacks.OnEvent = &EventCallback;
