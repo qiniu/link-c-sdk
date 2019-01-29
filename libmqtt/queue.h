@@ -20,6 +20,7 @@
 typedef struct
 {
         int       nMessageID;
+        void*	pReqID;
         void*     pMessage;
 } Message;
 

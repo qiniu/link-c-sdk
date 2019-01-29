@@ -24,8 +24,8 @@
 #define MqttCtx MQTTCtx
 #endif
 
-#define IO_CTR_MESSAGE "/linking/v1/"
-#define IO_CTR_MESSAGE_LENGTH 12
+#define IO_CTR_MESSAGE "linking/v1/"
+#define IO_CTR_MESSAGE_LENGTH 11
 typedef struct Node
 {
         char topic[MAX_MQTT_TOPIC_SIZE];

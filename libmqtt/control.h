@@ -99,9 +99,8 @@ typedef enum
 }ENUM_RESPONSE_CODE;
 int LinkInitIOCtrl(const char *_pAppId, const char *_pEncodeDeviceName, void *_pInstance);
 
-int LinkSendIOResponse(int nSession, unsigned int _nIOCtrlType, const char *_pIOCtrlData, int _nIOCtrlDataSize);
-
-int LinkRecvIOCtrl(int nSession, unsigned int *_pIOCtrlType, char *_pIOCtrlData, int *_nIOCtrlMaxDataSize, unsigned int _nTimeout);
+int LinkSendIOResponse(int nSession, const char *_pReqID, unsigned int _nIOErrorCode, const char *_pIOCtrlData, int _nIOCtrlDataSize);
+int LinkRecvIOCtrl(int nSession, char *_pReqID, unsigned int *_pIOCtrlType, char *_pIOCtrlData, int *_nIOCtrlMaxDataSize, unsigned int _nTimeout);
 
 void LinkDinitIOCtrl(int nSession);
 #endif
