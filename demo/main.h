@@ -10,7 +10,7 @@
 #ifndef IPC_TEST_H
 #define IPC_TEST_H
 
-#include "queue.h"
+#include "tools/queue.h"
 #include "uploader.h"
 #include "dev_core.h"
 #include "cfg.h"

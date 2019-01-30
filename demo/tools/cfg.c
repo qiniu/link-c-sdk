@@ -373,10 +373,15 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(aac_file), "AAC_FILE", 1 },
     { CFG_MEMBER(ak), "DAK", 1 },
     { CFG_MEMBER(sk), "DSK", 1 },
+    { CFG_MEMBER(mqtt_server), "MQTT_SERVER", 1 },
+    { CFG_MEMBER(mqtt_topic), "MQTT_TOPIC", 1 },
+    { CFG_MEMBER(mqtt_user), "MQTT_USER", 1 },
+    { CFG_MEMBER(mqtt_passwd), "MQTT_PASSWD", 1 },
     { CFG_MEMBER(url), "NETWORK_CHECK_URL", 1 },
     { CFG_MEMBER(tokenUrl), "GET_CONFIG_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
     { CFG_MEMBER(ota_url), "OTA_URL", 1 },
+    { CFG_MEMBER(client_id), "CLIENT_ID", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
     { CFG_MEMBER(appName), "APP_NAME", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
@@ -387,6 +392,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(simpleSshEnable), "SIMPLE_SSH", 0 },
     { CFG_MEMBER(ota_check_interval), "OTA_CHECK_INTERVAL", 0 },
     { CFG_MEMBER(ota_enable), "OTA_ENABLE", 0 },
+    { CFG_MEMBER(mqtt_port), "MQTT_PORT", 0 },
 };
 
 void CfgGetItem()
@@ -440,7 +446,7 @@ void UpdateConfig()
         if ( last != gIpc.config.logOutput ) {
             last = gIpc.config.logOutput;
             printf("%s %s %d reinit the logger, logOutput = %s\n", __FILE__, __FUNCTION__, __LINE__, logOutput );
-            LoggerInit( gIpc.config.logPrintTime, gIpc.config.logOutput, gIpc.config.logFile, gIpc.config.logVerbose );
+            LoggerInit( gIpc.config.logPrintTime, gIpc.config.logOutput, gIpc.config.logFile, gIpc.config.logVerbose, NULL );
         }
     } else {
         last = gIpc.config.logOutput;

@@ -3,11 +3,20 @@ cmake_minimum_required (VERSION 2.8)
 project(demo)
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libmqtt")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader/c-sdk/")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/devices")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tools")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/ota")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/log")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
 link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 include_directories(${THIRD_INC_PATH})
 link_directories(${THIRD_LIB_PATH})
+
+
+message( ${CMAKE_CURRENT_SOURCE_DIR}/tools )
 
 if (WITH_OPENSSL)
     set(DISABLE_OPENSSL OFF)
@@ -26,20 +35,17 @@ if (WITH_MQTT)
 endif()
 
 if (CMAKE_TOOLCHAIN_FILE)
-    set( DEV_FILE ipc_dev.c )
+    set( DEV_FILE ${THIRD_CODE_PATH} )
     add_definitions(-DENABLE_IPC)
 else()
     set( DEV_FILE sim_dev.c )
 endif()
 
-set(SOURCE_LIST main.c main.h log2file.c log2file.h cfg.c cfg.h dbg.c dbg.h mymalloc.c 
-			mymalloc.h queue.c queue.h log2tcp.c log2tcp.h dev_core.c dev_core.h stream.c 
-			stream.h ota.c md5.c func_trace.c)
-
-if (MODULE_COLLECTOR)
-	include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libmqtt")
-	set(SOURCE_LIST ${SOURCE_LIST} collector.c connect_mqtt.c log_mqtt.c)
-endif()
+AUX_SOURCE_DIRECTORY( ./ SOURCE_LIST )
+AUX_SOURCE_DIRECTORY( ./devices SOURCE_LIST )
+AUX_SOURCE_DIRECTORY( ./log SOURCE_LIST )
+AUX_SOURCE_DIRECTORY( ./tools SOURCE_LIST )
+AUX_SOURCE_DIRECTORY( ./ota SOURCE_LIST )
 
 if (WITH_MQTT)
 	link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfMQTT/output/${HOST}/lib")

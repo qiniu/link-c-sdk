@@ -384,7 +384,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         OnEventCallback(_pInstance,
                (rc == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(rc),
                (rc == 0) ? "on connect success" : MqttClient_ReturnCodeToString(rc));
-	LinkLogError("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
+//	LinkLogError("MQTT Connect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
 	RecoverSub(_pInstance);
 	return MqttErrorStatusChange(rc);
 }

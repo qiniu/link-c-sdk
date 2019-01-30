@@ -48,6 +48,14 @@ typedef struct {
     int ota_check_interval;
     int ota_enable;
     char *audioType;
+    
+    /* mqtt */
+    char *mqtt_server;
+    char *mqtt_topic;
+    char *mqtt_user;
+    char *mqtt_passwd;
+    char *client_id;
+    int mqtt_port;
 } Config;
 
 struct cfg_struct;

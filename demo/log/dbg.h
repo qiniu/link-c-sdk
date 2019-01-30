@@ -1,4 +1,4 @@
-// Last Update:2018-11-20 16:00:18
+// Last Update:2019-01-30 16:43:16
 /**
  * @file dbg.h
  * @brief 
@@ -11,7 +11,7 @@
 #define DBG_H
 
 #include <stdio.h>
-#include "queue.h"
+#include "../tools/queue.h"
 
 typedef enum {
     OUTPUT_NONE,
@@ -35,6 +35,16 @@ typedef struct {
     int logVerbose;
     Queue *logQueue;
 } Logger;
+
+typedef struct {
+    char *server;
+    int port;
+    char *user;
+    char *passwd;
+    char *topic;
+    char *pClientId;
+    int qos;
+} MqttParam;
 
 #define NONE                 "\e[0m"
 #define BLACK                "\e[0;30m"
@@ -71,7 +81,7 @@ typedef struct {
 #define LOGE(args...) BASIC();printf(args)
 #define LOGI(args...) BASIC();printf(args)
 
-extern int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose );
+extern int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg );
 extern int dbg( unsigned logLevel, const char *file, const char *function, int line, const char *format, ...  );
 extern void DbgReportLog( int stream, int streamType, char *reason );
 extern void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream );

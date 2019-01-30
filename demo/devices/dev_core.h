@@ -1,4 +1,4 @@
-// Last Update:2019-01-16 11:21:53
+// Last Update:2019-01-30 16:49:42
 /**
  * @file dev_core.h
  * @brief 
@@ -65,6 +65,7 @@ typedef struct {
     int (*getAudioEncodeType)();
 } CoreDevice;
 
-CoreDevice * NewCoreDevice();
+extern CoreDevice * NewCoreDevice();
+extern int CaptureDeviceRegister( CaptureDevice *pDev );
 
 #endif  /*DEV_CORE_H*/
