@@ -110,7 +110,6 @@ static int Dequeue( Queue *q, void *data, int *outSize )
     }
     q->size--;
     if ( q->pLast ) {
-//        printf("free the mem %x\n", q->pLast );
         free( q->pLast->data );
         free( q->pLast );
         q->pLast = NULL;

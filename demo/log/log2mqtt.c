@@ -1,4 +1,4 @@
-// Last Update:2019-01-30 17:44:20
+// Last Update:2019-01-30 19:34:25
 /**
  * @file log2mqtt.c
  * @brief 
@@ -9,12 +9,16 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <pthread.h>
+#include <unistd.h>
 #include "mqtt.h"
+#include "tools/queue.h"
 
 typedef struct {
     void *instance;    
     char *topic;
     int connected;
+    Queue *q;
 } MqttInfo;
 
 static MqttInfo gMqttnfo;
@@ -25,7 +29,7 @@ static MqttInfo gMqttnfo;
 static void OnMessage( const void* _pInstance, int _nAccountId, const char* _pTopic,
                 const char* _pMessage, size_t nLength )
 {
-    printf("get message topic %s message %s\n", _pTopic, _pMessage );
+//    printf("[ thread id : %d ] get message topic %s message %s\n", pthread_self(), _pTopic, _pMessage );
 }
 
 static void OnEvent(const void* _pInstance, int _nAccountId, int _nId,  const char* _pReason )
@@ -35,17 +39,33 @@ static void OnEvent(const void* _pInstance, int _nAccountId, int _nId,  const ch
         return;
     }
 
-    LOGI(" id %d reason %s \n", _nId, _pReason );
+    LOGI("[ thread id : %d] id %d reason %s \n", pthread_self(), _nId, _pReason );
     if ( _nId == MQTT_SUCCESS && gMqttnfo.instance && _pInstance == gMqttnfo.instance ) {
-        if (  gMqttnfo.topic ) {
-        //    printf("instance : %p start to subscribe %s \n", _pInstance, gMqttnfo.topic);
-        //    LinkMqttSubscribe( gMqttnfo.instance, gMqttnfo.topic );
-            gMqttnfo.connected = 1;
-        } else {
-            printf("topic is NULL\n");
-        }
+        gMqttnfo.connected = 1;
     }
 
+}
+
+void *LogOverMQTTTask( void *arg )
+{
+    (void)arg;
+
+    for (;;) {
+        if ( gMqttnfo.connected && gMqttnfo.instance && gMqttnfo.q ) {
+            char msg[512] = { 0 };
+            int size = 0;
+
+            gMqttnfo.q->dequeue( gMqttnfo.q, msg, &size );
+            int ret = LinkMqttPublish( gMqttnfo.instance, gMqttnfo.topic, size, msg );
+            if ( ret != MQTT_SUCCESS ) {
+                LOGE("LinkMqttPublish fail, ret = %d\n", ret ); 
+            } else {
+            }
+        } else {
+            sleep( 2 );
+        }
+    }
+    return NULL;
 }
 
 int MqttInit( char *_pClientId, int qos, char *_pUserName,
@@ -58,6 +78,14 @@ int MqttInit( char *_pClientId, int qos, char *_pUserName,
     }
 
     gMqttnfo.topic = _pTopic;
+
+    pthread_t thread;
+    pthread_create( &thread, NULL, LogOverMQTTTask, NULL );
+    gMqttnfo.q = NewQueue();
+    if ( !gMqttnfo.q ) {
+        LOGE("NewQueue fail\n");
+        goto err;
+    }
 
     LinkMqttLibInit();
 
@@ -81,8 +109,8 @@ int MqttInit( char *_pClientId, int qos, char *_pUserName,
         LOGE("LinkMqttCreateInstance error\n");
         goto err;
     } else {
-        LOGE("create mqtt instance, client : %s, broker : %s port : %d topic : %s\n",
-             _pClientId, _pHost, _nPort, _pTopic );
+        LOGE("[ thread id : %d ] create mqtt instance, client : %s, broker : %s port : %d topic : %s\n",
+             pthread_self(), _pClientId, _pHost, _nPort, _pTopic );
     }
 
     return 0;
@@ -98,17 +126,10 @@ int LogOverMQTT( char *msg )
         goto err;
     }
 
-    if ( gMqttnfo.connected && gMqttnfo.instance && gMqttnfo.topic ) {
-        LOGI("send ==> %s\n", msg );
-        int ret = LinkMqttPublish( gMqttnfo.instance, gMqttnfo.topic, strlen(msg), msg );
-        if ( ret != MQTT_SUCCESS ) {
-            LOGE("LinkMqttPublish fail, ret = %d\n", ret ); 
-        } else {
-            LOGI("send ok\n");
-        }
+    if ( gMqttnfo.q ) {
+        gMqttnfo.q->enqueue( gMqttnfo.q, msg, strlen(msg) );
     } else {
-        LOGE("param error, gMqttnfo.connected = %d gMqttnfo.instance = %p, gMqttnfo.topic = %s\n",
-             gMqttnfo.connected, gMqttnfo.instance, gMqttnfo.topic );
+        LOGE("send fail, q is null\n");
     }
 
     return 0;
