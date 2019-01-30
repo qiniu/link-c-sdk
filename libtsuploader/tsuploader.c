@@ -217,6 +217,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
         LinkSession *pSession = &pUploadCmd->ts.pKodoUploader->session;
         
+        pKodoUploader->session.nTsSequenceNumber++;
+        
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
@@ -300,7 +302,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                         nCusMagics = 0;
                 int putRet = linkPutBuffer(upHost, uptoken, key, bufData, lenOfBufData, pUpMeta->metaInfo, pUpMeta->nMetaInfoLen,
                                            cusMagics, nCusMagics,
-                                           tsDuration,pKodoUploader->session.nTsSequenceNumber++, isDiscontinuity);
+                                           tsDuration, pKodoUploader->session.nTsSequenceNumber, isDiscontinuity);
                 if (putRet == LINK_SUCCESS) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         pKodoUploader->state = LINK_UPLOAD_OK;
@@ -509,7 +511,7 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         
         pSession->nSessionStartTime =  nTsStartSystime;
         pSession->nSessionEndResonCode = 0;
-        pSession->nTsSequenceNumber = 0;
+        pSession->nTsSequenceNumber = -1;
         pSession->isNewSessionStarted = 1;
         
         pSession->nAudioGapFromLastReport = 0;
@@ -518,6 +520,9 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         pSession->nAccSessionDuration = 0;
         pSession->nAccSessionAudioDuration = 0;
         pSession->nAccSessionVideoDuration = 0;
+        
+        pSession->nSessionEndResonCode = 0;
+        pSession->nSessionEndTime = 0;
 }
 
 static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration) {
