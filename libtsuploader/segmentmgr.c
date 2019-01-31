@@ -55,14 +55,16 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
                 LinkLogDebug("not report segment");
                 return 0;
         }
-        if (nNow <= pSeg->nNextUpdateSegTimeInSecond && pCurSession->nSessionEndResonCode == 0) {
-                pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
-                pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
-                if (pCurSession->nSessionEndResonCode == 0 &&
-                    pSeg->segReportOk) {
+        if (pCurSession->nSessionEndResonCode == 0) {
+                if (pSeg->nNextUpdateSegTimeInSecond > nNow) {
+                        pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
+                        pSeg->tmpSession.nAudioGapFromLastReport += pCurSession->nAudioGapFromLastReport;
                         return 0;
                 }
         }
+
+        //if (pSeg->segReportOk) return 0;
+        
 
         if (pSeg->tmpSession.nVideoGapFromLastReport > 0)
                 pCurSession->nVideoGapFromLastReport += pSeg->tmpSession.nVideoGapFromLastReport;
@@ -406,6 +408,14 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         SegInfo segInfo;
         segInfo.handle = seg;
         segInfo.session = *pSession;
+        if (pSession->nSessionEndResonCode != 0) {
+                segInfo.session.nAccSessionAudioDuration -= segInfo.session.nAudioGapFromLastReport ;
+                segInfo.session.nAccSessionVideoDuration -= segInfo.session.nVideoGapFromLastReport ;
+                segInfo.session.nAccSessionDuration -= segInfo.session.nTsDuration;
+                segInfo.session.nTsDuration = 0;
+                segInfo.session.nVideoGapFromLastReport = 0;
+                segInfo.session.nAudioGapFromLastReport = 0;
+        }
         segInfo.nOperation = SEGMENT_UPDATE;
         int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         if (ret <= 0) {

@@ -229,9 +229,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         char fprefix[LINK_MAX_DEVICE_NAME_LEN * 2 + 32]={0};
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
-
-        int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);
-        assert(nSLen < sizeof(param.sessionId));
         
         char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
         
@@ -264,6 +261,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         if (getUploadParamOk)
                 handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration);
+        int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);
+        assert(nSLen < sizeof(param.sessionId));
         
         int isDiscontinuity = 0;
         if (pKodoUploader->nLastSystimeBak > 0 && getUploadParamOk) {
@@ -511,17 +510,22 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         
         pSession->nSessionStartTime =  nTsStartSystime;
         pSession->nSessionEndResonCode = 0;
-        pSession->nTsSequenceNumber = -1;
+        pSession->nTsSequenceNumber = 0;
         pSession->isNewSessionStarted = 1;
         
-        pSession->nAudioGapFromLastReport = 0;
-        pSession->nVideoGapFromLastReport = 0;
+#if 0
+        //pSession->nAudioGapFromLastReport = 0;
+        //pSession->nVideoGapFromLastReport = 0;
         
-        pSession->nAccSessionDuration = 0;
-        pSession->nAccSessionAudioDuration = 0;
-        pSession->nAccSessionVideoDuration = 0;
+        //pSession->nAccSessionDuration = 0;
+        //pSession->nAccSessionAudioDuration = 0;
+        //pSession->nAccSessionVideoDuration = 0;
+#else
+        pSession->nAccSessionDuration = pSession->nTsDuration;
+        pSession->nAccSessionAudioDuration = pSession->nAudioGapFromLastReport;
+        pSession->nAccSessionVideoDuration = pSession->nVideoGapFromLastReport;
+#endif
         
-        pSession->nSessionEndResonCode = 0;
         pSession->nSessionEndTime = 0;
 }
 
