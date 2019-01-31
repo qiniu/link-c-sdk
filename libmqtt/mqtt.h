@@ -7,6 +7,10 @@
 #define IN
 #define OUT
 
+#define LINK_MQTT_SUCCESS 0
+#define LINK_MQTT_ERROR -1
+
+
 typedef enum MQTT_ERR_STATUS {
         MQTT_SUCCESS = 3000,
         MQTT_CONNECT_SUCCESS = 3000,

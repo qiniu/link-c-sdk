@@ -7,18 +7,14 @@
 #include "segmentmgr.h"
 #include "httptools.h"
 #include "cJSON/cJSON.h"
-#include "libmqtt/mqtt.h"
 #include <signal.h>
+#include <libmqtt/linking-emitter-api.h>
 
 extern const char *gVersionAgent;
 
 static int volatile nProcStatus = 0;
 
-static bool gMQTTInitialized = false;
-static void *gMQTTInstance = NULL;
-static struct MqttOptions gMqttOpt;
-static char gDAK[64] = {0};
-static char gDSK[64] = {0};
+
 
 int LinkInit()
 {
@@ -53,9 +49,6 @@ int LinkInit()
         }
         nProcStatus = 1;
         LinkLogDebug("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
-        
-        /* Init libmqtt */
-        LinkMqttLibInit();
 
         return LINK_SUCCESS;
 
@@ -121,33 +114,10 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         *_pTsMuxUploader = pTsMuxUploader;
         
-        /* Create mqtt instance */
-        if (!gMQTTInitialized) {
-                strncpy(gDAK, userUploadArg.pDeviceAk, userUploadArg.nDeviceAkLen);
-                strncpy(gDSK, userUploadArg.pDeviceSk, userUploadArg.nDeviceSkLen);
-                memset(&gMqttOpt, 0, sizeof(MqttOptions));
-                gMqttOpt.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
-                gMqttOpt.userInfo.pHostname = LINK_MQTT_SERVER;
-                gMqttOpt.userInfo.nPort = LINK_MQTT_PORT;
-                gMqttOpt.nKeepalive = LINK_MQTT_KEEPALIVE;
-                gMqttOpt.nQos = 0;
-                gMqttOpt.pId = userUploadArg.pDeviceAk;
-                gMqttOpt.bRetain = false;
-                gMqttOpt.bCleanSession = false;
-                char MQTTusername[256] = {0};
-                int nMQTTUsernameLen;
-                char MQTTpassword[256] = {0};
-                int nMQTTPasswordLen;
-                if (LINK_SUCCESS == GetMqttUsernameSign(MQTTusername, &nMQTTUsernameLen, gDAK)
-                                && LINK_SUCCESS == GetMqttPasswordSign(MQTTusername, nMQTTUsernameLen, MQTTpassword, &nMQTTPasswordLen, gDSK)) {
-                        gMqttOpt.userInfo.pUsername = MQTTusername;
-                        gMqttOpt.userInfo.pPassword = MQTTpassword;
-                        gMQTTInstance = LinkMqttCreateInstance(&gMqttOpt);
-                        if (gMQTTInstance) {
-                                gMQTTInitialized = true;
-                        }
-                }
-        }
+        /* Initial link emitter service */
+        LinkEmitter_Init(_pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen,
+                        _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
+
         return LINK_SUCCESS;
 }
 
@@ -179,12 +149,6 @@ int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
         LinkDestroyTsMuxUploader(pTsMuxUploader);
-
-        /* Destroy mqtt instance */
-        if (gMQTTInitialized && gMQTTInstance) {
-                LinkMqttDestroy(gMQTTInstance);
-        }
-
 }
 
 int LinkIsProcStatusQuit()
@@ -202,9 +166,9 @@ void LinkCleanup()
         nProcStatus = 2;
         LinkUninitSegmentMgr();
         LinkStopMgr();
-        
-        /* Uninitial libmqtt */
-        LinkMqttLibCleanup();
+
+        /* stop emitter service */
+        LinkEmitter_Cleanup();
 
         return;
 }
