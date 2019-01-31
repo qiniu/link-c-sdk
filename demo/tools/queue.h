@@ -1,4 +1,4 @@
-// Last Update:2018-09-12 16:29:57
+// Last Update:2019-01-30 16:29:55
 /**
  * @file queue.h
  * @brief 
@@ -7,8 +7,8 @@
  * @date 2018-09-12
  */
 
-#ifndef QUEUE_H
-#define QUEUE_H
+#ifndef QUEUE_INTERNAL_H
+#define QUEUE_INTERNAL_H
 
 #include <pthread.h>
 

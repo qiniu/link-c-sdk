@@ -24,13 +24,14 @@
 #include "dbg.h"
 #include "cfg.h"
 #include "log2tcp.h"
-#include "queue.h"
+#include "tools/queue.h"
 #include "mymalloc.h"
 #include "dev_core.h"
 #include "stream.h"
 #include "picuploader.h"
 #include "httptools.h"
 #include "ota.h"
+#include "log2mqtt.h"
 
 /* global variable */
 App gIpc;
@@ -421,8 +422,16 @@ int main()
     } else {
         logFile = gIpc.config.defaultLogFile;
     }
+    MqttParam params;
+    params.server = gIpc.config.mqtt_server;
+    params.port = gIpc.config.mqtt_port;
+    params.topic = gIpc.config.mqtt_topic;
+    params.user = gIpc.config.mqtt_user;
+    params.passwd = gIpc.config.mqtt_passwd;
+    params.pClientId = gIpc.config.client_id;
+    params.qos = 0;
     LoggerInit( gIpc.config.logPrintTime, gIpc.config.logOutput,
-                logFile, gIpc.config.logVerbose );
+                logFile, gIpc.config.logVerbose, &params );
     CaptureDevInit();
     StartConfigUpdateTask();
     /* 

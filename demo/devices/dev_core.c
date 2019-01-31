@@ -1,4 +1,4 @@
-// Last Update:2019-01-16 12:00:11
+// Last Update:2019-01-30 16:49:20
 /**
  * @file dev_core.c
  * @brief 
@@ -10,24 +10,6 @@
 #include "stream.h"
 
 static CoreDevice gCoreDevice, *pCoreDevice = &gCoreDevice;
-
-// struct variable declear
-#undef DEV_CORE_CAPTURE_DEVICE_ENTRY
-#define DEV_CORE_CAPTURE_DEVICE_ENTRY( dev )  extern CaptureDevice dev;
-#include "dev_config.h"
-
-// struct variable use
-#undef DEV_CORE_CAPTURE_DEVICE_ENTRY
-#define DEV_CORE_CAPTURE_DEVICE_ENTRY( dev )   pCaptureDevice = &dev;
-
-CaptureDevice *GetCaptureDevice()
-{
-    CaptureDevice *pCaptureDevice;
-
-    #include "dev_config.h"
-
-    return pCaptureDevice;
-}
 
 int CoreDeviceInit( int audioType, int subStreamEnable, VideoFrameCb videoCb, AudioFrameCb audioCb )
 {
@@ -99,7 +81,6 @@ int CoreDeviceGetAudioEncodeType()
 
 CoreDevice * NewCoreDevice()
 {
-    pCoreDevice->pCaptureDevice = GetCaptureDevice();
     pCoreDevice->init = CoreDeviceInit;
     pCoreDevice->deInit = CoreDeviceDeInit;
     pCoreDevice->getDevId = CoreDeviceGetDevId;
@@ -110,5 +91,10 @@ CoreDevice * NewCoreDevice()
     pCoreDevice->getAudioEncodeType = CoreDeviceGetAudioEncodeType;
 
     return pCoreDevice;
+}
+
+int CaptureDeviceRegister( CaptureDevice *pDev )
+{
+    pCoreDevice->pCaptureDevice = pDev;
 }
 

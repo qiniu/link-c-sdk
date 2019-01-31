@@ -1,4 +1,4 @@
-// Last Update:2018-11-28 15:35:53
+// Last Update:2019-01-30 15:29:00
 /**
  * @file dbg.c
  * @brief 
@@ -21,6 +21,7 @@
 #include "dbg.h"
 #include "log2tcp.h"
 #include "log2file.h"
+#include "log2mqtt.h"
 #include "stream.h"
 #include "main.h"
 
@@ -31,7 +32,7 @@ void SdkLogCallback(int nLogLevel, char *log )
     DBG_LOG( log );
 }
 
-int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
+int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg )
 {
     memset( &gLogger, 0, sizeof(gLogger) );
 
@@ -51,6 +52,13 @@ int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose )
         StartSocketDbgTask();
         break;
     case OUTPUT_MQTT:
+        if ( !arg ) {
+            printf("%s check param error\n", __FUNCTION__ );
+            return -1;
+        }
+        MqttParam *param = (MqttParam*)arg;
+        MqttInit( param->pClientId, param->qos, param->user,
+                  param->passwd, param->topic, param->server,param->port);
         break;
     case OUTPUT_CONSOLE:
     default:
@@ -91,6 +99,7 @@ int dbg( unsigned logLevel, const char *file, const char *function, int line, co
         SendLog( buffer );
         break;
     case OUTPUT_MQTT:
+        LogOverMQTT( buffer );
         break;
     case OUTPUT_CONSOLE:
         if ( logLevel == DBG_LEVEL_FATAL ) {
