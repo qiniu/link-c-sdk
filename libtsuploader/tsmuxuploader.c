@@ -873,7 +873,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
         int isSegIdChange = 0;
         int isSeqNumChange = 0;
         if (pFFTsMuxUploader->remoteConfig.isValid) {
-                int64_t nDuration = nCurSystime - pFFTsMuxUploader->uploadArgBak.nSegmentId_;
+                int64_t nDuration = (nCurSystime - pFFTsMuxUploader->uploadArgBak.nSegmentId_ - nCurTsDuration * 1000000);
                 if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
                         LinkLogDebug("normal: update remote config");
                         isSegIdChange = 1;
