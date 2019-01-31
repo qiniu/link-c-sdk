@@ -131,6 +131,7 @@ void * LinkMqttThread(void* _pData)
                          sleep(1);
                 }
                 if (rc == MQTT_ERR_CONN_LOST) {
+                        sleep(1);
                         ReConnect(pInstance, MQTT_ERR_CONN_LOST);
                 }
         } while (!pInstance->isDestroying);
