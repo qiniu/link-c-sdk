@@ -38,7 +38,7 @@ if (CMAKE_TOOLCHAIN_FILE)
     set( DEV_FILE ${THIRD_CODE_PATH} )
     add_definitions(-DENABLE_IPC)
 else()
-    set( DEV_FILE sim_dev.c )
+    set( DEV_FILE devices/sim_dev.c )
 endif()
 
 AUX_SOURCE_DIRECTORY( ./ SOURCE_LIST )
