@@ -1,4 +1,4 @@
-// Last Update:2019-01-30 19:34:25
+// Last Update:2019-02-11 12:00:08
 /**
  * @file log2mqtt.c
  * @brief 
@@ -127,7 +127,7 @@ int LogOverMQTT( char *msg )
     }
 
     if ( gMqttnfo.q ) {
-        gMqttnfo.q->enqueue( gMqttnfo.q, msg, strlen(msg) );
+        gMqttnfo.q->enqueue( gMqttnfo.q, msg, strlen(msg)-1 );
     } else {
         LOGE("send fail, q is null\n");
     }
