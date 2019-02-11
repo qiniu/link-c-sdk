@@ -342,7 +342,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 LinkMediaInfo mediaInfo;
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
                 mediaInfo.startTime = tsStartTime / 1000000;
-                mediaInfo.endTime = tsStartTime / 1000000 + tsDuration;
+                mediaInfo.endTime = tsStartTime / 1000000 + tsPhysicalDuration;
                 mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
                 memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
                 int idx = 0;
