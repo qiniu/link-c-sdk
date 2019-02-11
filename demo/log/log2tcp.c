@@ -1,4 +1,4 @@
-// Last Update:2018-11-20 16:27:45
+// Last Update:2019-02-11 13:57:29
 /**
  * @file socket_logging.c
  * @brief 
@@ -90,19 +90,14 @@ void ReportUploadStatistic(void *pUserOpaque, LinkUploadKind uploadKind, LinkUpl
     char message[512] = { 0 };
     char now[200] = { 0 };
 
-    //DBG_LOG("uploadKind = %d\n", uploadKind );
     if ( uploadKind == LINK_UPLOAD_TS ) {
         memset( message, 0, sizeof(message) );
         if ( uploadResult != LINK_UPLOAD_RESULT_OK ) {
             error ++;
         }
         total++;
-        memset( now, 0, sizeof(now) );
-        GetCurrentTime( now );
-        sprintf( message, "[ %s ] [ %s ] [ cur : %s] [ total : %d ] [ error : %d ] [ percent : %%%f ]\n", 
-                 now,
+        sprintf( message, "[ %s ] [ total : %d ] [ error : %d ] [ percent : %%%f ]\n", 
                  gIpc.devId,
-                 "ts",
                  total, error, error*1.0/total*100 ); 
         DBG_LOG("%s", message );
     }
