@@ -1,4 +1,4 @@
-// Last Update:2019-01-30 15:29:00
+// Last Update:2019-02-11 11:22:14
 /**
  * @file dbg.c
  * @brief 
@@ -29,7 +29,7 @@ Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
-    DBG_LOG( log );
+    dbg2( "%s", log );
 }
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg )
@@ -273,5 +273,43 @@ float DbgGetCpuUsage()
     lseek(fd, 0, SEEK_SET);
 
     return usage;
+}
+
+int dbg2( const char *format, ...  )
+{
+    char buffer[BUFFER_SIZE] = { 0 };
+    va_list arg;
+    int len = 0;
+    char now[200] = { 0 };
+
+    if ( gLogger.printTime ) {
+        memset( now, 0, sizeof(now) );
+        GetCurrentTime( now );
+        len = sprintf( buffer, "[ %s ] ", now );
+    }
+
+    va_start( arg, format );
+    vsprintf( buffer+strlen(buffer), format, arg );
+    va_end( arg );
+
+    switch( gLogger.output ) {
+    case OUTPUT_FILE:
+        WriteLog( buffer ); 
+        break;
+    case OUTPUT_SOCKET:
+        SendLog( buffer );
+        break;
+    case OUTPUT_MQTT:
+        LogOverMQTT( buffer );
+        break;
+    case OUTPUT_CONSOLE:
+        printf( GRAY"%s"NONE, buffer );
+        break;
+    default:
+        break;
+    }
+
+    return 0;
+
 }
 

@@ -83,6 +83,7 @@ typedef struct {
 
 extern int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg );
 extern int dbg( unsigned logLevel, const char *file, const char *function, int line, const char *format, ...  );
+extern int dbg2( const char *format, ...  );
 extern void DbgReportLog( int stream, int streamType, char *reason );
 extern void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream );
 extern void DbgReportLog( int stream, int streamType, char *reason );

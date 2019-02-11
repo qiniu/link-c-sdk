@@ -265,6 +265,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
 
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
+    userUploadArg.pUpStatCb = ReportUploadStatistic;
     if ( ch == STREAM_MAIN ) {
         userUploadArg.getPictureCallback = GetPicCallback;
     }
