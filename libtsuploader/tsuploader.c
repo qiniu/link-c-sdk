@@ -327,6 +327,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                         LinkSendPictureToPictureUploader(pKodoUploader->picture.pOpaque, pKodoUploader->picture);
                         pKodoUploader->picture.pFilename = NULL;
                 }
+                pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
                 //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
         } else {
                 restoreDuration(pKodoUploader);
