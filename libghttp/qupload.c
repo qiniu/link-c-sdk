@@ -156,6 +156,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         if (upload_token == NULL || filepathOrBufer == NULL) {
                 return -1;
         }
+        errno = 0;
         memset(put_ret, 0, sizeof(LinkPutret));
         
         //form boundary
