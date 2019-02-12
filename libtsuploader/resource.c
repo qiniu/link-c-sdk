@@ -25,7 +25,7 @@ static void * recycle(void *_pOpaque)
                         continue;
                 }
                 if (ret == sizeof(LinkTsUploader *)) {
-                        LinkLogInfo("pop from mgr:%p\n", pAsync);
+                        LinkLogInfo("pop from mgr:%p", pAsync);
                         if (pAsync == NULL) {
                                 LinkLogWarn("NULL function");
                         } else {

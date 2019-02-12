@@ -300,7 +300,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
-                        LinkLogDebug("pop segment info:%d\n", segInfo.handle);
+                        LinkLogDebug("pop segment info:%d", segInfo.handle);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
                         } else {
