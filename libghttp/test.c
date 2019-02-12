@@ -137,7 +137,11 @@ void testupbuf(char * file, char * token) {
         long file_len = ftell(fp);
         rewind(fp);
 
-	char buf[1024 * 1024 * 2];
+	char * buf = malloc(file_len);
+	if (buf == NULL) {
+                printf("malloc %d fail\n", file_len);
+                return;
+	}
         size_t read_num = fread(buf, sizeof(char), file_len, fp);
         if (read_num != file_len) {
             fclose(fp);
@@ -148,6 +152,8 @@ void testupbuf(char * file, char * token) {
 
 	ret = LinkUploadBuffer(buf, file_len, "http://upload.qiniup.com",  token, file, NULL, 0, NULL, 0, NULL, &putret);
 	printf("%d %d [%s] [%s]\n", ret, putret.code, putret.error, putret.body);
+
+	free(buf);
 }
 
 int main(int argc, char **argv) {
@@ -182,6 +188,6 @@ int main(int argc, char **argv) {
 			printf("usage as:%s testupbuf filepath token\n", argv[0]);
 			return 2;
 		}
-		testupfile(argv[2], argv[3]);
+		testupbuf(argv[2], argv[3]);
 	}
 }
