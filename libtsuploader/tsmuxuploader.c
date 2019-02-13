@@ -284,7 +284,7 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
                 LinkLogDebug("push queue return zero");
                 return LINK_Q_WRONGSTATE;
         } else {
-                LinkLogTrace("write_packet: should write:len:%d  actual:%d\n", buf_size, ret);
+                LinkLogTrace("write_packet: should write:len:%d  actual:%d", buf_size, ret);
         }
         return ret;
 }
@@ -292,7 +292,7 @@ static int writeTsPacketToMem(void *opaque, uint8_t *buf, int buf_size)
 static int push(FFTsMuxUploader *pFFTsMuxUploader, const char * _pData, int _nDataLen, int64_t _nTimestamp, int _nFlag,
                 int _nIsKeyframe, int64_t nSysNanotime, int nIsForceNewSeg){
         
-        //LinkLogTrace("push thread id:%d\n", (int)pthread_self());
+        //LinkLogTrace("push thread id:%d", (int)pthread_self());
         
         FFTsMuxContext *pTsMuxCtx = NULL;
         int count = 0;
@@ -561,7 +561,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         int ret = 0;
 
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
-                LinkLogWarn("first video frame not IDR. drop this frame\n");
+                LinkLogWarn("first video frame not IDR. drop this frame");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
@@ -575,7 +575,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         if (isVideoMetaChanged)
                 _nIsSegStart = isVideoMetaChanged;
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
-                LinkLogWarn("first video frame not IDR. drop this frame\n");
+                LinkLogWarn("first video frame not IDR. drop this frame");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
@@ -818,7 +818,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         assert(nSLen < sizeof(upparam.sessionId));
         
         // update upload token
-        LinkLogInfo("force: update remote token:%"PRId64" %s\n", pSession->nSessionStartTime, pSession->sessionId);
+        LinkLogInfo("force: update remote token:%"PRId64" %s", pSession->nSessionStartTime, pSession->sessionId);
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
