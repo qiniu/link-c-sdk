@@ -945,6 +945,12 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
 }
 
 static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
+        if (pFFTsMuxUploader->tmpRemoteConfig.planType != pFFTsMuxUploader->remoteConfig.planType) {
+                if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
+                        LinkTsUploaderSetPlanType(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pFFTsMuxUploader->tmpRemoteConfig.planType);
+                }
+        }
+        
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         RemoteConfig rc = pFFTsMuxUploader->remoteConfig;
         pFFTsMuxUploader->remoteConfig = pFFTsMuxUploader->tmpRemoteConfig;
@@ -1315,10 +1321,6 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
                 LinkSetSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pDup2);
         }
         
-        if (pFFTsMuxUploader->pPicUploader) {
-                LinkPicSendTsType(pFFTsMuxUploader->pPicUploader, metas->isOneShot);
-        }
-        
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
         
         return LINK_SUCCESS;
@@ -1339,10 +1341,6 @@ void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
                 LinkClearSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
-        }
-        
-        if (pFFTsMuxUploader->pPicUploader) {
-                LinkPicSendClearTsType(pFFTsMuxUploader->pPicUploader);
         }
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);

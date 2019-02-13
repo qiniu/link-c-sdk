@@ -12,10 +12,6 @@ enum LinkPicUploadSignalType {
         LinkPicUploadSignalStop,
         LinkPicUploadGetPicSignalCallback,
         LinkPicUploadSignalUpload,
-        LinkPicSetTsType,
-        LinkPicSetTsOneShotType,
-        LinkPicClearTsType,
-        LinkPicSetPlanTpye,
 };
 
 typedef struct {
@@ -23,8 +19,6 @@ typedef struct {
         pthread_t workerId_;
         LinkCircleQueue *pSignalQueue_;
         int nQuit_;
-        int tsType_; // may control pic upload. 0 notype. -1 oneshot type. 1 persistent type
-        LinkPlanType planType_;
         int64_t nCount_;
         LinkPicUploadFullArg picUpSettings_;
 }PicUploader;
@@ -32,7 +26,6 @@ typedef struct {
 typedef struct {
         LinkAsyncInterface asyncWait_;
         enum LinkPicUploadSignalType signalType_;
-        LinkPlanType planType;
         char *pData;
         int nDataLen;
         int64_t nTimestamp; //file name need
@@ -102,40 +95,6 @@ int LinkSendPictureToPictureUploader(PictureUploader *pPicUploader, LinkPicture 
         return LINK_SUCCESS;
 }
 
-static int linkPicSendTsTypeInfo(PicUploader *pPicUp, enum LinkPicUploadSignalType sigType, LinkPlanType ptype) {
-        LinkPicUploadSignal sig;
-        memset(&sig, 0, sizeof(LinkPicUploadSignal));
-        
-        sig.pPicUploader = pPicUp;
-        sig.signalType_ = sigType;
-        sig.planType = ptype;
-        
-        int ret = pPicUp->pSignalQueue_->Push(pPicUp->pSignalQueue_, (char *)&sig, sizeof(LinkPicUploadSignal));
-        if (ret <= 0) {
-                LinkLogError("pic push queue ts type(%d) error:%d",sigType, ret);
-                return ret;
-        }
-        return LINK_SUCCESS;
-}
-
-int LinkPicSendTsType(PictureUploader *pPicUploader, int isOneShot) {
-        PicUploader *pPicUp = (PicUploader *)pPicUploader;
-        enum LinkPicUploadSignalType sigType = LinkPicSetTsType;
-        if (isOneShot)
-                sigType = LinkPicSetTsOneShotType;
-        return linkPicSendTsTypeInfo(pPicUp, sigType, LINK_PLAN_TYPE_NONE);
-}
-
-int LinkPicSendClearTsType(PictureUploader *pPicUploader) {
-        PicUploader *pPicUp = (PicUploader *)pPicUploader;
-        return linkPicSendTsTypeInfo(pPicUp, LinkPicClearTsType, LINK_PLAN_TYPE_NONE);
-}
-
-int LinkPicSetPlanType(PictureUploader *pPicUploader, LinkPlanType ptype) {
-        PicUploader *pPicUp = (PicUploader *)pPicUploader;
-        return linkPicSendTsTypeInfo(pPicUp, LinkPicSetPlanTpye, ptype);
-}
-
 static void * listenPicUpload(void *_pOpaque)
 {
         PicUploader *pPicUploader = (PicUploader *)_pOpaque;
@@ -160,22 +119,11 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadSignalIgnore:
                                         LinkLogWarn("ignore signal");
                                         continue;
-                                case LinkPicSetTsType:
-                                        pPicUploader->tsType_ = 1;
-                                        continue;
-                                case LinkPicSetTsOneShotType:
-                                        pPicUploader->tsType_ = -1;
-                                         continue;
-                                case LinkPicClearTsType:
-                                        pPicUploader->tsType_ = -1;
-                                         continue;
                                 case LinkPicUploadSignalStop:
                                         return NULL;
                                 case LinkPicUploadSignalUpload:
                                         uploadPicture(&sig);
                                         break;
-                                case LinkPicSetPlanTpye:
-                                        pPicUploader->planType_ = sig.planType;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
                                                 char key[64];
@@ -331,40 +279,35 @@ static void * uploadPicture(void *_pOpaque) {
                 realKey = NULL;
         else
                 nCusMagics = 0;
-        if (pSig->pPicUploader->planType_ == LINK_PLAN_TYPE_24 || pSig->pPicUploader->tsType_ != 0) {
-                ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
-                
-                LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
-                
-                if (ret != 0) { //http error
-                        LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
+
+        ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
+        
+        LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
+        
+        if (ret != 0) { //http error
+                LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
+        } else {
+                if (putret.code / 100 == 2) {
+                        uploadResult = LINK_UPLOAD_RESULT_OK;
+                        LinkLogDebug("upload picture: %s success", key);
                 } else {
-                        if (putret.code / 100 == 2) {
-                                uploadResult = LINK_UPLOAD_RESULT_OK;
-                                LinkLogDebug("upload picture: %s success", key);
+                        if (putret.body != NULL) {
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
+                                             key, putret.code, putret.reqid, putret.body);
                         } else {
-                                if (putret.body != NULL) {
-                                        LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
-                                                     key, putret.code, putret.reqid, putret.body);
-                                } else {
-                                        LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
-                                                     key, putret.code, putret.reqid);
-                                }
+                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
+                                             key, putret.code, putret.reqid);
                         }
                 }
-                
-                LinkFreePutret(&putret);
-                
-                
-                if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
-                        pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
-                }
-                
-                if (pSig->pPicUploader->tsType_ < 0)
-                        pSig->pPicUploader->tsType_ = 0;
-        } else {
-                LinkLogDebug("not upload pic:%d %d",pSig->pPicUploader->planType_ == LINK_PLAN_TYPE_24, pSig->pPicUploader->tsType_);
         }
+        
+        LinkFreePutret(&putret);
+        
+        
+        if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
+                pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
+        }
+
 END:
         if (pSig->pFileName) {
                 free(pSig->pFileName);

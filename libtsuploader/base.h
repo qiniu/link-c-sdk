@@ -74,9 +74,10 @@ typedef enum {
 } LinkUploadCbType;
 
 typedef enum {
-        LINK_PLAN_TYPE_NONE = 0,
+        LINK_PLAN_TYPE_NONE = -1,
+        LINK_PLAN_TYPE_MOVE = 0,
         LINK_PLAN_TYPE_24   = 1,
-        LINK_PLAN_TYPE_MOVE = 2,
+        LINK_PLAN_TYPE_BAN  = 2,
 } LinkPlanType;
 
 typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);

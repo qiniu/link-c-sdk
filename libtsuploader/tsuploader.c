@@ -278,7 +278,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
 
-        if ((pKodoUploader->pSessionMeta || pKodoUploader->planType == LINK_PLAN_TYPE_24) && (getBufDataRet > 0 && getUploadParamOk)) {
+        if (((pKodoUploader->pSessionMeta && pKodoUploader->planType == LINK_PLAN_TYPE_MOVE) || pKodoUploader->planType == LINK_PLAN_TYPE_24) &&
+            (getBufDataRet > 0 && getUploadParamOk)) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
                 sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
@@ -324,7 +325,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 if (pKodoUploader->picture.pFilename) {
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
                                  "-%s.jpg", pKodoUploader->session.sessionId);
-                        LinkSendPictureToPictureUploader(pKodoUploader->picture.pOpaque, pKodoUploader->picture);
+                        if (LINK_SUCCESS != LinkSendPictureToPictureUploader(pKodoUploader->picture.pOpaque, pKodoUploader->picture))
+                                free((void *)pKodoUploader->picture.pFilename);
                         pKodoUploader->picture.pFilename = NULL;
                 }
                 pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
