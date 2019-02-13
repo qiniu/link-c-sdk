@@ -117,7 +117,7 @@ int AlarmCallback( int alarm, void *data )
     int valuelens[1] = {4};
     metas.valuelens = valuelens;
 
-    if ( alarm == ALARM_MOTION_DETECT ) {
+    if ( alarm == ALARM_MOTION_DETECT && gIpc.config.movingDetection ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT\n");
         LinkSessionMeta metas = {0};
         metas.len = 1;
@@ -132,17 +132,19 @@ int AlarmCallback( int alarm, void *data )
 
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
             LinkSetTsType(gIpc.stream[STREAM_MAIN].uploader, &metas);
-        }if ( gIpc.stream[STREAM_SUB].uploader ) {
+        }
+        if ( gIpc.stream[STREAM_SUB].uploader ) {
             LinkSetTsType(gIpc.stream[STREAM_SUB].uploader, &metas);
         }
         gIpc.detectMoving = alarm;
-    } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
+    } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR && gIpc.config.movingDetection ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
             LinkClearTsType(gIpc.stream[STREAM_MAIN].uploader);
             LinkFlushUploader( gIpc.stream[STREAM_MAIN].uploader );
-        }if ( gIpc.stream[STREAM_SUB].uploader ) {
+        }
+        if ( gIpc.stream[STREAM_SUB].uploader ) {
             LinkClearTsType(gIpc.stream[STREAM_SUB].uploader);
             LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
         }
@@ -231,6 +233,7 @@ static int CaptureDevInit( )
 
     if ( gIpc.dev->registerAlarmCb ) {
         gIpc.dev->registerAlarmCb( AlarmCallback );
+    } else {
     }
 
     return 0;
