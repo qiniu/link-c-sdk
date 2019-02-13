@@ -37,6 +37,8 @@ add_custom_target(all-clean
         COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/wolfssl && git clean -dxf
     )
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(subst ${CMAKE_SOURCE_DIR}/,,$(abspath $<))\"'")
+
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wno-unused")
 if (WITH_DEBUG)
     message("WITH_DEBUG")
