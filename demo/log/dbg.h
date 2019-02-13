@@ -1,4 +1,4 @@
-// Last Update:2019-01-30 16:43:16
+// Last Update:2019-02-13 14:49:15
 /**
  * @file dbg.h
  * @brief 
@@ -74,10 +74,10 @@ typedef struct {
 
 #define BUFFER_SIZE 1024
 
-#define LOG(args...) dbg( DBG_LEVEL_DEBUG, __FILE__, __FUNCTION__, __LINE__, args )
-#define DBG_ERROR(args...) dbg( DBG_LEVEL_FATAL, __FILE__, __FUNCTION__, __LINE__, args )
+#define LOG(args...) dbg( DBG_LEVEL_DEBUG, __FILE_NAME__, __FUNCTION__, __LINE__, args )
+#define DBG_ERROR(args...) dbg( DBG_LEVEL_FATAL, __FILE_NAME__, __FUNCTION__, __LINE__, args )
 #define DBG_LOG(args...) LOG(args)
-#define BASIC() printf("[ %s %s() +%d] ", __FILE__, __FUNCTION__, __LINE__ )
+#define BASIC() printf("[ %s %s() +%d] ", __FILE_NAME__, __FUNCTION__, __LINE__ )
 #define LOGE(args...) BASIC();printf(args)
 #define LOGI(args...) BASIC();printf(args)
 
