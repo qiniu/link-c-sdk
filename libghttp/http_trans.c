@@ -30,6 +30,7 @@
 
 #include "http_trans.h"
 #include "http_global.h"
+#include "timeoutconn.h"
 
 #ifdef USE_OPENSSL
 #include <openssl/crypto.h>
@@ -151,7 +152,7 @@ http_trans_connect(http_trans_conn *a_conn)
       a_conn->error = errno;
       goto ec;
     }
-
+  //print_socket_block_mode(a_conn->sock);
   struct timeval tv;
   tv.tv_sec = a_conn->nTimeoutInSecond;
   tv.tv_usec = 0;
@@ -163,9 +164,19 @@ http_trans_connect(http_trans_conn *a_conn)
 	      (struct sockaddr *)&a_conn->saddr,
 	      sizeof(struct sockaddr)) < 0)
     {
+      int notok = 1;
+      int errnobak = errno;
+      if (errno == EINPROGRESS) {
+        notok = wait_connect(a_conn->sock, 3);
+        if (notok == 0)
+          notok = set_socket_to_block(a_conn->sock);
+      }
+      fprintf(stderr, "######connect fail:%d %d notok:%d %x\n", errnobak, errno, notok, a_conn->saddr.sin_addr.s_addr);
+     if (notok) {
       a_conn->error_type = http_trans_err_type_errno;
       a_conn->error = errno;
       goto ec;
+     }
     }
 #ifdef USE_OPENSSL
   /* initialize the SSL data structures */

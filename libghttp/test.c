@@ -122,7 +122,7 @@ void testupfile(char * file, char * token) {
 	printf("%d %d [%s] [%s]\n", ret, putret.code, putret.error, putret.body);
 }
 
-void testupbuf(int file_len, char * token) {
+void testupbuf(int file_len, char * token, int times) {
 	int ret;
 	LinkPutret putret={0};
         
@@ -132,12 +132,14 @@ void testupbuf(int file_len, char * token) {
                 return;
 	}
         memset(buf, 0x31, file_len);
-
-        char file[128] = {0};
-        sprintf(file, "testupbuf_%ld", time(NULL));
-	ret = LinkUploadBuffer(buf, file_len, "http://upload.qiniup.com",  token, file, NULL, 0, NULL, 0, NULL, &putret);
-        printf("upload:%s %d %d [%s] [%s]\n",file, ret, putret.code, putret.error, putret.body);
-
+        fprintf(stderr, "upload times:%d\n", times);
+        int i = 0;
+        for (i = 0; i < times; i++) {
+                char file[128] = {0};
+                sprintf(file, "testupbuf_%ld", time(NULL));
+                ret = LinkUploadBuffer(buf, file_len, "http://upload.qiniup.com",  token, file, NULL, 0, NULL, 0, NULL, &putret);
+                fprintf(stderr, "upload:%s %d %d [%s] [%s]\n",file, ret, putret.code, putret.error, putret.body);
+        }
 	free(buf);
 }
 
@@ -169,15 +171,20 @@ int main(int argc, char **argv) {
 		}
 		testupfile(argv[2], argv[3]);
 	} else if (memcmp("testupbuf", argv[1], 8) == 0) {
-		if (argc != 4) {
-			printf("usage as:%s testupbuf uploadsize token\n", argv[0]);
+		if (argc != 4 && argc != 5) {
+			printf("usage as:%s testupbuf uploadsize token [nums]\n", argv[0]);
 			return 2;
 		}
                 int uploadSize = atoi(argv[2]);
+                int times = 0;
+                if (argc == 5)
+                        times = atoi(argv[4]);
+                if (times == 0)
+                        times = 1;
                 if (uploadSize <= 0 || uploadSize > 2 * 1024*1024) {
                         printf("uploadsize must match: 0 < uploadsize < 2M\n");
                         return 2;
                 }
-		testupbuf(uploadSize, argv[3]);
+		testupbuf(uploadSize, argv[3], times);
 	}
 }
