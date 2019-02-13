@@ -33,6 +33,7 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include "timeoutconn.h"
 
 #elif defined (USE_WOLFSSL)
 #include <wolfssl/options.h>
