@@ -1,4 +1,4 @@
-// Last Update:2018-11-28 15:00:57
+// Last Update:2019-02-14 13:53:12
 /**
  * @file ota.c
  * @brief 
@@ -261,10 +261,24 @@ void * UpgradeTask( void *arg )
     return NULL;
 }
 
+void *OtaOverMqttTask( void *arg )
+{
+    for (;;) {
+        sleep(1);
+    }
+    return NULL;
+}
+
 void StartUpgradeTask()
 {
     pthread_t thread = 0;
 
-    pthread_create( &thread, NULL, UpgradeTask, NULL );
+    if ( gIpc.config.otaMode ) {
+        if ( strcmp( gIpc.config.otaMode, "OtaOverMqtt" ) == 0 ) {
+            pthread_create( &thread, NULL, OtaOverMqttTask, NULL );
+        } else {
+            pthread_create( &thread, NULL, UpgradeTask, NULL );
+        }
+    }
 }
 
