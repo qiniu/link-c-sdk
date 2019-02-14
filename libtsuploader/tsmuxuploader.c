@@ -1530,7 +1530,7 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         pRc->updateConfigInterval = pNode->valueint;
         *pUpdateConfigInterval = pNode->valueint;
         
-        pNode = cJSON_GetObjectItem(pJsonRoot, "planType");
+        pNode = cJSON_GetObjectItem(pJsonRoot, "uploadMode");
         if (pNode != NULL) {
                 pRc->planType = pNode->valueint;
         }
