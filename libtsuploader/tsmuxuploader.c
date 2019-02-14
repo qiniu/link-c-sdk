@@ -1849,3 +1849,7 @@ static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) 
 
         return LINK_SUCCESS;
 }
+
+void GhttpLogOutput(const char * errMsg) {
+        LinkLogError("%s", errMsg);
+}
