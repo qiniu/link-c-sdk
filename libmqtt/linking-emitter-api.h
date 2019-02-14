@@ -1,5 +1,5 @@
 /**
- * @file hrapi.h
+ * @file linking-emitter-api.h
  * @author Qiniu.com
  * @copyright 2019(c) Shanghai Qiniu Information Technologies Co., Ltd.
  * @brief linking emitter api header file
