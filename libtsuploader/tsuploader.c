@@ -249,6 +249,9 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nTsDuration;
+        if (tsDuration > 30) {
+                LinkLogWarn("abnormal ts duration:%"PRId64"", tsDuration);
+        }
         int64_t tsPhysicalDuration = (pKodoUploader->nLastSystime - tsStartTime)/1000000 - 40;
         
         int64_t tsEndTime = tsStartTime + tsDuration*1000000;

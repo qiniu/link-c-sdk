@@ -182,8 +182,6 @@ typedef struct _LinkSession { // seg report info
         // report scope
         int64_t nAudioGapFromLastReport; // ad
         int64_t nVideoGapFromLastReport; // vd
-        int64_t nLastReportAccSessionAudioDuration;
-        int64_t nLastReportAccSessionVideoDuration;
         
         // current ts scope
         int64_t nTsStartTime;

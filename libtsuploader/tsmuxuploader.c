@@ -561,7 +561,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         int ret = 0;
 
         if (pFFTsMuxUploader->nKeyFrameCount == 0 && !nIsKeyFrame) {
-                LinkLogWarn("first video frame not IDR. drop this frame");
+                LinkLogTrace("first video frame not IDR. drop this frame");
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
                 return 0;
         }
@@ -624,7 +624,7 @@ static int PushAudio(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
         }
         if (pFFTsMuxUploader->nKeyFrameCount == 0) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-                LinkLogDebug("no keyframe. drop audio frame");
+                LinkLogTrace("no keyframe. drop audio frame");
                 return 0;
         }
         ret = push(pFFTsMuxUploader, _pData, _nDataLen, _nTimestamp, LINK_STREAM_TYPE_AUDIO, 0, nSysNanotime, 0);
@@ -797,6 +797,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, Buffer token, Buffer ttok
         return ;
 }
 
+static const char *sReasonStr[] ={"---", "normal", "timeout", "force"};
 static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSession, int64_t nNewSessionId, int lastSessionEndReasonCode) {
         SessionUpdateParam upparam;
         upparam.nType = 1;
@@ -818,7 +819,7 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         assert(nSLen < sizeof(upparam.sessionId));
         
         // update upload token
-        LinkLogInfo("force: update remote token:%"PRId64" %s", pSession->nSessionStartTime, pSession->sessionId);
+        LinkLogInfo("%s: update remote token:%"PRId64" %s", sReasonStr[lastSessionEndReasonCode], pSession->nSessionStartTime, pSession->sessionId);
         pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
         
         pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
@@ -850,6 +851,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 LinkLogInfo("start: update remote config:%"PRId64" %"PRId64"\n",
                         pSession->nSessionStartTime, pFFTsMuxUploader->uploadArgBak.nSegmentId_);
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
+                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
                 pSession->isNewSessionStarted = 0;
                 
                 pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nCurSystime;
@@ -1567,9 +1569,6 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
         if (pNode != NULL) {
                 pRc->nSessionDuration = pNode->valueint * 1000;
-        }
-        if (pRc->nSessionDuration < 600 * 1000) {
-                pRc->nSessionDuration = 600 * 1000;
         }
         LinkLogInfo("nSessionDuration:%d", pRc->nSessionDuration);
         
