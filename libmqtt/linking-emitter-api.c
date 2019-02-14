@@ -56,9 +56,11 @@ static int LinkEmitter_GetUsernameSign(char *_pUsername, int *_pLen, const char 
         if (!_pDak) {
                 return LINK_MQTT_ERROR;
         }
-        sprintf(query, "dak=%s&timestamp=%ld&version=v1", _pDak, timestamp);
-        *_pLen = strlen(query);
-        memcpy(_pUsername, query, *_pLen);
+        *_pLen = sprintf(query, "dak=%s&timestamp=%ld&version=v1", _pDak, timestamp);
+        if (*_pLen <= 0) {
+                return LINK_MQTT_ERROR;
+        }
+        strncpy(_pUsername, query, *_pLen + 1);
         return LINK_MQTT_SUCCESS;
 }
 
@@ -80,6 +82,7 @@ static int LinkEmitter_GetPasswordSign(const char *_pInput, int _nInLen,
         }
         int outlen = urlsafe_b64_encode(sha1, 20, _pOutput, _pOutLen);
         *_pOutLen = outlen;
+
         return LINK_MQTT_SUCCESS;
 }
 
