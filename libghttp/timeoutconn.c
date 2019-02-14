@@ -62,6 +62,14 @@ void print_socket_block_mode(int fd) {
                 fprintf(stderr, "===========>socket is block:%02x %02x\n", flags, O_NONBLOCK);
 }
 
+int socket_is_nonblock(int fd) {
+        int flags;
+        if((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+                return -1;
+        }
+        return flags & O_NONBLOCK;
+}
+
 int wait_connect(int sockfd, int timeout) {
         
         struct timeval tm;

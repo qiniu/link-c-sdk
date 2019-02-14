@@ -249,7 +249,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nTsDuration;
-        if (tsDuration > 30) {
+        if (tsDuration > 30000) {
                 LinkLogWarn("abnormal ts duration:%"PRId64"", tsDuration);
         }
         int64_t tsPhysicalDuration = (pKodoUploader->nLastSystime - tsStartTime)/1000000 - 40;
@@ -270,7 +270,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 shouldUpload = 1;
                 shouldReport = 1;
         }
-                
+        
         if (getUploadParamOk)
                 handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration, shouldReport);
         int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);

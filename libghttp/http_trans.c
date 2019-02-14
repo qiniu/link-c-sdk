@@ -168,15 +168,18 @@ http_trans_connect(http_trans_conn *a_conn)
     {
       int notok = 1;
       int errnobak = errno;
+      const char * blkMode = "blksock";
       if (errno == EINPROGRESS) {
-        notok = wait_connect(a_conn->sock, 3);
-        if (notok == 0)
-          notok = set_socket_to_block(a_conn->sock);
+              if (socket_is_nonblock(a_conn->sock)) {
+                      blkMode = "nonblksock";
+                      notok = wait_connect(a_conn->sock, 3);
+                      if (notok == 0)
+                              notok = set_socket_to_block(a_conn->sock);
+              }
       }
       char connErr[128]={0};
-      snprintf(connErr, sizeof(connErr), "######connect fail:%d %d notok:%d %x\n", errnobak, errno, notok, a_conn->saddr.sin_addr.s_addr);
-      if (GhttpLogOutput != NULL)
-              GhttpLogOutput(connErr);
+      snprintf(connErr, sizeof(connErr), "######%s connect fail:%d %d notok:%d %x\n", blkMode, errnobak, errno, notok, a_conn->saddr.sin_addr.s_addr);
+      GhttpLogOutput(connErr);
      if (notok) {
       a_conn->error_type = http_trans_err_type_errno;
       a_conn->error = errno;
