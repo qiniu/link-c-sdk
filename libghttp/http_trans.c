@@ -56,8 +56,8 @@ static int http_trans_buf_free(http_trans_conn *a_conn);
 
 static char cert_file[256]={"/etc/ssl/certs/ca-certificates.crt"};
 static char cert_path[256];
-typedef void __ghttp_err_log(const char *);
-extern __ghttp_err_log GhttpLogOutput;
+typedef void (*__ghttp_trans_log)(const char *);
+extern __ghttp_trans_log GhttpLogOutput;
 void ghttp_set_global_cert_file_path(const char *file, const char *path)
 {
     int lenf = strlen(file);
@@ -178,8 +178,11 @@ http_trans_connect(http_trans_conn *a_conn)
               }
       }
       char connErr[128]={0};
-      snprintf(connErr, sizeof(connErr), "######%s connect fail:%d %d notok:%d %x\n", blkMode, errnobak, errno, notok, a_conn->saddr.sin_addr.s_addr);
-      GhttpLogOutput(connErr);
+      unsigned char * sockip = (unsigned char *)&a_conn->saddr.sin_addr.s_addr;
+      snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:%d %d notok:%d ip:%d.%d.%d.%d\n", blkMode, a_conn->sock, errnobak, errno, notok,
+               sockip[0], sockip[1], sockip[2], sockip[3]);
+      if (GhttpLogOutput != NULL)
+        GhttpLogOutput(connErr);
      if (notok) {
       a_conn->error_type = http_trans_err_type_errno;
       a_conn->error = errno;
