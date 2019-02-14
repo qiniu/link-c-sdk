@@ -74,9 +74,10 @@ typedef enum {
 } LinkUploadCbType;
 
 typedef enum {
-        LINK_PLAN_TYPE_NONE = 0,
+        LINK_PLAN_TYPE_NONE = -1,
+        LINK_PLAN_TYPE_MOVE = 0,
         LINK_PLAN_TYPE_24   = 1,
-        LINK_PLAN_TYPE_MOVE = 2,
+        LINK_PLAN_TYPE_BAN  = 2,
 } LinkPlanType;
 
 typedef int (*LinkUploadParamCallback)(IN void *pOpaque, IN OUT LinkUploadParam *pParam, IN LinkUploadCbType cbtype);
@@ -181,8 +182,6 @@ typedef struct _LinkSession { // seg report info
         // report scope
         int64_t nAudioGapFromLastReport; // ad
         int64_t nVideoGapFromLastReport; // vd
-        int64_t nLastReportAccSessionAudioDuration;
-        int64_t nLastReportAccSessionVideoDuration;
         
         // current ts scope
         int64_t nTsStartTime;

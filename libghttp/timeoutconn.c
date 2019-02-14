@@ -66,19 +66,22 @@ int wait_connect(int sockfd, int timeout) {
         
         struct timeval tm;
         fd_set set;
+        int ret = 0;
         int len = sizeof(int);
         int error = -1;
         tm.tv_sec = timeout;
         tm.tv_usec = 0;
         FD_ZERO(&set);
         FD_SET(sockfd, &set);
-        if(select(sockfd+1, NULL, &set, NULL, &tm) > 0) {
+        if((ret = select(sockfd+1, NULL, &set, NULL, &tm)) > 0) {
                 getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, (socklen_t*)&len);
                 if (error == 0)
                         return 0;
                 else
                         return error;
         }
+        if (ret == 0)
+                return -1;
         return errno;
 }
 

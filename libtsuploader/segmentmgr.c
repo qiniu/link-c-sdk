@@ -29,6 +29,7 @@ typedef struct {
         void *pGetUploadParamCallbackArg;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
+        int nReportTTL;
         int64_t nNextUpdateSegTimeInSecond;
         LinkSession tmpSession; //TODO backup report info when next report time is not arrival
         LinkSessionMeta* pSessionMeta;
@@ -38,6 +39,7 @@ typedef struct {
         pthread_t segMgrThread_;
         LinkCircleQueue *pSegQueue_;
         Seg handles[8];
+        int nReportTTL;
         int nQuit_;
 }SegmentMgr;
 
@@ -51,10 +53,9 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
                 memcpy(&pSeg->tmpSession, pCurSession, sizeof(LinkSession));
                 return 0;
         }
-        if (pSeg->pSessionMeta == NULL) {
-                LinkLogDebug("not report segment");
-                return 0;
-        }
+        pSeg->tmpSession.nAccSessionAudioDuration = pCurSession->nAccSessionAudioDuration;
+        pSeg->tmpSession.nAccSessionVideoDuration = pCurSession->nAccSessionVideoDuration;
+
         if (pCurSession->nSessionEndResonCode == 0) {
                 if (pSeg->nNextUpdateSegTimeInSecond > nNow) {
                         pSeg->tmpSession.nVideoGapFromLastReport += pCurSession->nVideoGapFromLastReport;
@@ -89,21 +90,17 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
  "endReason": <endReason> // 切片会话结束的原因，如果会话没结束不需要本字段
  }
  */
-static int reportSegInfo(SegInfo *pSegInfo, int idx) {
+static const char *sReasonStr[] ={"---", "normal", "timeout", "force", "destroy"};
+static int reportSegInfo(LinkSession *s , int idx, int rtype) {
         char buffer[1280];
         int nReportHostLen = 640;
         char *body = buffer + nReportHostLen;
         int nBodyLen = 0;
-        LinkSession *s = &pSegInfo->session;
         memset(buffer, 0, sizeof(buffer));
         
         const LinkSessionMeta* smeta = segmentMgr.handles[idx].pSessionMeta;
         if (s->nSessionEndResonCode != 0) {
-                const char * reason = "timeout";
-                if (s->nSessionEndResonCode == 1)
-                        reason = "normal";
-                else if (s->nSessionEndResonCode == 3)
-                        reason = "force";
+                const char * reason = sReasonStr[s->nSessionEndResonCode];
                 
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
@@ -132,7 +129,7 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
         body[nBodyLen++] = '}';
         
         assert(nBodyLen <= sizeof(buffer) - nReportHostLen);
-        LinkLogDebug("body:%s", body);
+        LinkLogDebug("%dbody:%s",rtype, body);
         
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
@@ -186,18 +183,21 @@ static int reportSegInfo(SegInfo *pSegInfo, int idx) {
                 return LINK_JSON_FORMAT;
         }
         
-        int nextReportTime = 0;
+        int reportTTL = 0;
         cJSON *pNode = cJSON_GetObjectItem(pJsonRoot, "ttl");
         if (pNode == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
         } else {
                 cJSON_Delete(pJsonRoot);
-                nextReportTime = pNode->valueint;
+                reportTTL = pNode->valueint;
         }
         
-        if (nextReportTime > 0) {
-                segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nextReportTime + time(NULL);
+        if (reportTTL > 0) {
+                if (segmentMgr.nReportTTL <= 0 || segmentMgr.nReportTTL > reportTTL)
+                        segmentMgr.nReportTTL = reportTTL;
+                segmentMgr.handles[idx].nReportTTL = reportTTL;
+                segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = reportTTL + time(NULL);
         }
         
         
@@ -225,11 +225,53 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
                 return;
         }
 
-        int ret = reportSegInfo(pSegInfo, idx);
+        int ret = reportSegInfo(&pSegInfo->session, idx, 0);
         if (ret == LINK_SUCCESS)
                 segmentMgr.handles[idx].segReportOk = 1;
         else
                 segmentMgr.handles[idx].segReportOk = 0;
+        
+        return;
+}
+
+static void handleOnSegReportSegInfo(int idx, int64_t nNow) {
+        if (segmentMgr.handles[idx].tmpSession.nAccSessionDuration <= 0 ||
+            (segmentMgr.handles[idx].tmpSession.nVideoGapFromLastReport <=0 &&
+             segmentMgr.handles[idx].tmpSession.nAudioGapFromLastReport <= 0)) {
+                    
+                    LinkLogInfo("not report due to session duration is 0");
+                    return;
+            }
+        
+        int ret = reportSegInfo(&segmentMgr.handles[idx].tmpSession, idx, 1);
+        if (ret == LINK_SUCCESS)
+                segmentMgr.handles[idx].segReportOk = 1;
+        else
+                segmentMgr.handles[idx].segReportOk = 0;
+
+        segmentMgr.handles[idx].nNextUpdateSegTimeInSecond = nNow + segmentMgr.handles[idx].nReportTTL;
+        segmentMgr.handles[idx].tmpSession.nVideoGapFromLastReport = 0;
+        segmentMgr.handles[idx].tmpSession.nAudioGapFromLastReport = 0;
+        return;
+}
+
+static void handleTTLReportSegInfo(int force) {
+        int idx = 0;
+        int total = sizeof(segmentMgr.handles) / sizeof(Seg);
+        int64_t nNow = time(NULL);
+        for (idx = 0; idx < total; idx++) {
+                if (segmentMgr.handles[idx].handle < 0) {
+                        continue;
+                }
+                if (force) {
+                        if (segmentMgr.handles[idx].tmpSession.nSessionEndResonCode == 0)
+                                segmentMgr.handles[idx].tmpSession.nSessionEndResonCode = 4;
+                } else if (nNow < segmentMgr.handles[idx].nNextUpdateSegTimeInSecond) {
+                        continue;
+                }
+                
+                handleOnSegReportSegInfo(idx, nNow);
+        }
         
         return;
 }
@@ -275,6 +317,7 @@ static void linkReleaseSegmentHandle(SegmentHandle seg) {
         pthread_mutex_lock(&segMgrMutex);
         if (seg >= 0 && seg < sizeof(segmentMgr.handles) / sizeof(SegmentHandle)) {
                 segmentMgr.handles[seg].handle = -1;
+                segmentMgr.handles[seg].nReportTTL = 0;
                 segmentMgr.handles[seg].getUploadParamCallback = NULL;
                 segmentMgr.handles[seg].pGetUploadParamCallbackArg = NULL;
                 segmentMgr.handles[seg].nNextUpdateSegTimeInSecond = 0;
@@ -289,17 +332,26 @@ static void * segmetMgrRun(void *_pOpaque) {
         while(!segmentMgr.nQuit_ || info.nLen_ != 0) {
                 SegInfo segInfo = {0};
                 segInfo.handle = -1;
-                int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), 24 * 60 * 60 * 1000000LL);
+                int64_t popWaitTime = (int64_t)24 * 60 * 60 * 1000000;
+                if (segmentMgr.nReportTTL > 0)
+                        popWaitTime = segmentMgr.nReportTTL * 1000000;
+                int ret = segmentMgr.pSegQueue_->PopWithTimeout(segmentMgr.pSegQueue_, (char *)(&segInfo), sizeof(segInfo), popWaitTime);
                 
                 segmentMgr.pSegQueue_->GetStatInfo(segmentMgr.pSegQueue_, &info);
-                LinkLogDebug("segment queue:%d cmd:%d", info.nLen_, segInfo.nOperation);
+                LinkLogDebug("segment queue:%d cmd:%d end:%d", info.nLen_, segInfo.nOperation, segInfo.session.nSessionEndResonCode);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("seg queue error. pop:%d", ret);
+                        } else {
+                                handleTTLReportSegInfo(0);
                         }
                         continue;
                 }
                 if (ret == sizeof(segInfo)) {
+                        if (segInfo.nOperation == SEGMENT_QUIT) {
+                                handleTTLReportSegInfo(1);
+                                continue;
+                        }
                         LinkLogDebug("pop segment info:%d", segInfo.handle);
                         if (segInfo.handle < 0) {
                                 LinkLogWarn("wrong segment handle:%d", segInfo.handle);
@@ -307,6 +359,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                                 switch (segInfo.nOperation) {
                                                 
                                         case SEGMENT_RELEASE:
+                                                handleOnSegReportSegInfo(segInfo.handle, time(NULL));
                                                 linkReleaseSegmentHandle(segInfo.handle);
                                                 break;
                                         case SEGMENT_UPDATE:
@@ -319,8 +372,6 @@ static void * segmetMgrRun(void *_pOpaque) {
                                         case SEGMENT_CLEAR_META:
                                                 handleClearSessionMeta(&segInfo);
                                                 break;
-                                        case  SEGMENT_QUIT:
-                                                continue;
                                 }
                         }
                 }

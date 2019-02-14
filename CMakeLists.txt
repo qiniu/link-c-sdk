@@ -42,7 +42,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILE_NAME__='\"$(subst ${CMAKE_SOURCE_DI
 SET(GCC_COVERAGE_COMPILE_FLAGS "-Wno-unused")
 if (WITH_DEBUG)
     message("WITH_DEBUG")
-    add_definitions("-Wall -g -fstack-protector")
+    add_definitions("-Wall -g -fstack-protector-all")
 endif()
 
 if(TRACE_FUNCTION)
