@@ -89,6 +89,8 @@ typedef struct _FFTsMuxUploader{
         int64_t nLastFrameTimestamp;
         int64_t nLastVideoFrameTsForCheck;
         int64_t nLastAudioFrameTsForCheck;
+        int64_t nLastVideoFrameTsForCheckSysTime;
+        int64_t nLastAudioFrameTsForCheckSysTime;
         
         int64_t nLastPicCallbackSystime; //upload picture need
         int nKeyFrameCount;
@@ -550,8 +552,19 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                 if (_nTimestamp <= pFFTsMuxUploader->nLastVideoFrameTsForCheck) {
                         LinkLogWarn("Video timestamp not monotonical:%"PRId64" %"PRId64"",_nTimestamp, pFFTsMuxUploader->nLastVideoFrameTsForCheck);
                 }
+                if (pFFTsMuxUploader->nLastAudioFrameTsForCheck > 0) {
+                        int64_t avDiff = _nTimestamp - pFFTsMuxUploader->nLastAudioFrameTsForCheck;
+                        if (avDiff < 0) {
+                                avDiff = -avDiff;
+                        }
+                        if (avDiff > 500) {
+                                LinkLogWarn("av timestamp may not align to same timebase:cv:%"PRId64" la:%"PRId64"",
+                                            _nTimestamp, pFFTsMuxUploader->nLastAudioFrameTsForCheck);
+                        }
+                }
         }
         pFFTsMuxUploader->nLastVideoFrameTsForCheck =_nTimestamp;
+        pFFTsMuxUploader->nLastVideoFrameTsForCheckSysTime = nSysNanotime;
         
         
         if (pFFTsMuxUploader->isPause) {

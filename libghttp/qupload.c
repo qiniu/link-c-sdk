@@ -9,7 +9,8 @@
 #include "ghttp.h"
 #include <errno.h>
 
-
+typedef void (*__ghttp_qupload)(const char *);
+extern __ghttp_qupload GhttpLogOutput;
 static int get_fix_random_str(char *buf, int bufLen, int len) {
         int i = 0, val = 0;
         const char *base = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -162,15 +163,16 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         //form boundary
         const char *form_prefix = "--------LINKFormBoundary"; //24
         size_t form_prefix_len = strlen(form_prefix);
-        char form_boundary[24+16+1];
+        char form_boundary[24+16+1] = {0};
         memcpy(form_boundary, form_prefix, form_prefix_len);
         get_fix_random_str(form_boundary + form_prefix_len, sizeof(form_boundary) - form_prefix_len, 16);
         size_t form_boundary_len = strlen(form_boundary);
+        form_boundary[form_boundary_len] = 0;
         
         char *form_data = NULL;
         char *form_data_p = NULL;
         int form_buf_buf_len  = 0;
-        char static_form_data[1536];
+        char static_form_data[1636] = {0};
         int staticPrevFormDataLen = 0;
         //alloc body buffer
         struct stat st;
@@ -241,9 +243,12 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         
         
         //send the request
-        size_t form_content_type_len = 31 + form_boundary_len;
-        char form_content_type[31+64] = {0};
-        snprintf(form_content_type, form_content_type_len, "multipart/form-data; boundary=%s", form_boundary);
+        char form_content_type[256] = {0};
+        snprintf(form_content_type, sizeof(form_content_type), "multipart/form-data; boundary=%s", form_boundary);
+        if (strchr(form_content_type, '\r')) {
+                if (GhttpLogOutput != NULL)
+                        GhttpLogOutput("abnormal contentype");
+        }
         
         ghttp_request *request = NULL;
         request = ghttp_request_new();
