@@ -30,7 +30,6 @@
 
 #include "http_trans.h"
 #include "http_global.h"
-#include "timeoutconn.h"
 
 #ifdef USE_OPENSSL
 #include <openssl/crypto.h>
@@ -99,6 +98,14 @@ static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
     return 0;
 }
 
+static socket_is_nonblock(int fd) {
+        int flags;
+        if((flags = fcntl(fd, F_GETFL, 0)) < 0) {
+                return -1;
+        }
+        return flags & O_NONBLOCK;
+}
+
 int
 http_trans_connect(http_trans_conn *a_conn)
 {
@@ -154,7 +161,7 @@ http_trans_connect(http_trans_conn *a_conn)
       a_conn->error = errno;
       goto ec;
     }
-  //print_socket_block_mode(a_conn->sock);
+
   struct timeval tv;
   tv.tv_sec = a_conn->nTimeoutInSecond;
   tv.tv_usec = 0;
@@ -162,24 +169,24 @@ http_trans_connect(http_trans_conn *a_conn)
   setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
   /* set up the socket */
+  int connBeginTime = time(NULL);
   if (connect(a_conn->sock,
 	      (struct sockaddr *)&a_conn->saddr,
 	      sizeof(struct sockaddr)) < 0)
     {
+      int connEndTime = time(NULL);
       int notok = 1;
       int errnobak = errno;
       const char * blkMode = "blksock";
       if (errno == EINPROGRESS) {
               if (socket_is_nonblock(a_conn->sock)) {
                       blkMode = "nonblksock";
-                      notok = wait_connect(a_conn->sock, 3);
-                      if (notok == 0)
-                              notok = set_socket_to_block(a_conn->sock);
               }
       }
       char connErr[128]={0};
       unsigned char * sockip = (unsigned char *)&a_conn->saddr.sin_addr.s_addr;
-      snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:%d %d notok:%d ip:%d.%d.%d.%d\n", blkMode, a_conn->sock, errnobak, errno, notok,
+            snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1%d en2%d time:%d notok:%d ip:%d.%d.%d.%d\n",
+               blkMode, a_conn->sock, errnobak, errno, notok, connEndTime - connBeginTime,
                sockip[0], sockip[1], sockip[2], sockip[3]);
       if (GhttpLogOutput != NULL)
         GhttpLogOutput(connErr);
