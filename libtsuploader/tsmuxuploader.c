@@ -798,7 +798,7 @@ static void setToken(FFTsMuxUploader* _PTsMuxUploader, Buffer token, Buffer ttok
 }
 
 static const char *sReasonStr[] ={"---", "normal", "timeout", "force"};
-static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSession, int64_t nNewSessionId, int lastSessionEndReasonCode) {
+static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSession, int64_t nNewSessionId, int lastSessionEndReasonCode, int shouldReport) {
         SessionUpdateParam upparam;
         upparam.nType = 1;
         
@@ -808,7 +808,8 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
                 pSession->nSessionEndTime = pSession->nLastTsEndTime;
         else
                 pSession->nSessionEndTime = nNewSessionId;
-        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
+        if (shouldReport)
+                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         
         // update session
         upparam.nSeqNum = 0;
@@ -825,14 +826,15 @@ static void handNewSession(FFTsMuxUploader *pFFTsMuxUploader, LinkSession *pSess
         pFFTsMuxUploader->uploadArgBak.nSegmentId_ = pSession->nSessionStartTime;
         pFFTsMuxUploader->uploadArgBak.nSegSeqNum = 0;
         
-        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
+        if (shouldReport)
+                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
         pSession->isNewSessionStarted = 0;
         pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nNewSessionId;
         
         return;
 }
 
-static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime, int64_t nCurTsDuration)
+static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStartSystime, int64_t nCurSystime, int64_t nCurTsDuration, int reportFlag)
 {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pOpaque;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
@@ -851,7 +853,8 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
                 LinkLogInfo("start: update remote config:%"PRId64" %"PRId64"\n",
                         pSession->nSessionStartTime, pFFTsMuxUploader->uploadArgBak.nSegmentId_);
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
-                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
+                if (reportFlag)
+                        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
                 pSession->isNewSessionStarted = 0;
                 
                 pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nCurSystime;
@@ -866,7 +869,7 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
         } else {
                 if (nCurSystime == 0) {
                         pFFTsMuxUploader->uploadArgBak.nLastCheckTime = LinkGetCurrentNanosecond();
-                        handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, 3);
+                        handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, 3, reportFlag);
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return;
                 }
@@ -898,12 +901,13 @@ static void updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsSta
         pFFTsMuxUploader->uploadArgBak.nSegSeqNum = pSession->nTsSequenceNumber;
         pFFTsMuxUploader->uploadArgBak.nLastCheckTime = nCurSystime;
         if (isSegIdChange) {
-                handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, isSegIdChange);
+                handNewSession(pFFTsMuxUploader, pSession, nTsStartSystime, isSegIdChange, reportFlag);
         } else {
 
                 if (isSeqNumChange) {
                         pSession->isNewSessionStarted = 0;
-                        LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
+                        if (reportFlag)
+                                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
                 }
         }
 
