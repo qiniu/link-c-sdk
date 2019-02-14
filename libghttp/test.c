@@ -2,6 +2,11 @@
 #include <string.h>
 #include <ghttp.h>
 #include "qupload.h"
+
+void GhttpLogOutput(const char * errMsg) {
+        printf("%s\n", errMsg);
+}
+
 int testhttps(char * p)
 {
     char *uri = "https://www.baidu.com";
