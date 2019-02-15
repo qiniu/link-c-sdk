@@ -249,7 +249,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         
         int64_t tsStartTime = pSession->nTsStartTime;
         int64_t tsDuration = pSession->nTsDuration;
-        if (tsDuration > 30000) {
+        if (tsDuration > 30000 && tsDuration < 0) {
                 LinkLogWarn("abnormal ts duration:%"PRId64"", tsDuration);
         }
         int64_t tsPhysicalDuration = (pKodoUploader->nLastSystime - tsStartTime)/1000000 - 40;
@@ -259,6 +259,9 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 if (tsStartTime < pKodoUploader->nLastTsEndTime) {
                         LinkLogWarn("ts timestamp not monotonical: le:%"PRId64" ns:%"PRId64"",tsEndTime/1000000, pKodoUploader->nLastTsEndTime/1000000);
                 }
+        }
+        if (tsDuration < 0) {
+                tsDuration = tsPhysicalDuration;
         }
         pKodoUploader->nLastTsEndTime = tsEndTime;
         
