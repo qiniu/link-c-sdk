@@ -168,8 +168,8 @@ void LinkCleanup()
         if (nProcStatus != 1)
                 return;
         nProcStatus = 2;
-        LinkUninitSegmentMgr();
         LinkStopMgr();
+        LinkUninitSegmentMgr();
 
         /* stop emitter service */
         LinkEmitter_Cleanup();
