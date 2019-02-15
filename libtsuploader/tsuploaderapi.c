@@ -9,18 +9,22 @@
 #include "cJSON/cJSON.h"
 #include <signal.h>
 #include <libmqtt/linking-emitter-api.h>
+#include <qupload.h>
 
 extern const char *gVersionAgent;
 
 static int volatile nProcStatus = 0;
 
-
+void ghttpLogOutput(const char * errMsg) {
+        LinkLogError("%s", errMsg);
+}
 
 int LinkInit()
 {
         if (nProcStatus) {
                 return LINK_SUCCESS;
         }
+        LinkGhttpSetLog(ghttpLogOutput);
         
         signal(SIGPIPE, SIG_IGN);
         sigset_t signal_mask;

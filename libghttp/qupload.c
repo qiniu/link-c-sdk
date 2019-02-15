@@ -9,8 +9,6 @@
 #include "ghttp.h"
 #include <errno.h>
 
-typedef void (*__ghttp_qupload)(const char *);
-extern __ghttp_qupload GhttpLogOutput;
 static int get_fix_random_str(char *buf, int bufLen, int len) {
         int i = 0, val = 0;
         const char *base = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -27,6 +25,14 @@ static int get_fix_random_str(char *buf, int bufLen, int len) {
         return len;
 }
 
+LinkGhttpLog ghttpLog = NULL;
+void LinkGhttpSetLog(LinkGhttpLog log) {
+        ghttpLog = log;
+}
+void LinkGhttpLogger(const char *msg) {
+        if (ghttpLog != NULL)
+                ghttpLog(msg);
+}
 
 /*
  * form body concatenation function
@@ -246,8 +252,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         char form_content_type[256] = {0};
         snprintf(form_content_type, sizeof(form_content_type), "multipart/form-data; boundary=%s", form_boundary);
         if (strchr(form_content_type, '\r')) {
-                if (GhttpLogOutput != NULL)
-                        GhttpLogOutput("abnormal contentype");
+                LinkGhttpLogger("abnormal contentype");
         }
         
         ghttp_request *request = NULL;

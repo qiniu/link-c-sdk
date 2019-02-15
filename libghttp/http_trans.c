@@ -30,6 +30,7 @@
 
 #include "http_trans.h"
 #include "http_global.h"
+#include "qupload.h"
 
 #ifdef USE_OPENSSL
 #include <openssl/crypto.h>
@@ -55,8 +56,7 @@ static int http_trans_buf_free(http_trans_conn *a_conn);
 
 static char cert_file[256]={"/etc/ssl/certs/ca-certificates.crt"};
 static char cert_path[256];
-typedef void (*__ghttp_trans_log)(const char *);
-extern __ghttp_trans_log GhttpLogOutput;
+
 void ghttp_set_global_cert_file_path(const char *file, const char *path)
 {
     int lenf = strlen(file);
@@ -188,8 +188,7 @@ http_trans_connect(http_trans_conn *a_conn)
             snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1%d en2%d time:%d notok:%d ip:%d.%d.%d.%d\n",
                blkMode, a_conn->sock, errnobak, errno, notok, connEndTime - connBeginTime,
                sockip[0], sockip[1], sockip[2], sockip[3]);
-      if (GhttpLogOutput != NULL)
-        GhttpLogOutput(connErr);
+      LinkGhttpLogger(connErr);
      if (notok) {
       a_conn->error_type = http_trans_err_type_errno;
       a_conn->error = errno;
