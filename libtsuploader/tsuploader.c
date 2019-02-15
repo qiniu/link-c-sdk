@@ -140,7 +140,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         pp[6] = pCnt; *pCnt++ = 'c'; *pCnt++ = 0;
         pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
-        LinkPutret putret;
+        LinkPutret putret = {0};
         if (nCustomMagicLen > 0)
                 realKey = NULL;
         int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
@@ -158,11 +158,11 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                         LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg=%s",
-                                             key, datasize, putret.reqid, putret.code, putret.body);
+                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s",
+                                             key, datasize, putret.reqid, putret.xreqid,putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg={not receive response}",
-                                             key, datasize, putret.reqid, putret.code);
+                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
+                                             key, datasize, putret.reqid, putret.xreqid, putret.code);
                         }
                 }
         }

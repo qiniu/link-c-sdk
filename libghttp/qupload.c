@@ -249,7 +249,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         
         
         //send the request
-        char form_content_type[256] = {0};
+        char form_content_type[192] = {0};
         snprintf(form_content_type, sizeof(form_content_type), "multipart/form-data; boundary=%s", form_boundary);
         if (strchr(form_content_type, '\r')) {
                 LinkGhttpLogger("abnormal contentype");
@@ -266,6 +266,8 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         
         ghttp_set_uri(request, upHost);
         ghttp_set_header(request, "Content-Type", form_content_type);
+        get_fix_random_str(put_ret->xreqid, sizeof(put_ret->xreqid), 16);
+        ghttp_set_header(request, "X-Reqid", put_ret->xreqid);
         ghttp_set_type(request, ghttp_type_post);
         if (!isTypeFile)
                 ghttp_set_body3(request, form_data, staticPrevFormDataLen, filepathOrBufer, bufferLen,

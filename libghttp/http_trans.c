@@ -185,8 +185,8 @@ http_trans_connect(http_trans_conn *a_conn)
       }
       char connErr[128]={0};
       unsigned char * sockip = (unsigned char *)&a_conn->saddr.sin_addr.s_addr;
-            snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1%d en2%d time:%d notok:%d ip:%d.%d.%d.%d\n",
-               blkMode, a_conn->sock, errnobak, errno, notok, connEndTime - connBeginTime,
+            snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1:%d en2:%d time:%d-%d=%d notok:%d ip:%d.%d.%d.%d\n",
+               blkMode, a_conn->sock, errnobak, errno, connEndTime, connBeginTime, connEndTime - connBeginTime, notok,
                sockip[0], sockip[1], sockip[2], sockip[3]);
       LinkGhttpLogger(connErr);
      if (notok) {

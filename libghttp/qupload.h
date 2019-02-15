@@ -4,6 +4,7 @@
 typedef struct {
     int code;
     char reqid[17];
+    char xreqid[17];
     char error[64];
     char *body;
 } LinkPutret;
