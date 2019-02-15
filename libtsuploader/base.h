@@ -174,7 +174,7 @@ typedef struct _LinkSession { // seg report info
         int64_t nLastTsEndTime;
         int nSessionEndResonCode;
         int isNewSessionStarted;
-        
+        int segHandle;
         int64_t nAccSessionDuration;
         int64_t nAccSessionAudioDuration; // tad
         int64_t nAccSessionVideoDuration; // tvd

@@ -49,6 +49,7 @@ static int segMgrStarted = 0;
 
 static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
         int64_t nNow = LinkGetCurrentNanosecond() / 1000000000LL;
+        pSeg->tmpSession.nTsSequenceNumber = pCurSession->nTsSequenceNumber;
         if (pCurSession->isNewSessionStarted != 0) {
                 memcpy(&pSeg->tmpSession, pCurSession, sizeof(LinkSession));
                 return 0;
@@ -242,7 +243,10 @@ static void handleOnSegReportSegInfo(int idx, int64_t nNow) {
                     LinkLogInfo("not report due to session duration is 0");
                     return;
             }
-        
+        if (segmentMgr.handles[idx].tmpSession.nSessionEndTime == 0) {
+                segmentMgr.handles[idx].tmpSession.nSessionEndTime = segmentMgr.handles[idx].tmpSession.nSessionStartTime +
+                segmentMgr.handles[idx].tmpSession.nAccSessionVideoDuration * 1000000;
+        }
         int ret = reportSegInfo(&segmentMgr.handles[idx].tmpSession, idx, 1);
         if (ret == LINK_SUCCESS)
                 segmentMgr.handles[idx].segReportOk = 1;
@@ -349,6 +353,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                 }
                 if (ret == sizeof(segInfo)) {
                         if (segInfo.nOperation == SEGMENT_QUIT) {
+                                LinkLogInfo("segmentmgr recv quit");
                                 handleTTLReportSegInfo(1);
                                 continue;
                         }
@@ -363,7 +368,7 @@ static void * segmetMgrRun(void *_pOpaque) {
                                                 linkReleaseSegmentHandle(segInfo.handle);
                                                 break;
                                         case SEGMENT_UPDATE:
-                                                LinkLogDebug("segment %s", segInfo.session.sessionId);
+                                                LinkLogDebug("segment %s %"PRId64"", segInfo.session.sessionId, segInfo.session.nTsSequenceNumber);
                                                 handleReportSegInfo(&segInfo);
                                                 break;
                                         case  SEGMENT_UPDATE_META:
@@ -459,6 +464,7 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         SegInfo segInfo;
         segInfo.handle = seg;
         segInfo.session = *pSession;
+        /*
         if (pSession->nSessionEndResonCode != 0) {
                 segInfo.session.nAccSessionAudioDuration -= segInfo.session.nAudioGapFromLastReport ;
                 segInfo.session.nAccSessionVideoDuration -= segInfo.session.nVideoGapFromLastReport ;
@@ -467,6 +473,7 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
                 segInfo.session.nVideoGapFromLastReport = 0;
                 segInfo.session.nAudioGapFromLastReport = 0;
         }
+        */
         segInfo.nOperation = SEGMENT_UPDATE;
         int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         if (ret <= 0) {
@@ -513,6 +520,7 @@ void LinkUninitSegmentMgr() {
         SegInfo segInfo;
         segInfo.nOperation = SEGMENT_QUIT;
         
+        LinkLogInfo("segmentmgr require to quit");
         int ret = 0;
         while(ret <= 0) {
                 ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));

@@ -11,6 +11,7 @@
 #include "libghttp/qupload.h"
 #include "httptools.h"
 #include "picuploader.h"
+#include "segmentmgr.h"
 
 
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
@@ -59,6 +60,8 @@ typedef struct _KodoUploader{
         int nQuit_;
         LinkPlanType planType;
         LinkSession session;
+        LinkSession bakSession;
+        int reportType;
         
         // for restoreDuration
         int64_t nAudioDuration;
@@ -70,6 +73,7 @@ typedef struct _KodoUploader{
         int64_t nLastSystimeBak;
         
         int64_t nLastTsEndTime;
+        int64_t nLastTsDuration;
         
         LinkTsOutput output;
         void *pOutputUserArg;
@@ -95,7 +99,7 @@ typedef struct _TsUploaderCommand {
         };
 }TsUploaderCommand;
 
-static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport);
+static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport);
 static void restoreDuration (KodoUploader * pKodoUploader);
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
@@ -140,7 +144,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         pp[6] = pCnt; *pCnt++ = 'c'; *pCnt++ = 0;
         pp[7] = pCnt; pCnt += sprintf(pCnt, "%d", isDiscontinuity); *pCnt++ = 0;
         
-        LinkPutret putret;
+        LinkPutret putret = {0};
         if (nCustomMagicLen > 0)
                 realKey = NULL;
         int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
@@ -158,11 +162,11 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                         LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg=%s",
-                                             key, datasize, putret.reqid, putret.code, putret.body);
+                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s",
+                                             key, datasize, putret.reqid, putret.xreqid,putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s[%d] reqid:%s httpcode=%d errmsg={not receive response}",
-                                             key, datasize, putret.reqid, putret.code);
+                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
+                                             key, datasize, putret.reqid, putret.xreqid, putret.code);
                         }
                 }
         }
@@ -217,8 +221,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
         LinkSession *pSession = &pUploadCmd->ts.pKodoUploader->session;
         
-        pKodoUploader->session.nTsSequenceNumber++;
-        
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
@@ -262,8 +264,10 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         }
         if (tsDuration < 0) {
                 tsDuration = tsPhysicalDuration;
+                tsEndTime = tsStartTime + tsDuration*1000000;
         }
         pKodoUploader->nLastTsEndTime = tsEndTime;
+        pKodoUploader->nLastTsDuration = tsDuration;
         
         getBufDataRet = LinkGetQueueBuffer(pDataQueue, &bufData, &lenOfBufData);
         
@@ -274,8 +278,15 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 shouldReport = 1;
         }
         
-        if (getUploadParamOk)
-                handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration, shouldReport);
+        int reportType = pKodoUploader->reportType;
+        /*
+        if (getUploadParamOk && reportType == 0) {
+                //reportType = handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration, shouldReport);
+                reportType = 2;
+                assert(reportType == 2);
+        }
+        */
+        
         int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);
         assert(nSLen < sizeof(param.sessionId));
         
@@ -333,7 +344,28 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
+        
+        if (shouldReport && reportType & 0x4) {
+                LinkLogDebug("=========================4>%s", pKodoUploader->bakSession.sessionId);
+                pKodoUploader->bakSession.isNewSessionStarted = 0;
+                pKodoUploader->bakSession.nSessionEndResonCode = pSession->nSessionEndResonCode;
+                assert(pKodoUploader->bakSession.nSessionEndResonCode != 0);
+                LinkUpdateSegment(pSession->segHandle, &pKodoUploader->bakSession);
+        }
+        
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
+                if (shouldReport){
+                        if(reportType & 0x1) {
+                                LinkLogDebug("=========================1>%s", pSession->sessionId);
+                                pSession->isNewSessionStarted = 1;
+                                LinkUpdateSegment(pSession->segHandle, pSession);
+                                pSession->isNewSessionStarted = 0;
+                        } else if(reportType & 0x2) {
+                                LinkLogDebug("=========================2>%s %"PRId64"", pSession->sessionId, pSession->nTsSequenceNumber);
+                                LinkUpdateSegment(pSession->segHandle, pSession);
+                        }
+                }
+                
                 if (pKodoUploader->picture.pFilename) {
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
                                  "-%s.jpg", pKodoUploader->session.sessionId);
@@ -345,7 +377,16 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
         } else {
                 restoreDuration(pKodoUploader);
+                if (shouldReport){
+                        if(reportType & 0x1) {
+                                LinkLogDebug("=========================1>%s", pSession->sessionId);
+                                pSession->isNewSessionStarted = 1;
+                                LinkUpdateSegment(pSession->segHandle, pSession);
+                                pSession->isNewSessionStarted = 0;
+                        }
+                }
         }
+        
         resetSessionReportScope(pSession);
         resetSessionCurrentTsScope(pSession);
         if (pKodoUploader->pTsEndUploadCallback) {
@@ -385,7 +426,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                         pKodoUploader->pSessionMeta = NULL;
                 }
         }
-        
+        pKodoUploader->reportType = 0;
+        pSession->nSessionEndResonCode = 0;
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         pKodoUploader->nTsCacheNum--;
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
@@ -524,7 +566,7 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         }
         
         pSession->nSessionStartTime =  nTsStartSystime;
-        pSession->nSessionEndResonCode = 0;
+        //pSession->nSessionEndResonCode = 0;
         pSession->nTsSequenceNumber = 0;
         pSession->isNewSessionStarted = 1;
         
@@ -544,17 +586,18 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         pSession->nSessionEndTime = 0;
 }
 
-static void handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport) {
+static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport) {
 
         if (pKodoUploader->uploadArg.UploadUpdateSegmentId) {
                 if (isForceNewSession)
-                        pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
+                        return pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
                                                                        &pKodoUploader->session, nSysTimestamp, 0, nCurTsDuration, shouldReport);
                 else
-                        pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
+                        return pKodoUploader->uploadArg.UploadUpdateSegmentId(pKodoUploader->uploadArg.pUploadArgKeeper_,
                                                                        &pKodoUploader->session,
                                                                        pKodoUploader->session.nTsStartTime, nSysTimestamp, nCurTsDuration, shouldReport);
         }
+        return 0;
 }
 
 static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
@@ -569,7 +612,18 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0, 0);
+        if (pKodoUploader->reportType == 0) {
+                pKodoUploader->bakSession = pKodoUploader->session;
+                pKodoUploader->session.nTsSequenceNumber++;
+                pKodoUploader->reportType = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, pKodoUploader->nLastTsDuration, 0);
+                if (pKodoUploader->reportType == 5)
+                        pKodoUploader->session.nTsSequenceNumber = 1;
+        } else { // 强制片段结束了
+                pKodoUploader->session.nTsSequenceNumber++;
+                int xx = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, pKodoUploader->nLastTsDuration, 0);
+                pKodoUploader->reportType |= xx;
+        }
+        pKodoUploader->bakSession.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
 }
 
 static void restoreDuration (KodoUploader * pKodoUploader) {
@@ -601,13 +655,12 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         
         
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
-        
-        //handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, 0);
 }
 
 static void handleSegTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
         
-        handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 1, 0, 0);
+        pKodoUploader->bakSession = pKodoUploader->session;
+        pKodoUploader->reportType = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 1, 0, 0);
 }
 
 static void * listenTsUpload(void *_pOpaque)
@@ -640,8 +693,13 @@ static void * listenTsUpload(void *_pOpaque)
                                 pKodoUploader->picture = cmd.pic;
                                 break;
                         case LINK_TSU_QUIT:
-                                LinkLogInfo("tsuploader required to quit");
-                                handleSegTimeReport(pKodoUploader, &cmd.time);
+                                LinkLogInfo("tsuploader required to quit:%"PRId64"", pKodoUploader->session.nAccSessionDuration);
+                                if (pKodoUploader->session.nAccSessionDuration > 0) {
+                                        LinkLogDebug("=========================4>%s", pKodoUploader->session.sessionId);
+                                        pKodoUploader->session.nSessionEndResonCode = 4;
+                                        pKodoUploader->session.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
+                                        LinkUpdateSegment(pKodoUploader->session.segHandle, &pKodoUploader->session);
+                                }
                                 break;
                         case LINK_TSU_START_TIME:
                                 handleTsStartTimeReport(pKodoUploader, &cmd.time);
