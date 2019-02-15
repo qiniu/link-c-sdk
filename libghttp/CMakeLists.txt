@@ -41,8 +41,6 @@ add_library(ghttp STATIC
 	http_uri.h
 	qupload.h
 	qupload.c
-	timeoutconn.h
-	timeoutconn.c
 )
 
 

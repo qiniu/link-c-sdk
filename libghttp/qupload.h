@@ -16,4 +16,8 @@ int LinkUploadBuffer(const char *buffer, int bufferLen, const char* upHost, cons
                 const char **customMagic, int nCustomMagicLen, const char *mime_type, LinkPutret *put_ret);
 void LinkFreePutret(LinkPutret *put_ret);
 
+typedef void (*LinkGhttpLog)(const char *);
+void LinkGhttpSetLog(LinkGhttpLog log);
+void LinkGhttpLogger(const char *);
+
 #endif

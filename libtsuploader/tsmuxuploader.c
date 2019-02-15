@@ -1579,8 +1579,8 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         if (pNode != NULL) {
                 pRc->nTsDuration = pNode->valueint * 1000;
         }
-        if (pRc->nTsDuration < 5000 || pRc->nTsDuration > 15000)
-                pRc->nTsDuration = 5000;
+        if (pRc->nTsDuration < 4000 || pRc->nTsDuration > 15000)
+                pRc->nTsDuration = 4000;
         LinkLogInfo("tsDuration:%d", pRc->nTsDuration);
         
         pNode = cJSON_GetObjectItem(pSeg, "sessionDuration");
@@ -1861,8 +1861,4 @@ static int linkTsMuxUploaderTokenThreadStart(FFTsMuxUploader* pFFTsMuxUploader) 
         }
 
         return LINK_SUCCESS;
-}
-
-void GhttpLogOutput(const char * errMsg) {
-        LinkLogError("%s", errMsg);
 }
