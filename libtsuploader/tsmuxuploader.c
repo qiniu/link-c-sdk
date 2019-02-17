@@ -1190,20 +1190,14 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
                 LinkLogError("ak or sk or app or devicename is not exits");
                 return LINK_ARG_ERROR;
         }
-        //LinkTsMuxUploader *pTsMuxUploader
-        int ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
-        if (ret != LINK_SUCCESS) {
-                return ret;
-        }
         
-        ret = LinkInitSegmentMgr();
+	int ret = LinkInitSegmentMgr();
         if (ret != LINK_SUCCESS) {
-                LinkDestroyTsMuxUploader(_pTsMuxUploader);
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);
                 return ret;
         }
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
-        
+
         SegmentHandle segHandle;
         SegmentArg arg;
         memset(&arg, 0, sizeof(arg));
@@ -1213,11 +1207,18 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
-                LinkDestroyTsMuxUploader(_pTsMuxUploader);
+                LinkUninitSegmentMgr();
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);
                 return ret;
         }
         pFFTsMuxUploader->segmentHandle = segHandle;
+
+        //LinkTsMuxUploader *pTsMuxUploader
+        ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
+        if (ret != LINK_SUCCESS) {
+                LinkUninitSegmentMgr();
+                return ret;
+        }
         
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
