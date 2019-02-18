@@ -1196,6 +1196,13 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);
                 return ret;
         }
+        
+        //LinkTsMuxUploader *pTsMuxUploader
+        ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
+        if (ret != LINK_SUCCESS) {
+                LinkUninitSegmentMgr();
+                return ret;
+        }
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
 
         SegmentHandle segHandle;
@@ -1208,17 +1215,11 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
                 LinkUninitSegmentMgr();
+                LinkDestroyTsMuxUploader(_pTsMuxUploader);
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);
                 return ret;
         }
         pFFTsMuxUploader->segmentHandle = segHandle;
-
-        //LinkTsMuxUploader *pTsMuxUploader
-        ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
-        if (ret != LINK_SUCCESS) {
-                LinkUninitSegmentMgr();
-                return ret;
-        }
         
         LinkPicUploadFullArg fullArg;
         fullArg.getPicCallback = _pPicArg->getPicCallback;
@@ -1230,6 +1231,7 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
+                LinkUninitSegmentMgr();
                 LinkDestroyTsMuxUploader(_pTsMuxUploader);
                 LinkLogError("LinkNewPictureUploader fail:%d", ret);
                 return ret;
