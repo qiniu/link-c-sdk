@@ -333,9 +333,6 @@ void LinkMqttDinit(struct MqttInstance* _pInstance)
 
 MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
 {
-        // sleep DEFAULT_CON_TIMEOUT_MS to make previous connection down.
-        usleep(DEFAULT_CON_TIMEOUT_MS * 1000);
-
         if (_pInstance == NULL || _pInstance->mosq == NULL) {
                 return MQTT_ERR_NOMEM;
         }
