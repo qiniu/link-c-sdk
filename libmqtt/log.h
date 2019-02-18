@@ -30,15 +30,15 @@ void LinkSetLogLevel(IN int nLevel);
 void LinkLog(IN int nLevel, IN char * pFmt, ...);
 
 #define LinkLogTrace(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_TRACE, __FILE__ ":" __STR_LINE__ "[T]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_TRACE, __FILE_NAME__ ":" __STR_LINE__ "[T]: " fmt "\n", ##__VA_ARGS__)
 #define LinkLogDebug(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_DEBUG, __FILE__ ":" __STR_LINE__ "[D]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_DEBUG, __FILE_NAME__ ":" __STR_LINE__ "[D]: " fmt "\n", ##__VA_ARGS__)
 #define LinkLogInfo(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_INFO,  __FILE__ ":" __STR_LINE__ "[I]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_INFO,  __FILE_NAME__ ":" __STR_LINE__ "[I]: " fmt "\n", ##__VA_ARGS__)
 #define LinkLogWarn(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_WARN,  __FILE__ ":" __STR_LINE__ "[W]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_WARN,  __FILE_NAME__ ":" __STR_LINE__ "[W]: " fmt "\n", ##__VA_ARGS__)
 #define LinkLogError(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_ERROR, __FILE__ ":" __STR_LINE__ "[E]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_ERROR, __FILE_NAME__ ":" __STR_LINE__ "[E]: " fmt "\n", ##__VA_ARGS__)
 
 
 #endif

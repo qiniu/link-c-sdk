@@ -56,6 +56,8 @@ typedef struct {
     char *mqtt_passwd;
     char *client_id;
     int mqtt_port;
+
+    char *otaMode;
 } Config;
 
 struct cfg_struct;
