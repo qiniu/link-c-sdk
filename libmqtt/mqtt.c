@@ -112,6 +112,7 @@ void * LinkMqttThread(void* _pData)
                 LinkMqttDestroyInstance(pInstance);
                 return NULL;
         }
+        srand(time(0));
         do {
                 if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
                          pInstance->status = STATUS_CONNECTING;
