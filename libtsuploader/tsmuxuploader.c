@@ -677,6 +677,7 @@ int LinkPushPicture(IN LinkTsMuxUploader *_pTsMuxUploader,const char *pFilename,
 
 static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 {
+        sleep(2);
         FFTsMuxContext *pTsMuxCtx = (FFTsMuxContext*)_pOpaque;
         
         if (pTsMuxCtx) {

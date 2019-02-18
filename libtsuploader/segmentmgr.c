@@ -145,9 +145,18 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
         param.pSk = sk;
         param.nSkLen = sizeof(sk);
 
+        int getParamOk = 0;
         int ret = segmentMgr.handles[idx].getUploadParamCallback(segmentMgr.handles[idx].pGetUploadParamCallbackArg,
                                                                  &param, LINK_UPLOAD_CB_GETPARAM);
-        
+        if (ret != LINK_SUCCESS) {
+                if (ret == LINK_BUFFER_IS_SMALL) {
+                        LinkLogError("param buffer is too small. drop seg");
+                } else {
+                        LinkLogError("not get param yet:%d", ret);
+                }
+        } else {
+                getParamOk = 1;
+        }
         
         int nUrlLen = param.nSegUrlLen;
         reportHost[nUrlLen] = 0;
