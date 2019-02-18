@@ -1,4 +1,4 @@
-// Last Update:2018-11-19 11:10:28
+// Last Update:2019-02-18 10:30:30
 /**
  * @file sim_dev.c
  * @brief 
@@ -757,4 +757,9 @@ CaptureDevice gSimDevCaptureDev =
     NULL,
     SimDevCaptureJpeg
 };
+
+static void __attribute__((constructor)) SimDevRegisterToCore()
+{
+    CaptureDeviceRegister( &gSimDevCaptureDev );
+}
 
