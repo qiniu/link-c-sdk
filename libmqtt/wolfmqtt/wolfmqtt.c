@@ -9,7 +9,7 @@
 #include <signal.h>
 
 #define MAX_PACKET_ID ((1<<16) -1)
-#define DEFAULT_CON_TIMEOUT_MS 500
+#define DEFAULT_CON_TIMEOUT_MS 2000
 
 #define min(a,b) ((a)>(b)? (b):(a))
 
@@ -333,7 +333,7 @@ void LinkMqttDinit(struct MqttInstance* _pInstance)
 
 MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
 {
-	if (_pInstance == NULL || _pInstance->mosq == NULL) {
+        if (_pInstance == NULL || _pInstance->mosq == NULL) {
                 return MQTT_ERR_NOMEM;
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
@@ -394,21 +394,18 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
         if (_pInstance == NULL || _pInstance->mosq == NULL) {
                 return;
         }
-	struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
+        struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
         if (client->tls.ctx) {
                 wolfSSL_CTX_free(client->tls.ctx);
                 client->tls.ctx = NULL;
         }
-	int rc = MqttClient_Disconnect(client);
+
+        int rc = MqttClient_NetDisconnect(client);
         if (rc != MQTT_CODE_SUCCESS) {
                 LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
-	rc = MqttClient_NetDisconnect(client);
-	if (rc != MQTT_CODE_SUCCESS) {
-                LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
-        }
-	_pInstance->connected = false;
+        _pInstance->connected = false;
 }
 
 MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
