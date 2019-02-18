@@ -261,6 +261,18 @@ static void GetPicCallback (void *pOpaque,  const char *pFileName, int nFilename
     start = end;
 }
 
+int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
+	static int64_t starttime = 0;
+	static int64_t endtime = 0;
+	if (endtime > 0) {
+                DBG_LOG("time overlap assert" );
+		assert(info.startTime > endtime);
+	}
+	starttime = info.startTime;
+	endtime = info.endTime;
+        return 0;
+}
+
 int _TsUploaderSdkInit( StreamChannel ch )
 {
     int ret = 0;
@@ -305,6 +317,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
         DBG_LOG("CreateAndStartAVUploader error, ret = %d\n", ret );
         return ret;
     }
+    LinkUploaderSetTsOutputCallback(gIpc.stream[ch].uploader, tsToFile, NULL);
 
     DBG_LOG("gIpc.config.movingDetection = %d\n", gIpc.config.movingDetection );
     if ( !gIpc.config.movingDetection ) {
