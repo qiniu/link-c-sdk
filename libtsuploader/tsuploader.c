@@ -647,8 +647,10 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         pKodoUploader->session.nAccSessionAudioDuration += pTi->nAudioDuration;
         pKodoUploader->session.nVideoGapFromLastReport += pTi->nVideoDuration;
         pKodoUploader->session.nAudioGapFromLastReport += pTi->nAudioDuration;
-        pKodoUploader->session.nAccSessionDuration += pTi->nMediaDuation;
-        pKodoUploader->session.nTsDuration = pTi->nMediaDuation;
+        pKodoUploader->session.nTsDuration = pTi->nVideoDuration;
+        if ((pTi->nVideoDuration <= 0 && pTi->nAudioDuration > 0) || pTi->nAudioDuration > pTi->nVideoDuration)
+                pKodoUploader->session.nTsDuration = pTi->nAudioDuration;
+        pKodoUploader->session.nAccSessionDuration += pKodoUploader->session.nTsDuration;//pTi->nMediaDuation;
         
         pKodoUploader->nAudioDuration = pTi->nAudioDuration;
         pKodoUploader->nVideoDuration = pTi->nVideoDuration;

@@ -461,7 +461,7 @@ void LinkReleaseSegmentHandle(SegmentHandle *pSeg) {
 }
 
 int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
-        SegInfo segInfo;
+        SegInfo segInfo = {0};
         segInfo.handle = seg;
         segInfo.session = *pSession;
         /*
