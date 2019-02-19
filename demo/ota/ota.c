@@ -1,4 +1,4 @@
-// Last Update:2019-02-18 20:55:34
+// Last Update:2019-02-19 16:49:50
 /**
  * @file ota.c
  * @brief 
@@ -29,7 +29,7 @@
 typedef struct {
     void *pMqttInstance;
     Queue *q;
-    char ackTopic[16];
+    char ackTopic[32];
     int binSize;
     pthread_mutex_t mutex;
     pthread_cond_t cond;
@@ -289,8 +289,9 @@ void * UpgradeTask( void *arg )
 static void OnMessage( const void* _pInstance, int _nAccountId, const char* _pTopic,
                 const char* _pMessage, size_t nLength )
 {
-    LOGI("[ thread id : %d ] get message topic %s message %s, nLength = %d\n",
-         (int)pthread_self(), _pTopic, _pMessage, (int)nLength );
+//    LOGI("[ thread id : %d ] get message topic %s message %s, nLength = %d\n",
+//        (int)pthread_self(), _pTopic, _pMessage, (int)nLength );
+//    printf("msg : %02d len : %03d\t", _pMessage[0], nLength );
     if ( _pInstance && 
          gOtaInfo.pMqttInstance &&
          _pInstance == gOtaInfo.pMqttInstance && 
@@ -436,41 +437,58 @@ void *OtaOverMqttTask( void *arg )
             buf[0] = OTA_EVENT_ACK_TOPIC;
             buf[1] = strlen(resp);
             strncpy( &buf[2], resp, strlen(resp)  );
-            LinkMqttPublish( gOtaInfo.pMqttInstance, gOtaInfo.ackTopic, strlen(buf), buf );
-            LOGI("send OTA_EVENT_ACK_TOPIC success\n");
+            LinkMqttPublish( gOtaInfo.pMqttInstance, gOtaInfo.ackTopic, 2+strlen(buf), buf );
+            LOGI("send OTA_EVENT_ACK_TOPIC %s success\n", resp );
             break;
         case OTA_EVENT_START:
             {
                 LOGI("get OTA_EVENT_START\n");
-                char *pBinSie = (char *)&gOtaInfo.binSize;
+                LOGI("get OTA_EVENT_ACK_TOPIC, topic = %s\n", gOtaInfo.ackTopic );
+                int size = 0;
+                char *pBinSie = (char *)&size;
                 int i = 0;
                 for ( i=0; i<4; i++ ) {
                     *pBinSie++ = buf[i+1];
                 }
+                gOtaInfo.binSize = size;
+                LOGI("get OTA_EVENT_ACK_TOPIC, topic = %s\n", gOtaInfo.ackTopic );
                 LOGI("gOtaInfo.binSize = %d\n", gOtaInfo.binSize );
-                strncpy( md5, &buf[5], 32 );
+                strncpy( md5, &buf[6], 32 );
                 LOGI("md5 = %s\n", md5 );
-                fp = fopen( EXE_FILE_NAME, "w+" );
+                fp = fopen( EXE_OTA_NAME, "w+" );
                 if ( !fp ) {
                     LOGE("open file %s error\n", EXE_FILE_NAME );
                     break;
                 }
+                memset( buf, 0, sizeof(buf) );
+                char *resp = "ota start ok";
+                buf[0] = OTA_EVENT_ACK_TOPIC;
+                buf[1] = strlen( resp );
+                strncpy( &buf[2], resp, strlen(resp) );
+                LOGI("send resp %s, topic : %s\n", resp, gOtaInfo.ackTopic );
+                LinkMqttPublish( gOtaInfo.pMqttInstance, gOtaInfo.ackTopic, strlen(buf)+2, buf );
             }
             break;
         case OTA_EVENT_PACKET:
             if ( fp ) {
                 int nPacketSize = 0, i = 0;
                 char *pPacketSize = (char *)&nPacketSize;
+                static int count = 0;
+
+                count ++;
+     //           printf("pkt : %03d\t", count );
                 for ( i=0; i<4; i++ ) {
                    *pPacketSize++ = buf[i+1]; 
                 }
-                LOGI("nPacketSize = %d\n", nPacketSize );
+     //           LOGI("nPacketSize = %d\n", nPacketSize );
                 fwrite( &buf[5], 1, nPacketSize, fp );
             }
             break;
         case OTA_EVENT_END:
+            LOGI("### OTA_EVENT_END\n");
             if ( fp ) {
                 fclose( fp );
+                fp = NULL;
             }
             do_upgrade( md5 );
             break;
