@@ -558,7 +558,7 @@ static int PushVideo(LinkTsMuxUploader *_pTsMuxUploader, const char * _pData, in
                                 avDiff = -avDiff;
                         }
                         if (avDiff > 500) {
-                                LinkLogWarn("av timestamp may not align to same timebase:cv:%"PRId64" la:%"PRId64"",
+                                LinkLogTrace("av timestamp may not align to same timebase:cv:%"PRId64" la:%"PRId64"",
                                             _nTimestamp, pFFTsMuxUploader->nLastAudioFrameTsForCheck);
                         }
                 }

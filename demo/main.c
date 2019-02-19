@@ -265,8 +265,11 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
 	static int64_t starttime = 0;
 	static int64_t endtime = 0;
 	if (endtime > 0) {
-                DBG_LOG("time overlap assert" );
-		assert(info.startTime > endtime);
+            if (info.startTime < endtime) {
+                DBG_LOG("time overlap assert:%"PRId64" %"PRId64"\n", endtime, info.startTime);
+                sleep(2);
+            }
+            assert(info.startTime > endtime);
 	}
 	starttime = info.startTime;
 	endtime = info.endTime;
@@ -390,7 +393,6 @@ int WaitForNetworkOk()
             sleep(1);
         }
     }
-
     printf("finished to check network \n");
     return 0;
 }
