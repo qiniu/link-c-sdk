@@ -494,14 +494,14 @@ int main()
         sleep( gIpc.config.heartBeatInterval );
         DbgGetMemUsed( used );
         cpu_usage = DbgGetCpuUsage();
-//        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\n",
-//                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage );
-//        DBG_LOG(" toekn url : %s\n", gIpc.config.tokenUrl );
+        DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\n",
+                gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage );
+        DBG_LOG(" toekn url : %s\n", gIpc.config.tokenUrl );
     }
 
+    LOGI("main process exit\n");
     CaptureDevDeinit();
     TsUploaderSdkDeInit();
-    LOGI("main process exit\n");
 
     return 0;
 }

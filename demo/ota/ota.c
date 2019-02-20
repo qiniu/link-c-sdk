@@ -1,4 +1,4 @@
-// Last Update:2019-02-19 16:49:50
+// Last Update:2019-02-20 14:39:41
 /**
  * @file ota.c
  * @brief 
@@ -363,18 +363,15 @@ err:
     return -1;
 }
 
-int do_upgrade( char *md5 )
+int do_upgrade()
 {
-    if ( Md5Sum( md5 ) != 1 ) {
-        LOGI("md5sum error\n");
-        return -1;
-    }
 
-    char buf[128] = { 0 };
+    char buf[256] = { 0 };
 
     gIpc.running = 0;
     LOGI("notify main process to exit\n");
-    sprintf( buf,  "rm %s ; mv %s %s; %s ", EXE_FILE_NAME, EXE_OTA_NAME, EXE_FILE_NAME, EXE_FILE_NAME );
+    sprintf( buf,  "rm %s ; mv %s %s; chmod +x %s; %s ", EXE_FILE_NAME, EXE_OTA_NAME, EXE_FILE_NAME, EXE_FILE_NAME, EXE_FILE_NAME );
+    LOGI("buf = %s\n", buf );
     system( buf );
 
     return 0;
@@ -408,7 +405,7 @@ void *OtaOverMqttTask( void *arg )
     ops->userInfo.pCertfile = NULL;
     ops->userInfo.pKeyfile = NULL;
     ops->nKeepalive = 15;
-    ops->nQos = 0;
+    ops->nQos = 1;
     ops->bRetain = false;
     ops->callbacks.OnMessage = &OnMessage;
     ops->callbacks.OnEvent = &OnEvent;
@@ -490,7 +487,22 @@ void *OtaOverMqttTask( void *arg )
                 fclose( fp );
                 fp = NULL;
             }
-            do_upgrade( md5 );
+
+            if ( Md5Sum( md5 ) != 1 ) {
+                LOGI("md5sum error\n");
+                char *ack = "md5 check fail";
+                buf[0] = OTA_EVENT_ACK_TOPIC;
+                buf[1] = strlen(ack);
+                strncpy( &buf[2], ack, strlen(ack) );
+                LinkMqttPublish( gOtaInfo.pMqttInstance, gOtaInfo.ackTopic, strlen(ack)+2, buf );
+                return NULL;
+            }
+            char *ack = "ota success";
+            buf[0] = OTA_EVENT_ACK_TOPIC;
+            buf[1] = strlen(ack);
+            strncpy( &buf[2], ack, strlen(ack) );
+            LinkMqttPublish( gOtaInfo.pMqttInstance, gOtaInfo.ackTopic, strlen(ack)+2, buf );
+            do_upgrade();
             break;
         }
     }
@@ -503,7 +515,7 @@ void StartUpgradeTask()
 {
     pthread_t thread = 0;
 
-    if ( gIpc.config.otaMode ) {
+    if ( gIpc.config.ota_enable && gIpc.config.otaMode ) {
         if ( strcmp( gIpc.config.otaMode, "ota-over-mqtt" ) == 0 ) {
             pthread_create( &thread, NULL, OtaOverMqttTask, NULL );
         } else {
