@@ -1,4 +1,4 @@
-// Last Update:2019-02-11 11:22:14
+// Last Update:2019-02-18 17:00:15
 /**
  * @file dbg.c
  * @brief 
@@ -140,11 +140,13 @@ void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream )
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
     if ( interval >= gIpc.config.timeStampPrintInterval ) {
+#if 0
         DBG_LOG( "[ %s ] [ %s ] [ %s ] [ timestamp interval ] [ %f ]\n", 
                  gIpc.devId,
                  pStream,
                  pType,
                  duration );
+#endif
         start = end;
     }
     lastTimeStamp = _dTimeStamp;
@@ -172,12 +174,14 @@ void DbgReportLog( int stream, int streamType, char *reason )
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
     if ( interval >= gIpc.config.timeStampPrintInterval ) {
+#if 0
         DBG_LOG( "[ %s ] [ %s ] [ %s ] [ %s ]\n", 
                  pStreamTypeStr,
                  gIpc.devId,
                  pStreamStr,
                  reason
                  );
+#endif
         start = end;
     }
 }

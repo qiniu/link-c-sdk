@@ -42,7 +42,7 @@ int GetFileSize( char *_pFileName)
     int size = 0;
     
     if( !fp ) {
-        DBG_ERROR("fopen file %s error\n", _pFileName );
+        //DBG_ERROR("fopen file %s error\n", _pFileName );
         return -1;
     }
 
@@ -169,7 +169,7 @@ int AlarmCallback( int alarm, void *data )
         
         size = GetFileSize( (char*)data );
         if ( size < 0 ) {
-            DBG_ERROR("GetFileSize error\n");
+            //DBG_ERROR("GetFileSize error\n");
             return 0;
         }
         pBuf = malloc( size ); 
@@ -254,7 +254,7 @@ static void GetPicCallback (void *pOpaque,  const char *pFileName, int nFilename
 
     gettimeofday( &end, NULL );
     interval = GetTimeDiffMs( &start, &end );
-    DBG_LOG("capture jpeg %s interval %d\n", pFileName, interval );
+    //DBG_LOG("capture jpeg %s interval %d\n", pFileName, interval );
 
     gIpc.dev->captureJpeg( 0, 0, path, (char *)pFileName );
 
@@ -284,7 +284,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
 
-    userUploadArg.pUpStatCb = ReportUploadStatistic;
+//    userUploadArg.pUpStatCb = ReportUploadStatistic;
     if ( ch == STREAM_MAIN ) {
         userUploadArg.getPictureCallback = GetPicCallback;
     }
@@ -499,9 +499,9 @@ int main()
         DBG_LOG(" toekn url : %s\n", gIpc.config.tokenUrl );
     }
 
+    LOGI("main process exit\n");
     CaptureDevDeinit();
     TsUploaderSdkDeInit();
-    LOGI("main process exit\n");
 
     return 0;
 }

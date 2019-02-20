@@ -301,6 +301,7 @@ void InitConfig()
     } else {
         gIpc.config.tokenUploadInterval = 3540;
     }
+    gIpc.config.mqttOtaTopic = NULL;
 
 }
 
@@ -383,7 +384,9 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(ota_url), "OTA_URL", 1 },
     { CFG_MEMBER(client_id), "CLIENT_ID", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
+    { CFG_MEMBER(mqttOtaTopic), "MQTT_OTA_TOPIC", 1 },
     { CFG_MEMBER(appName), "APP_NAME", 1 },
+    { CFG_MEMBER(otaMode), "OTA_MODE", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },
     { CFG_MEMBER(multiChannel), "MULTI_CHANNEL", 0 },
@@ -393,6 +396,7 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(ota_check_interval), "OTA_CHECK_INTERVAL", 0 },
     { CFG_MEMBER(ota_enable), "OTA_ENABLE", 0 },
     { CFG_MEMBER(mqtt_port), "MQTT_PORT", 0 },
+    { CFG_MEMBER(heartBeatInterval), "HEART_BEAT_INTERVAL", 0 },
 };
 
 void CfgGetItem()
