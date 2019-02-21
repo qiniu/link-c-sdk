@@ -109,7 +109,9 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
 			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason);
-
+                segmentMgr.handles[idx].tmpSession.nAccSessionVideoDuration = 0;
+                segmentMgr.handles[idx].tmpSession.nAccSessionAudioDuration = 0;
+                segmentMgr.handles[idx].tmpSession.nSessionEndTime = 0;
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"",
@@ -230,7 +232,7 @@ static void handleReportSegInfo(SegInfo *pSegInfo) {
         if (!checkShouldReport(&segmentMgr.handles[idx], &pSegInfo->session)) {
                 return;
         }
-        if (pSegInfo->session.nAccSessionDuration <= 0) {
+        if (pSegInfo->session.nAccSessionVideoDuration <= 0) {
                 LinkLogInfo("not report due to session duration is 0");
                 return;
         }

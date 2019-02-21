@@ -52,7 +52,7 @@ int LinkInit()
                 return ret;
         }
         nProcStatus = 1;
-        LinkLogDebug("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
+        LinkLogInfo("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
 
         return LINK_SUCCESS;
 

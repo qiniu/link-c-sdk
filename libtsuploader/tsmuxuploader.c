@@ -893,7 +893,7 @@ static int updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStar
         
         int isSegIdChange = 0;
         int isSeqNumChange = 0;
-        if (pFFTsMuxUploader->remoteConfig.isValid) {
+        if (pFFTsMuxUploader->remoteConfig.nSessionDuration > 0) {
                 int64_t nDuration = (nCurSystime - pFFTsMuxUploader->uploadArgBak.nSegmentId_ - nCurTsDuration * 1000000);
                 if (pFFTsMuxUploader->remoteConfig.nSessionDuration <= nDuration / 1000000LL) {
                         LinkLogDebug("normal: update remote config");
@@ -994,6 +994,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         memset(pFFTsMuxUploader, 0, sizeof(FFTsMuxUploader));
         memcpy(pFFTsMuxUploader->ak, _pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen);
         memcpy(pFFTsMuxUploader->sk, _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
+        pFFTsMuxUploader->remoteConfig.nSessionDuration = 100000;
+        pFFTsMuxUploader->remoteConfig.nTsDuration = 4000;
+        pFFTsMuxUploader->remoteConfig.nSessionTimeout = 3000;
         
         int ret = 0;
         
