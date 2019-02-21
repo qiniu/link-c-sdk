@@ -11,6 +11,9 @@
 #define IN
 #endif
 
+#define MAX_LOG_LENGTH 512
+
+#define LOG_WITH_TIME
 
 #define _s_l_(x) #x
 #define _str_line_(x) _s_l_(x)
@@ -22,23 +25,34 @@
 #define LINK_LOG_LEVEL_WARN 4
 #define LINK_LOG_LEVEL_ERROR 5
 
+#ifndef __PROJECT__
+#define __PROJECT__
+#endif
+
+#ifndef __FILE_NAME__
+#define __FILE_NAME__
+#define __FILE_LINE__
+#else
+#define __FILE_LINE__ ":" __STR_LINE__
+#endif
+
 extern int nLogLevel;
 typedef void (*LinkLogFunc)(IN int nLevel, IN char * pLog);
 
 void LinkSetLogLevel(IN int nLevel);
-//void LinkSetLogCallback(IN LinkLogFunc f);
+void LinkSetLogCallback(IN LinkLogFunc f);
 void LinkLog(IN int nLevel, IN char * pFmt, ...);
 
 #define LinkLogTrace(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_TRACE, __FILE_NAME__ ":" __STR_LINE__ "[T]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_TRACE, "[T]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 #define LinkLogDebug(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_DEBUG, __FILE_NAME__ ":" __STR_LINE__ "[D]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_DEBUG, "[D]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 #define LinkLogInfo(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_INFO,  __FILE_NAME__ ":" __STR_LINE__ "[I]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_INFO,  "[I]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 #define LinkLogWarn(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_WARN,  __FILE_NAME__ ":" __STR_LINE__ "[W]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_WARN,  "[W]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 #define LinkLogError(fmt,...) \
-        LinkLog(LINK_LOG_LEVEL_ERROR, __FILE_NAME__ ":" __STR_LINE__ "[E]: " fmt "\n", ##__VA_ARGS__)
+        LinkLog(LINK_LOG_LEVEL_ERROR, "[E]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 
+#endif //__LINK_LOG_H__
 
-#endif
