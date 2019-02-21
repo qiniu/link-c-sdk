@@ -117,7 +117,7 @@ int AlarmCallback( int alarm, void *data )
     int valuelens[1] = {4};
     metas.valuelens = valuelens;
 
-    if ( alarm == ALARM_MOTION_DETECT && gIpc.config.movingDetection ) {
+    if ( alarm == ALARM_MOTION_DETECT ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT\n");
         LinkSessionMeta metas = {0};
         metas.len = 1;
@@ -137,7 +137,7 @@ int AlarmCallback( int alarm, void *data )
             LinkSetTsType(gIpc.stream[STREAM_SUB].uploader, &metas);
         }
         gIpc.detectMoving = alarm;
-    } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR && gIpc.config.movingDetection ) {
+    } else if ( alarm == ALARM_MOTION_DETECT_DISAPPEAR ) {
         //DBG_LOG("get event ALARM_MOTION_DETECT_DISAPPEAR\n");
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
@@ -286,7 +286,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
 
-//    userUploadArg.pUpStatCb = ReportUploadStatistic;
+    userUploadArg.pUpStatCb = ReportUploadStatistic;
     if ( ch == STREAM_MAIN ) {
         userUploadArg.getPictureCallback = GetPicCallback;
     }
@@ -323,25 +323,6 @@ int _TsUploaderSdkInit( StreamChannel ch )
         return ret;
     }
     LinkUploaderSetTsOutputCallback(gIpc.stream[ch].uploader, tsToFile, NULL);
-
-    DBG_LOG("gIpc.config.movingDetection = %d\n", gIpc.config.movingDetection );
-    if ( !gIpc.config.movingDetection ) {
-        LinkSessionMeta metas = {0};
-        metas.len = 1;
-        char *keys[1] = {"type"};
-        metas.keys = (const char **)keys;
-        int keylens[1] = {4};
-        metas.keylens = keylens;
-        char *values[1] = {"move"};
-        metas.values = (const char **)values;
-        int valuelens[1] = {4};
-        metas.valuelens = valuelens;
-
-        if ( gIpc.stream[ch].uploader ) {
-            DBG_LOG("set meta data\n");
-            LinkSetTsType(gIpc.stream[ch].uploader, &metas);
-        }
-    }
 
     return 0;
 }
