@@ -121,7 +121,7 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         /* Initial link emitter service */
         LinkEmitter_Init(_pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen,
                         _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
-
+        LinkSetLogCallback(LinkEmitter_SendLog);
         return LINK_SUCCESS;
 }
 
@@ -173,7 +173,7 @@ void LinkCleanup()
 
         /* stop emitter service */
         LinkEmitter_Cleanup();
-
+        LinkSetLogCallback(NULL);
         return;
 }
 

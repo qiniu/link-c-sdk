@@ -12,18 +12,31 @@
 #include <wolfssl/wolfcrypt/hmac.h>
 #include "cJSON/cJSON.h"
 #include "b64/urlsafe_b64.h"
+#include "log.h"
+#include "queue.h"
 #include "mqtt_internal.h"
 #include "mqtt.h"
 
 #define LINK_EMITTER_SERVER "mqtt.qnlinking.com"
 #define LINK_EMITTER_PORT 1883
 #define LINK_EMITTER_KEEPALIVE 15
+#define MAX_LOG_LEN 512
+#define LINK_EMITTER_LOG_TOPIC "linking/v1/${appid}/${device}/syslog/"
+
+typedef struct _LinkEmitterLog {
+        bool isUsed;
+        char pubTopic[128];
+        void *pInstance;
+        MessageQueue *pQueue;
+        pthread_t Thread;
+}LinkEmitterLog;
 
 static bool gLinkEmitterInitialized = false;
 static void *gLinkEmitterInstance = NULL;
 static struct MqttOptions gLinkEmitterMqttOpt;
 static char gLinkEmitterDAK[64] = {0};
 static char gLinkEmitterDSK[64] = {0};
+static LinkEmitterLog gEmitterLog;
 
 static int LinkEmitter_HmacSha1(const char * pKey, int nKeyLen, const char * pInput, int nInputLen,
         char *pOutput, int *pOutputLen)
@@ -100,6 +113,22 @@ static int LinkEmitter_UpdateUserPasswd(const void *_pInstance)
         return LINK_MQTT_ERROR;
 }
 
+void * LinkEmitterLogThread(void* _pData)
+{
+        do {
+                Message *pMessage = ReceiveMessageTimeout(gEmitterLog.pQueue, 1000);
+                if (pMessage) {
+                         char topic[128] = {0};
+                         sprintf(topic, "%s",gEmitterLog.pubTopic);
+                         LinkMqttPublish(gEmitterLog.pInstance, topic, strlen(pMessage->pMessage), pMessage->pMessage);
+                         free(pMessage->pMessage);
+                         free(pMessage);
+                }
+
+        } while(gEmitterLog.isUsed);
+
+        return NULL;
+}
 
 void LinkEmitter_EventCallback(const void *_pInstance, int _nAccountId, int _nId, const char *_pReason)
 {
@@ -130,7 +159,7 @@ void LinkEmitter_Init(const char * pDak, int nDakLen, const char * pDsk, int nDs
                 gLinkEmitterMqttOpt.userInfo.pHostname = LINK_EMITTER_SERVER;
                 gLinkEmitterMqttOpt.userInfo.nPort = LINK_EMITTER_PORT;
                 gLinkEmitterMqttOpt.nKeepalive = LINK_EMITTER_KEEPALIVE;
-                gLinkEmitterMqttOpt.nQos = 1;
+                gLinkEmitterMqttOpt.nQos = 0;
                 gLinkEmitterMqttOpt.pId = gLinkEmitterDAK;
                 gLinkEmitterMqttOpt.bRetain = false;
                 gLinkEmitterMqttOpt.bCleanSession = false;
@@ -148,12 +177,33 @@ void LinkEmitter_Init(const char * pDak, int nDakLen, const char * pDsk, int nDs
                         gLinkEmitterInstance = LinkMqttCreateInstance(&gLinkEmitterMqttOpt);
                         if (gLinkEmitterInstance) gLinkEmitterInitialized = true;
                 }
+
+                /* Init log */
+                gEmitterLog.pQueue = CreateMessageQueue(MESSAGE_QUEUE_MAX);
+                if (!gEmitterLog.pQueue) {
+                        printf("queue malloc fail\n");
+                        return;
+                }
+                strncpy(gEmitterLog.pubTopic, LINK_EMITTER_LOG_TOPIC, strlen(LINK_EMITTER_LOG_TOPIC) + 1);
+                gEmitterLog.pInstance = gLinkEmitterInstance;
+                gEmitterLog.isUsed = true;
+                pthread_create(&gEmitterLog.Thread, NULL, LinkEmitterLogThread, NULL);
         }
 
 }
 
+
 void LinkEmitter_Cleanup()
 {
+        /* Clean up log */
+        if (gEmitterLog.isUsed) {
+                gEmitterLog.isUsed = false;
+                pthread_join(gEmitterLog.Thread, NULL);
+                DestroyMessageQueue(&gEmitterLog.pQueue);
+                memset(gEmitterLog.pubTopic, 0, sizeof(gEmitterLog.pubTopic));
+                gEmitterLog.pInstance = NULL;
+        }
+
         /* Destroy mqtt instance */
         if (gLinkEmitterInitialized && gLinkEmitterInstance) {
                 LinkMqttDestroy(gLinkEmitterInstance);
@@ -163,3 +213,26 @@ void LinkEmitter_Cleanup()
 }
 
 
+void LinkEmitter_SendLog(int nLevel, const char * pLog)
+{
+        if (!pLog) {
+                return;
+        }
+        int nLogLen = (strlen(pLog) <= MAX_LOG_LEN) ? strlen(pLog) : MAX_LOG_LEN;
+
+        Message *pMessage = (Message *) malloc(sizeof(Message));
+        char* message = (char*) malloc(nLogLen + 1);
+        if ( !pMessage || !message ) {
+                return;
+        }
+        pMessage->nMessageID = nLevel;
+        memset(message, 0, nLogLen + 1);
+        memcpy(message, pLog, nLogLen);
+        pMessage->pMessage = message;
+
+        if (gEmitterLog.pQueue->nSize == gEmitterLog.pQueue->nCapacity) {
+                return;
+        }
+        SendMessage(gEmitterLog.pQueue, pMessage);
+        return;
+}
