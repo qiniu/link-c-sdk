@@ -50,7 +50,8 @@ typedef struct _KodoUploader{
         int nTsMaxCacheNum;
 
         pthread_t workerId_;
-        int isThreadStarted_;
+        unsigned char isThreadStarted_;
+        unsigned char isForceSeg;
         
         LinkTsUploadArg uploadArg;
         LinkUploadState state;
@@ -102,6 +103,7 @@ typedef struct _TsUploaderCommand {
 
 static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport);
 static void restoreDuration (KodoUploader * pKodoUploader);
+static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTime);
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
@@ -624,7 +626,10 @@ static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestam
 }
 
 static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
-        
+        if (pKodoUploader->isForceSeg) {
+                pKodoUploader->isForceSeg = 0;
+                handleSegTimeReport(pKodoUploader, pTi->nSystimestamp);
+        }
         if (pKodoUploader->nFirstSystime <= 0)
                 pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         if (pKodoUploader->session.nSessionStartTime <= 0)
@@ -688,10 +693,10 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
 }
 
-static void handleSegTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
+static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTime) {
         
         pKodoUploader->bakSession = pKodoUploader->session;
-        pKodoUploader->reportType = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 1, 0, 0);
+        pKodoUploader->reportType = handleSessionCheck(pKodoUploader, nCurSysTime, 1, 0, 0);
 }
 
 static void * listenTsUpload(void *_pOpaque)
@@ -740,10 +745,14 @@ static void * listenTsUpload(void *_pOpaque)
                                 handleTsEndTimeReport(pKodoUploader, &cmd.time);
                                 break;
                         case LINK_TSU_SEG_TIME:
-                                handleSegTimeReport(pKodoUploader, &cmd.time);
+                                handleSegTimeReport(pKodoUploader, cmd.time.nSystimestamp);
                                 break;
                         case LINK_TSU_SET_META:
                                 if (pKodoUploader->pSessionMeta) {
+                                        if (pKodoUploader->nFirstSystime > 0) // 切片还在缓存中
+                                                handleSegTimeReport(pKodoUploader, pKodoUploader->nFirstSystime);
+                                        else // 当前切片已结束，但是下一个切片还没有开始
+                                                pKodoUploader->isForceSeg = 1;
                                         free(pKodoUploader->pSessionMeta);
                                         pKodoUploader->pSessionMeta = NULL;
                                 }
