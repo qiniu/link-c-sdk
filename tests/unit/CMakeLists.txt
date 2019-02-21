@@ -21,5 +21,5 @@ add_executable(link_unit_test
     test_link_api.c
 )
 
-target_link_libraries(link_unit_test tsuploader ghttp mqtt wolfmqtt wolfssl m pthread)
+target_link_libraries(link_unit_test tsuploader ghttp mqtt wolfmqtt wolfssl rt m pthread)
 
