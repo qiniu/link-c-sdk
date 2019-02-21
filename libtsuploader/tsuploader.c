@@ -62,6 +62,7 @@ typedef struct _KodoUploader{
         LinkSession session;
         LinkSession bakSession;
         int reportType;
+        int isReport;
         
         // for restoreDuration
         int64_t nAudioDuration;
@@ -232,7 +233,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         param.pFilePrefix = fprefix;
         param.nFilePrefix = sizeof(fprefix);
         
-        char key[128+LINK_MAX_DEVICE_NAME_LEN+LINK_MAX_APP_LEN] = {0};
+        char key[256] = {0};
         
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
 
@@ -250,21 +251,20 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         }
         
         int64_t tsStartTime = pSession->nTsStartTime;
+        
+        //just for log
         int64_t tsDuration = pSession->nTsDuration;
         if (tsDuration > 30000 && tsDuration < 0) {
                 LinkLogWarn("abnormal ts duration:%"PRId64"", tsDuration);
         }
-        int64_t tsPhysicalDuration = (pKodoUploader->nLastSystime - tsStartTime)/1000000 - 40;
         
-        int64_t tsEndTime = tsStartTime + tsDuration*1000000;
+        int reportType = pKodoUploader->reportType;
+        int64_t tsEndTime = pKodoUploader->nLastSystime - 40 * 1000000;
         if (pKodoUploader->nLastTsEndTime > 0) {
                 if (tsStartTime < pKodoUploader->nLastTsEndTime) {
-                        LinkLogWarn("ts timestamp not monotonical: le:%"PRId64" ns:%"PRId64"",tsEndTime/1000000, pKodoUploader->nLastTsEndTime/1000000);
+                        LinkLogWarn("ts start timestamp abnormal: le:%"PRId64" cs:%"PRId64" -%"PRId64"-",pKodoUploader->nLastTsEndTime/1000000,
+                                    tsStartTime/1000000,pKodoUploader->nLastTsEndTime/1000000 - tsStartTime/1000000);
                 }
-        }
-        if (tsDuration < 0) {
-                tsDuration = tsPhysicalDuration;
-                tsEndTime = tsStartTime + tsDuration*1000000;
         }
         pKodoUploader->nLastTsEndTime = tsEndTime;
         pKodoUploader->nLastTsDuration = tsDuration;
@@ -277,15 +277,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 shouldUpload = 1;
                 shouldReport = 1;
         }
-        
-        int reportType = pKodoUploader->reportType;
-        /*
-        if (getUploadParamOk && reportType == 0) {
-                //reportType = handleSessionCheck(pKodoUploader, pKodoUploader->session.nTsStartTime + tsDuration * 1000000LL, 0, tsDuration, shouldReport);
-                reportType = 2;
-                assert(reportType == 2);
-        }
-        */
         
         int nSLen = snprintf(param.sessionId, sizeof(param.sessionId), "%s", pKodoUploader->session.sessionId);
         assert(nSLen < sizeof(param.sessionId));
@@ -302,17 +293,17 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
 
         memset(key, 0, sizeof(key));
 
+        snprintf(key, sizeof(key), "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
+                tsStartTime / 1000000, tsEndTime / 1000000, pSession->sessionId);
+        
+        LinkLogDebug("upload prepared:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
         if (shouldUpload) {
                 resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 
-                sprintf(key, "%s/ts/%"PRId64"-%"PRId64"-%s.ts", param.pFilePrefix,
-                        tsStartTime / 1000000, tsStartTime / 1000000 + tsPhysicalDuration, pSession->sessionId);
-                
-                LinkLogDebug("upload start:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
                 char startTs[14]={0};
                 char endTs[14]={0};
                 snprintf(startTs, sizeof(startTs), "%"PRId64"", tsStartTime / 1000000);
-                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsStartTime / 1000000+tsPhysicalDuration);
+                snprintf(endTs, sizeof(endTs), "%"PRId64"", tsEndTime / 1000000);
                 const char *cusMagics[6];
                 int nCusMagics = 6;
                 cusMagics[0]="x:start";
@@ -345,12 +336,13 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
         
-        if (shouldReport && reportType & 0x4) {
+        if ((shouldReport || pKodoUploader->isReport) && reportType & 0x4) {
                 LinkLogDebug("=========================4>%s", pKodoUploader->bakSession.sessionId);
                 pKodoUploader->bakSession.isNewSessionStarted = 0;
                 pKodoUploader->bakSession.nSessionEndResonCode = pSession->nSessionEndResonCode;
                 assert(pKodoUploader->bakSession.nSessionEndResonCode != 0);
                 LinkUpdateSegment(pSession->segHandle, &pKodoUploader->bakSession);
+                pKodoUploader->isReport = 0;
         }
         
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
@@ -360,7 +352,9 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                 pSession->isNewSessionStarted = 1;
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                                 pSession->isNewSessionStarted = 0;
+                                pKodoUploader->isReport = 1;
                         } else if(reportType & 0x2) {
+                                pKodoUploader->isReport = 1;
                                 LinkLogDebug("=========================2>%s %"PRId64"", pSession->sessionId, pSession->nTsSequenceNumber);
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                         }
@@ -379,6 +373,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 restoreDuration(pKodoUploader);
                 if (shouldReport){
                         if(reportType & 0x1) {
+                                pKodoUploader->isReport = 1;
                                 LinkLogDebug("=========================1>%s", pSession->sessionId);
                                 pSession->isNewSessionStarted = 1;
                                 LinkUpdateSegment(pSession->segHandle, pSession);
@@ -397,7 +392,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 LinkMediaInfo mediaInfo;
                 memset(&mediaInfo, 0, sizeof(mediaInfo));
                 mediaInfo.startTime = tsStartTime / 1000000;
-                mediaInfo.endTime = tsStartTime / 1000000 + tsPhysicalDuration;
+                mediaInfo.endTime = tsEndTime / 1000000;
                 mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
                 memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
                 int idx = 0;
@@ -606,9 +601,16 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
                 pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         if (pKodoUploader->session.nSessionStartTime <= 0)
                 pKodoUploader->session.nSessionStartTime =  pTi->nSystimestamp;
-        if (pKodoUploader->session.nTsStartTime <= 0)
-                pKodoUploader->session.nTsStartTime = pTi->nSystimestamp;
+        if (pKodoUploader->session.nTsStartTime > 0)
+                LinkLogWarn("ts start should be zero:%"PRId64"", pKodoUploader->session.nTsStartTime/1000000);
+        pKodoUploader->session.nTsStartTime = pTi->nSystimestamp;
         
+        if (pKodoUploader->nLastSystime > 0) {
+                if (pTi->nSystimestamp < pKodoUploader->nLastSystime) {
+                        LinkLogWarn("setime abnormal:%"PRId64" %"PRId64" =%"PRId64"=", pTi->nSystimestamp/1000000,
+                                    pKodoUploader->nLastSystime/1000000, pTi->nSystimestamp/1000000 - pKodoUploader->nLastSystime/1000000);
+                }
+        }
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
         pKodoUploader->nFirstSystime = pTi->nSystimestamp;
         
@@ -654,7 +656,6 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         
         pKodoUploader->nAudioDuration = pTi->nAudioDuration;
         pKodoUploader->nVideoDuration = pTi->nVideoDuration;
-        
         
         pKodoUploader->nLastSystime = pTi->nSystimestamp;
 }

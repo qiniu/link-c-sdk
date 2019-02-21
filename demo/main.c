@@ -264,6 +264,8 @@ static void GetPicCallback (void *pOpaque,  const char *pFileName, int nFilename
 int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
 	static int64_t starttime = 0;
 	static int64_t endtime = 0;
+        DBG_LOG("tsfile callback:%"PRId64" %"PRId64" %"PRId64" --%d--", info.startTime, info.endTime, endtime,
+                info.startTime>endtime?1:0);
 	if (endtime > 0) {
             if (info.startTime < endtime) {
                 DBG_LOG("time overlap assert:%"PRId64" %"PRId64"\n", endtime, info.startTime);
