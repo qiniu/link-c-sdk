@@ -322,25 +322,6 @@ int _TsUploaderSdkInit( StreamChannel ch )
     }
     LinkUploaderSetTsOutputCallback(gIpc.stream[ch].uploader, tsToFile, NULL);
 
-    DBG_LOG("gIpc.config.movingDetection = %d\n", gIpc.config.movingDetection );
-    if ( !gIpc.config.movingDetection ) {
-        LinkSessionMeta metas = {0};
-        metas.len = 1;
-        char *keys[1] = {"type"};
-        metas.keys = (const char **)keys;
-        int keylens[1] = {4};
-        metas.keylens = keylens;
-        char *values[1] = {"move"};
-        metas.values = (const char **)values;
-        int valuelens[1] = {4};
-        metas.valuelens = valuelens;
-
-        if ( gIpc.stream[ch].uploader ) {
-            DBG_LOG("set meta data\n");
-            LinkSetTsType(gIpc.stream[ch].uploader, &metas);
-        }
-    }
-
     return 0;
 }
 
