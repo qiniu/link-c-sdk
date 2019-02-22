@@ -1,4 +1,4 @@
-// Last Update:2019-02-21 19:36:42
+// Last Update:2019-02-22 20:29:19
 /**
  * @file stream.c
  * @brief 
@@ -14,67 +14,6 @@
 #include "main.h"
 #include "dbg.h"
 #include "mymalloc.h"
-
-int CacheHandle( Queue *pQueue, LinkTsMuxUploader *pUploader,
-                 int _nStreamType, char *_pFrame,
-                 int _nLen, int _nIskey, double _dTimeStamp
-  )
-{
-    Frame frame;
-    static __thread int count = STREAM_CACHE_SIZE;
-
-    if ( !pQueue || !pUploader  ) {
-        return -1;
-    }
-
-    memset( &frame, 0, sizeof(frame) );
-    frame.data = (char *) malloc ( _nLen );
-    if ( !frame.data ) {
-        printf("%s %s %d malloc error\n", __FILE__, __FUNCTION__, __LINE__);
-        return -1;
-    }
-    memcpy( frame.data, _pFrame, _nLen );
-    frame.len = _nLen;
-    frame.timeStamp = _dTimeStamp;
-    frame.isKey = _nIskey;
-    if (_nIskey) {
-        frame.nCurSysTime = LinkGetCurrentNanosecond();	    
-    }
-    pQueue->enqueue( pQueue, (void *)&frame, sizeof(frame) );
-
-    if (  pQueue->getSize( pQueue ) == gIpc.config.cacheSize ) {
-        memset( &frame, 0, sizeof(frame) );
-        pQueue->dequeue( pQueue, (void *)&frame, NULL );
-        if ( !frame.data ) {
-            printf("%s %s %d data is NULL\n", __FILE__, __FUNCTION__, __LINE__ );
-            return -1;
-        }
-
-        if (  gIpc.detectMoving == ALARM_MOTION_DETECT  ) {
-            count = STREAM_CACHE_SIZE;
-            if ( _nStreamType == TYPE_VIDEO ) {
-                LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , frame.nCurSysTime);
-            } else {
-                LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp , 0);
-            }
-        } else if ( gIpc.detectMoving == ALARM_MOTION_DETECT_DISAPPEAR ) {
-            if ( count-- > 0 ) {
-                if ( _nStreamType == TYPE_VIDEO ) {
-                    LinkPushVideo( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, frame.isKey, 0 , frame.nCurSysTime);
-                } else {
-                    LinkPushAudio( pUploader, frame.data, frame.len, (int64_t)frame.timeStamp, 0);
-                }
-            } else {
-                DbgReportLog( STREAM_MAIN, TYPE_VIDEO, "use cache, not detect moving" );
-            }
-        } else {
-            DbgReportLog( STREAM_MAIN, TYPE_VIDEO, "use cache, not detect moving" );
-        }
-        free( frame.data );
-    }
-
-    return 0;
-}
 
 int StreamCommonHandle( int _nStreamType, int _nStream, char *_pFrame, int _nLen, int _nIskey,
                         double _dTimeStamp )

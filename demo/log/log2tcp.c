@@ -1,4 +1,4 @@
-// Last Update:2019-02-11 13:57:29
+// Last Update:2019-02-22 21:05:44
 /**
  * @file socket_logging.c
  * @brief 
@@ -33,7 +33,6 @@ void CmdHnadleLogStop( char *param );
 void CmdHnadleLogStart( char *param );
 void CmdHnadleOutput( char *param );
 void CmdHandleMovingDetection( char *param );
-void CmdHnadleUpdateFrom( char *param );
 void CmdHnadleHelp( char *param );
 void CmdHnadleCache( char *param );
 void CmdHandleGetVersion( char *param );
@@ -47,7 +46,6 @@ static DemoCmd gCmds[] =
     { "logstart", CmdHnadleLogStart },
     { "output", CmdHnadleOutput },
     { "moving", CmdHandleMovingDetection },
-    { "updatefrom", CmdHnadleUpdateFrom },
     { "cache", CmdHnadleCache },
     { "remotehelp", CmdHnadleHelp },
     { "get-version", CmdHandleGetVersion }
@@ -213,7 +211,7 @@ void StartSimpleSshTask()
     static pthread_t thread = 0;
 
     if ( !thread ) {
-        if ( gIpc.config.simpleSshEnable )
+        if ( gIpc.config.logOutput == OUTPUT_SOCKET)
             pthread_create( &thread, NULL, SimpleSshTask, NULL );
     }
 }
@@ -239,8 +237,7 @@ void CmdHnadleDump( char *param )
     sprintf( buffer+strlen(buffer), "gMovingDetect = %d\n", gIpc.detectMoving );
     sprintf( buffer+strlen(buffer), "gAudioType = %d\n", gIpc.audioType );
     sprintf( buffer+strlen(buffer), "queue = %d\n", gLogQueue->getSize( gLogQueue ) );
-    sprintf( buffer+strlen(buffer), "tokenUrl = %s\n", pConfig->tokenUrl );
-    sprintf( buffer+strlen(buffer), "renameTokenUrl = %s\n", pConfig->renameTokenUrl );
+    sprintf( buffer+strlen(buffer), "configUrl = %s\n", pConfig->configUrl );
     sprintf( buffer+strlen(buffer), "cache = %d\n", pConfig->openCache );
     sprintf( buffer+strlen(buffer), "logStop = %d\n", gStatus.logStop );
     ret = send(gsock , buffer , strlen(buffer) , flags );// MSG_NOSIGNAL ignore SIGPIPE signal
@@ -315,24 +312,6 @@ void CmdHandleMovingDetection( char *param )
             gIpc.config.movingDetection = 0;
             DBG_LOG("set moving detection disalbe\n");
         }
-    }
-}
-
-void CmdHnadleUpdateFrom( char *param )
-{
-    char *p = NULL;
-
-    p = strchr( (char *)param, ' ');
-    if ( !p ) {
-        printf("error, p is NULL\n");
-        return;
-    }
-
-    p++;
-    if ( strcmp( p, "socket") == 0 ) {
-        gIpc.config.updateFrom = UPDATE_FROM_SOCKET;
-    } else {
-        gIpc.config.updateFrom = UPDATE_FROM_FILE;
     }
 }
 

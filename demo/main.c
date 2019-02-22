@@ -305,17 +305,17 @@ int _TsUploaderSdkInit( StreamChannel ch )
     }
     userUploadArg.nChannels = 1;
     userUploadArg.nVideoFormat = LINK_VIDEO_H264;
-    if ( gIpc.config.tokenUrl ) {
-        userUploadArg.pConfigRequestUrl = gIpc.config.tokenUrl;
-        userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.tokenUrl);
+    if ( gIpc.config.configUrl ) {
+        userUploadArg.pConfigRequestUrl = gIpc.config.configUrl;
+        userUploadArg.nConfigRequestUrlLen = strlen(gIpc.config.configUrl);
     }
-    if ( gIpc.config.ak ) {
-        userUploadArg.pDeviceAk = gIpc.config.ak;
-        userUploadArg.nDeviceAkLen = strlen( gIpc.config.ak );
+    if ( gIpc.config.dak ) {
+        userUploadArg.pDeviceAk = gIpc.config.dak;
+        userUploadArg.nDeviceAkLen = strlen( gIpc.config.dak );
     }
-    if ( gIpc.config.sk ) {
-        userUploadArg.pDeviceSk = gIpc.config.sk;
-        userUploadArg.nDeviceSkLen = strlen( gIpc.config.sk );
+    if ( gIpc.config.dsk ) {
+        userUploadArg.pDeviceSk = gIpc.config.dsk;
+        userUploadArg.nDeviceSkLen = strlen( gIpc.config.dsk );
     }
         
     ret = LinkNewUploader( &gIpc.stream[ch].uploader, &userUploadArg);
@@ -384,9 +384,7 @@ int WaitForNetworkOk()
 void *ConfigUpdateTask( void *param )
 {
     for (;;) {
-        if ( gIpc.config.updateFrom == UPDATE_FROM_FILE ) {
-            UpdateConfig();
-        }
+        UpdateConfig();
         sleep( gIpc.config.configUpdateInterval );
     }
 }
@@ -450,13 +448,23 @@ int main()
         TelnetdProcess();
     }
 
+    if ( gIpc.config.logOutput == OUTPUT_MQTT && !gIpc.config.devId ) {
+        printf("if you use mqtt to send log, DEVICE_ID must should be set,\
+               please modify /tmp/oem/app/ipc.conf add unique DEVICE_ID\n");
+        return 0;
+    }
+
+    char topic[64] = { 0 };
     MqttParam params;
+
+    sprintf( topic, "/%s/log", gIpc.config.devId );
+
     params.server = gIpc.config.mqtt_server;
     params.port = gIpc.config.mqtt_port;
-    params.topic = gIpc.config.mqtt_topic;
+    params.topic = topic;
     params.user = gIpc.config.mqtt_user;
     params.passwd = gIpc.config.mqtt_passwd;
-    params.pClientId = gIpc.config.client_id;
+    params.pClientId = gIpc.config.devId;
     params.qos = 0;
     LoggerInit( gIpc.config.logPrintTime, gIpc.config.logOutput,
                 logFile, gIpc.config.logVerbose, &params );
@@ -475,17 +483,15 @@ int main()
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
-    DBG_LOG("gIpc.config.heartBeatInterval = %d\n", gIpc.config.heartBeatInterval);
 
     while ( gIpc.running ) {
         float cpu_usage = 0;
 
-        sleep( gIpc.config.heartBeatInterval );
+        sleep( gIpc.config.logInterval );
         DbgGetMemUsed( used );
         cpu_usage = DbgGetCpuUsage();
         DBG_LOG("[ %s ] [ HEART BEAT] move_detect : %d cache : %d multi_ch : %d memeory used : %skB cpu_usage : %%%6.2f\n",
                 gIpc.devId, gIpc.config.movingDetection, gIpc.config.openCache, gIpc.config.multiChannel,used, cpu_usage );
-        DBG_LOG(" toekn url : %s\n", gIpc.config.tokenUrl );
     }
 
     LOGI("main process exit\n");

@@ -1,4 +1,4 @@
-// Last Update:2019-02-22 11:56:23
+// Last Update:2019-02-22 21:12:16
 /**
  * @file telnetd.c
  * @brief 
@@ -29,9 +29,16 @@ static ServerInfo gSrvInfo;
 
 static void OnEvent(const void* _pInstance, int _nAccountId, int _nId,  const char* _pReason )
 {
-    LOGI("_pInstance %p id %d reason %s topic  %s \n", _pInstance,  _nId, _pReason, gIpc.config.mqttInTopic );
-    if ( _nId == MQTT_SUCCESS && gIpc.config.mqttInTopic ) {
-        LinkMqttSubscribe( _pInstance, gIpc.config.mqttInTopic );
+    char topic[64] = {0 };
+
+    if ( !gIpc.config.devId ) {
+        LOGI("gIpc.config.devId not set\n");
+        return;
+    }
+    sprintf( topic, "/%s/telnet/sub", gIpc.config.devId );
+    LOGI("_pInstance %p id %d reason %s topic  %s \n", _pInstance,  _nId, _pReason, topic );
+    if ( _nId == MQTT_SUCCESS ) {
+        LinkMqttSubscribe( _pInstance, topic );
     }
 }
 
@@ -51,14 +58,14 @@ void TelnetdProcess()
 
     LinkMqttLibInit();
 
-    if ( !gIpc.config.mqttOutTopic ) {
+    if ( !gIpc.config.devId ) {
         LOGI("check topic error\n");
         return;
     }
 
     memset( ops, 0, sizeof(struct MqttOptions) );
     char clientId[64] = { 0 };
-    sprintf( clientId, "/%s/telnetd", gIpc.config.client_id);
+    sprintf( clientId, "/%s/telnetd", gIpc.config.devId );
     ops->pId = clientId;
     ops->bCleanSession = false;
     ops->userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_NULL;
@@ -77,8 +84,8 @@ void TelnetdProcess()
         LOGI("LinkMqttCreateInstance error\n");
     }
 
-    LOGI("new mqtt instance\n\t clientId : %s\n\t broker : %s\n port : %d\n\t  subTopic : %s\n\t pubTopic : %s\n", 
-         clientId, gIpc.config.mqtt_server, gIpc.config.mqtt_port, gIpc.config.mqttInTopic, gIpc.config.mqttOutTopic );
+    LOGI("new mqtt instance\n\t clientId : %s\n\t broker : %s\n port : %d\n\t  device id : %s\n", 
+         clientId, gIpc.config.mqtt_server, gIpc.config.mqtt_port, gIpc.config.devId );
 
     gSrvInfo.q = NewQueue();
     if ( !gSrvInfo.q ) {
@@ -91,6 +98,8 @@ void TelnetdProcess()
     }
     char *p = pbuf;
 
+    char topic[64] = { 0 };
+    sprintf( topic, "/%s/telnet/pub", gIpc.config.devId );
     for (;;) {
 
         if ( gSrvInfo.q ) {
@@ -107,7 +116,7 @@ void TelnetdProcess()
             }
             LOGI("%s\n", pbuf );
             pclose( fp );
-            LinkMqttPublish( gSrvInfo.pInstance, gIpc.config.mqttOutTopic, strlen(pbuf), pbuf  );
+            LinkMqttPublish( gSrvInfo.pInstance, topic, strlen(pbuf), pbuf  );
         }
     }
 

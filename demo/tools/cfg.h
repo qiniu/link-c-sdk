@@ -17,50 +17,38 @@ typedef struct {
     unsigned char logOutput;
     unsigned char logVerbose;
     unsigned char logPrintTime;
-    int timeStampPrintInterval;
-    unsigned char heartBeatInterval;
     char *logFile;
     char *defaultLogFile;
     int tokenUploadInterval;
     int tokenRetryCount;
-    char *bucketName;
-    char *defaultBucketName;
     char *ak;
     char *sk;
+    char *dak;
+    char *dsk;
     unsigned char movingDetection;
     int configUpdateInterval;
     unsigned char multiChannel;
     unsigned char openCache;
     int cacheSize;
-    unsigned char updateFrom;
     char *url;
     char *defaultUrl;
-    char *tokenUrl;
-    unsigned char simpleSshEnable;
-    unsigned char useLocalToken;
+    char *configUrl;
     char *serverIp;
     int serverPort;
-    char *renameTokenUrl;
     char *h264_file;
     char *aac_file;
     char *ota_url;
-    char *appName;
-    int ota_check_interval;
     int ota_enable;
     char *audioType;
+    char *devId;
+    int logInterval;
+    int telnetdEnable;
     
     /* mqtt */
     char *mqtt_server;
-    char *mqtt_topic;
     char *mqtt_user;
     char *mqtt_passwd;
-    char *client_id;
     int mqtt_port;
-
-    char *otaMode;
-    char *mqttOtaTopic;
-    char *mqttOutTopic;
-    char *mqttInTopic;
 } Config;
 
 struct cfg_struct;

@@ -1,4 +1,4 @@
-// Last Update:2019-02-20 14:39:41
+// Last Update:2019-02-22 21:16:10
 /**
  * @file ota.c
  * @brief 
@@ -222,12 +222,12 @@ void * UpgradeTask( void *arg )
     for (;;) {
         if ( !gIpc.config.ota_enable ) {
             DBG_LOG("ota function not enable\n");
-            sleep( gIpc.config.ota_check_interval );
+            sleep( gIpc.config.logInterval );
         }
 
         if ( !gIpc.config.ota_url ) {
             DBG_ERROR("OTA_URL not set, please modify /tmp/oem/app/ip.conf and add OTA_URL\n");
-            sleep( gIpc.config.ota_check_interval );
+            sleep( gIpc.config.logInterval );
             continue;
         }
 
@@ -236,7 +236,7 @@ void * UpgradeTask( void *arg )
         ret = CheckUpdate( versionFile );
         if ( ret <= 0 ) {
             DBG_LOG("there is no new version in server\n");
-            sleep( gIpc.config.ota_check_interval );
+            sleep( gIpc.config.logInterval );
             continue;
         } 
 
@@ -314,6 +314,7 @@ static void OnEvent(const void* _pInstance, int _nAccountId, int _nId,  const ch
          gOtaInfo.pMqttInstance &&
          _pInstance == gOtaInfo.pMqttInstance && 
          _nId == MQTT_SUCCESS ) {
+
         LOGI("subscribe topic %s\n", gIpc.config.mqttOtaTopic );
         LinkMqttSubscribe( _pInstance, gIpc.config.mqttOtaTopic );
     }

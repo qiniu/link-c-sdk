@@ -1,4 +1,4 @@
-// Last Update:2019-02-18 17:00:15
+// Last Update:2019-02-22 21:02:19
 /**
  * @file dbg.c
  * @brief 
@@ -29,7 +29,7 @@ Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
-//    dbg2( "%s", log );
+    dbg2( "%s", log );
 }
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg )
@@ -139,14 +139,12 @@ void DbgTraceTimeStamp( int type, double _dTimeStamp, int stream )
     duration = _dTimeStamp - lastTimeStamp;
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
-    if ( interval >= gIpc.config.timeStampPrintInterval ) {
-#if 0
+    if ( interval >= gIpc.config.logInterval ) {
         DBG_LOG( "[ %s ] [ %s ] [ %s ] [ timestamp interval ] [ %f ]\n", 
                  gIpc.devId,
                  pStream,
                  pType,
                  duration );
-#endif
         start = end;
     }
     lastTimeStamp = _dTimeStamp;
@@ -173,15 +171,13 @@ void DbgReportLog( int stream, int streamType, char *reason )
 
     gettimeofday( &end, NULL );
     interval = GetTimeDiff( &start, &end );
-    if ( interval >= gIpc.config.timeStampPrintInterval ) {
-#if 0
+    if ( interval >= gIpc.config.logInterval ) {
         DBG_LOG( "[ %s ] [ %s ] [ %s ] [ %s ]\n", 
                  pStreamTypeStr,
                  gIpc.devId,
                  pStreamStr,
                  reason
                  );
-#endif
         start = end;
     }
 }

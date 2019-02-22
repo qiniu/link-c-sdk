@@ -273,35 +273,21 @@ void InitConfig()
     gIpc.config.logOutput = OUTPUT_CONSOLE;
     gIpc.config.logVerbose = 1;
     gIpc.config.logPrintTime = 1;
-    gIpc.config.timeStampPrintInterval = TIMESTAMP_REPORT_INTERVAL;
-    gIpc.config.heartBeatInterval = 20;
     gIpc.config.defaultLogFile = "/tmp/oem/tsupload.log";
     gIpc.config.tokenRetryCount = TOKEN_RETRY_COUNT;
-    gIpc.config.defaultBucketName = "ipcamera";
-    gIpc.config.bucketName = NULL;
     gIpc.config.movingDetection = 0;
     gIpc.config.configUpdateInterval = 10;
     gIpc.config.multiChannel = 0;
     gIpc.config.openCache = 1;
     gIpc.config.cacheSize = STREAM_CACHE_SIZE;
-    gIpc.config.updateFrom = UPDATE_FROM_FILE;
     gIpc.config.defaultUrl = "http://www.qiniu.com";
-    gIpc.config.tokenUrl = NULL;
-    gIpc.config.simpleSshEnable = 1;
-    gIpc.config.useLocalToken = 0;
+    gIpc.config.configUrl = NULL;
     gIpc.config.ak = NULL;
     gIpc.config.sk = NULL;
     gIpc.config.serverIp = NULL;
-    gIpc.config.renameTokenUrl = NULL;
     gIpc.config.ota_url = NULL;
-    gIpc.config.ota_check_interval = 30;
     gIpc.config.ota_enable = 0;
-    if ( gIpc.config.useLocalToken ) {
-        gIpc.config.tokenUploadInterval = 5;
-    } else {
-        gIpc.config.tokenUploadInterval = 3540;
-    }
-    gIpc.config.mqttOtaTopic = NULL;
+    gIpc.config.logInterval = 10;
 
 }
 
@@ -372,33 +358,25 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(audioType), "AUDIO_ENCODE_TYPE", 1 },
     { CFG_MEMBER(h264_file), "H264_FILE", 1 },
     { CFG_MEMBER(aac_file), "AAC_FILE", 1 },
-    { CFG_MEMBER(ak), "DAK", 1 },
-    { CFG_MEMBER(sk), "DSK", 1 },
+    { CFG_MEMBER(dak), "DAK", 1 },
+    { CFG_MEMBER(dsk), "DSK", 1 },
+    { CFG_MEMBER(ak), "AK", 1 },
+    { CFG_MEMBER(sk), "SK", 1 },
     { CFG_MEMBER(mqtt_server), "MQTT_SERVER", 1 },
-    { CFG_MEMBER(mqtt_topic), "MQTT_TOPIC", 1 },
     { CFG_MEMBER(mqtt_user), "MQTT_USER", 1 },
     { CFG_MEMBER(mqtt_passwd), "MQTT_PASSWD", 1 },
     { CFG_MEMBER(url), "NETWORK_CHECK_URL", 1 },
-    { CFG_MEMBER(tokenUrl), "GET_CONFIG_URL", 1 },
+    { CFG_MEMBER(configUrl), "GET_CONFIG_URL", 1 },
     { CFG_MEMBER(serverIp), "SERVER_IP", 1 },
     { CFG_MEMBER(ota_url), "OTA_URL", 1 },
-    { CFG_MEMBER(client_id), "CLIENT_ID", 1 },
-    { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
-    { CFG_MEMBER(mqttOtaTopic), "MQTT_OTA_TOPIC", 1 },
-    { CFG_MEMBER(mqttOutTopic), "MQTT_OUT_TOPIC", 1 },
-    { CFG_MEMBER(mqttInTopic), "MQTT_IN_TOPIC", 1 },
-    { CFG_MEMBER(appName), "APP_NAME", 1 },
-    { CFG_MEMBER(otaMode), "OTA_MODE", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
     { CFG_MEMBER(openCache), "OPEN_CACHE", 0 },
     { CFG_MEMBER(multiChannel), "MULTI_CHANNEL", 0 },
-    { CFG_MEMBER(useLocalToken), "USE_LOCAL_TOKEN", 0 },
     { CFG_MEMBER(serverPort), "SERVER_PORT", 0 },
-    { CFG_MEMBER(simpleSshEnable), "SIMPLE_SSH", 0 },
-    { CFG_MEMBER(ota_check_interval), "OTA_CHECK_INTERVAL", 0 },
     { CFG_MEMBER(ota_enable), "OTA_ENABLE", 0 },
     { CFG_MEMBER(mqtt_port), "MQTT_PORT", 0 },
-    { CFG_MEMBER(heartBeatInterval), "HEART_BEAT_INTERVAL", 0 },
+    { CFG_MEMBER(logInterval), "LOG_INTERVEL", 0 },
+    { CFG_MEMBER(telnetdEnable), "TELNETD_ENABLE", 0 },
 };
 
 void CfgGetItem()
@@ -412,15 +390,6 @@ void CfgGetItem()
             CfgGetIntItem( cfg_items[i].item, (int *)cfg_items[i].save );
         }
     }
-}
-
-void DumpConfig()
-{
-#if 0
-    printf("log_output : %d\n", gIpc.config.logOutput );
-    printf("h264_file : %s\n", gIpc.config.h264_file );
-    printf("ota_enable : %d\n", gIpc.config.ota_enable );
-#endif
 }
 
 void UpdateConfig()
@@ -460,11 +429,5 @@ void UpdateConfig()
 
     CfgGetItem();
 
-    if ( gIpc.config.useLocalToken ) {
-        gIpc.config.tokenUploadInterval = 5;
-    } else {
-        gIpc.config.tokenUploadInterval = 3540;
-    }
-    DumpConfig();
 }
 
