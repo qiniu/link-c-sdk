@@ -749,18 +749,25 @@ static void * listenTsUpload(void *_pOpaque)
                                 break;
                         case LINK_TSU_SET_META:
                                 if (pKodoUploader->pSessionMeta) {
-                                        if (pKodoUploader->nFirstSystime > 0) // 切片还在缓存中
-                                                handleSegTimeReport(pKodoUploader, pKodoUploader->nFirstSystime);
-                                        else // 当前切片已结束，但是下一个切片还没有开始
-                                                pKodoUploader->isForceSeg = 1;
                                         free(pKodoUploader->pSessionMeta);
                                         pKodoUploader->pSessionMeta = NULL;
+                                }
+                                if (pKodoUploader->nFirstSystime > 0) { // 切片还在缓存中
+                                        LinkLogDebug("1force seg cuz meta");
+                                        handleSegTimeReport(pKodoUploader, pKodoUploader->nFirstSystime);
+                                } else { // 当前切片已结束，但是下一个切片还没有开始
+                                        LinkLogDebug("2force seg cuz meta");
+                                        pKodoUploader->isForceSeg = 1;
                                 }
                                 pKodoUploader->pSessionMeta = cmd.pSessionMeta;
                                 break;
                         case LINK_TSU_CLR_META:
                                 if (pKodoUploader->pSessionMeta) {
                                         pKodoUploader->pSessionMeta->isOneShot = 1;
+                                }
+                                if (pKodoUploader->nFirstSystime > 0) {
+                                        LinkLogDebug("3force seg cuz meta");
+                                        pKodoUploader->isForceSeg = 1;
                                 }
                                 break;
                         case LINK_TSU_SET_PLAN_TYPE:
