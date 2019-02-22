@@ -102,6 +102,10 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
         const LinkSessionMeta* smeta = segmentMgr.handles[idx].pSessionMeta;
         if (s->nSessionEndResonCode != 0) {
                 const char * reason = sReasonStr[s->nSessionEndResonCode];
+                if (s->nSessionEndTime <= 0){
+                        s->nSessionEndTime = s->nSessionStartTime + s->nAccSessionVideoDuration*1000000;
+                        LinkLogWarn("abnormal session:%s %"PRId64"", s->sessionId, s->nSessionEndTime);
+                }
                 
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
