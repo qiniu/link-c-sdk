@@ -105,19 +105,21 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
                 
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
                         " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
-                        " %"PRId64", \"endReason\": \"%s\"",
+                        " %"PRId64", \"endReason\": \"%s\",\"picReason\":%d",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason);
+			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason,
+                                   s->coverStatus);
                 segmentMgr.handles[idx].tmpSession.nAccSessionVideoDuration = 0;
                 segmentMgr.handles[idx].tmpSession.nAccSessionAudioDuration = 0;
                 segmentMgr.handles[idx].tmpSession.nSessionEndTime = 0;
+                segmentMgr.handles[idx].tmpSession.coverStatus = 0;
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
-                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64"",
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64",\"picReason\":%d",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration);
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration,  s->coverStatus);
         }
         
         if (smeta && smeta->len > 0) {

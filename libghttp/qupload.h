@@ -3,6 +3,7 @@
 
 typedef struct {
     int code;
+    unsigned char isTimeout;
     char reqid[17];
     char xreqid[17];
     char error[64];

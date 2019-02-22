@@ -35,7 +35,7 @@ typedef struct {
 }LinkPicUploadSignal;
 
 
-static void * uploadPicture(void *_pOpaque);
+static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam);
 
 int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysTimestamp) {
         LinkPicUploadSignal sig;
@@ -122,7 +122,7 @@ static void * listenPicUpload(void *_pOpaque)
                                 case LinkPicUploadSignalStop:
                                         return NULL;
                                 case LinkPicUploadSignalUpload:
-                                        uploadPicture(&sig);
+                                        uploadPicture(&sig, NULL);
                                         break;
                                 case LinkPicUploadGetPicSignalCallback:
                                         if (pPicUploader->picUpSettings_.getPicCallback) {
@@ -192,7 +192,7 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         return LINK_SUCCESS;
 }
 
-static void * uploadPicture(void *_pOpaque) {
+static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam) {
         LinkPicUploadSignal *pSig = (LinkPicUploadSignal*)_pOpaque;
         
         if (pSig->pFileName == NULL) {
@@ -218,27 +218,40 @@ static void * uploadPicture(void *_pOpaque) {
         
         int ret = 0;
         int isFirst = 0, tryCount = 2;
-        while(tryCount-- > 0) {
-                ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
-                                                                                    &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
+        if (upParam) {
+                ret = upParam->getUploadParamCallback(upParam->pParamOpaque,&param, LINK_UPLOAD_CB_GETFRAMEPARAM);
                 if (ret != LINK_SUCCESS) {
                         if (ret == LINK_BUFFER_IS_SMALL) {
                                 LinkLogError("param buffer is too small. drop file:");
                         } else {
                                 LinkLogError("not get param yet:%d", ret);
                         }
-                        if (pSig->pPicUploader->nCount_ == 0) {
-                                isFirst = 1;
-                                pSig->pPicUploader->nCount_++;
-                                LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
-                                sleep(3);
+                        upParam->nRetCode = ret;
+                        goto END;
+                }
+        } else {
+                while(tryCount-- > 0) {
+                        ret = pSig->pPicUploader->picUpSettings_.getUploadParamCallback(pSig->pPicUploader->picUpSettings_.pGetUploadParamCallbackOpaque,
+                                                                                        &param, LINK_UPLOAD_CB_GETFRAMEPARAM);
+                        if (ret != LINK_SUCCESS) {
+                                if (ret == LINK_BUFFER_IS_SMALL) {
+                                        LinkLogError("param buffer is too small. drop file:");
+                                } else {
+                                        LinkLogError("not get param yet:%d", ret);
+                                }
+                                if (pSig->pPicUploader->nCount_ == 0) {
+                                        isFirst = 1;
+                                        pSig->pPicUploader->nCount_++;
+                                        LinkLogInfo("first pic upload. may wait get uptoken. sleep 3s");
+                                        sleep(3);
+                                } else {
+                                        goto END;
+                                }
                         } else {
-                                goto END;
+                                if (!isFirst)
+                                        pSig->pPicUploader->nCount_++;
+                                break;
                         }
-                } else {
-                        if (!isFirst)
-                                pSig->pPicUploader->nCount_++;
-                        break;
                 }
         }
         char *pFile = strrchr(pSig->pFileName, '/');
@@ -261,6 +274,7 @@ static void * uploadPicture(void *_pOpaque) {
         }
         if (*pFile == 0) {
                 LinkLogError("wrong picture name:%s", key);
+                upParam->nRetCode = -11;
                 goto END;
         }
         
@@ -272,6 +286,7 @@ static void * uploadPicture(void *_pOpaque) {
         }
         if (*pFile == 0) {
                 LinkLogError("wrong picture name:%s", key);
+                upParam->nRetCode = -12;
                 goto END;
         }
         *pFile++ = 0;
@@ -285,12 +300,18 @@ static void * uploadPicture(void *_pOpaque) {
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
         if (ret != 0) { //http error
+                if (putret.isTimeout)
+                        upParam->nRetCode = LINK_TIMEOUT;
+                else
+                        upParam->nRetCode = ret;
                 LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
         } else {
-                if (putret.code / 100 == 2) {
+                if (putret.code == 200) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
+                        upParam->nRetCode = LINK_SUCCESS;
                         LinkLogDebug("upload picture: %s success", key);
                 } else {
+                        upParam->nRetCode = putret.code;
                         if (putret.body != NULL) {
                                 LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
                                              key, putret.code, putret.reqid, putret.body);
@@ -303,8 +324,10 @@ static void * uploadPicture(void *_pOpaque) {
         
         LinkFreePutret(&putret);
         
-        
-        if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
+        if(upParam) {
+                if  (upParam->pUploadStatisticCb)
+                        upParam->pUploadStatisticCb(upParam->pStatOpauqe, LINK_UPLOAD_PIC, uploadResult);
+        }else if (pSig->pPicUploader->picUpSettings_.pUploadStatisticCb) {
                 pSig->pPicUploader->picUpSettings_.pUploadStatisticCb(pSig->pPicUploader->picUpSettings_.pUploadStatArg, LINK_UPLOAD_PIC, uploadResult);
         }
 
@@ -314,6 +337,26 @@ END:
         }
  
         return NULL;
+}
+
+int LinkUploadPicture(LinkPicture *pic, LinkPicUploadParam *upParam) {
+
+        if (pic == NULL || upParam == NULL || upParam->getUploadParamCallback == NULL ||
+            upParam->pParamOpaque == NULL) {
+                return LINK_ARG_ERROR;
+        }
+        
+        LinkPicUploadSignal sig;
+         memset(&sig, 0, sizeof(sig));
+        
+        sig.nDataLen = pic->nBuflen;
+        sig.pFileName = (char *)pic->pFilename;
+        sig.pData = (char *)pic->pBuf;
+        
+        uploadPicture(&sig, upParam);
+        pic->pFilename = NULL;
+        
+        return LINK_SUCCESS;
 }
 
 void LinkDestroyPictureUploader(PictureUploader **pPicUploader) {
