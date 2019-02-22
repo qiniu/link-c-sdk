@@ -59,6 +59,8 @@ typedef struct {
 
     char *otaMode;
     char *mqttOtaTopic;
+    char *mqttOutTopic;
+    char *mqttInTopic;
 } Config;
 
 struct cfg_struct;

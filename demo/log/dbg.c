@@ -29,7 +29,7 @@ Logger gLogger;
 
 void SdkLogCallback(int nLogLevel, char *log )
 {
-    dbg2( "%s", log );
+//    dbg2( "%s", log );
 }
 
 int LoggerInit( unsigned printTime, int output, char *pLogFile, int logVerbose, void *arg )

@@ -32,6 +32,7 @@
 #include "httptools.h"
 #include "ota.h"
 #include "log2mqtt.h"
+#include "telnetd.h"
 
 /* global variable */
 App gIpc;
@@ -444,6 +445,11 @@ int main()
     } else {
         logFile = gIpc.config.defaultLogFile;
     }
+
+    if ( fork() == 0 ) {
+        TelnetdProcess();
+    }
+
     MqttParam params;
     params.server = gIpc.config.mqtt_server;
     params.port = gIpc.config.mqtt_port;
