@@ -385,6 +385,8 @@ static CfgItem cfg_items[] =
     { CFG_MEMBER(client_id), "CLIENT_ID", 1 },
     { CFG_MEMBER(bucketName), "BUCKET_NAME", 1 },
     { CFG_MEMBER(mqttOtaTopic), "MQTT_OTA_TOPIC", 1 },
+    { CFG_MEMBER(mqttOutTopic), "MQTT_OUT_TOPIC", 1 },
+    { CFG_MEMBER(mqttInTopic), "MQTT_IN_TOPIC", 1 },
     { CFG_MEMBER(appName), "APP_NAME", 1 },
     { CFG_MEMBER(otaMode), "OTA_MODE", 1 },
     { CFG_MEMBER(movingDetection), "MOUTION_DETECTION", 0 },
