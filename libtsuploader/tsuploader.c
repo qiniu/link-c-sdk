@@ -13,7 +13,7 @@
 #include "picuploader.h"
 #include "segmentmgr.h"
 
-
+static int64_t lastReportAccdu  = 0; // for test
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
@@ -63,9 +63,9 @@ typedef struct _KodoUploader{
         LinkSession session;
         LinkSession bakSession;
         int reportType;
-        int isReport;
-        int isFirstSessionPicReported; // 第一个seg的封面检查
-        int nInternalForceSegFlag; // 防止内存强制切片(meta),在短时间内重复多次，必须好在有片段上传后才能再次强制分片
+        int8_t isSegStartReport; // 是否上报了片段开始
+        int8_t isFirstSessionPicReported; // 第一个seg的封面检查
+        int8_t nInternalForceSegFlag; // 防止内存强制切片(meta),在短时间内重复多次，必须在有片段上传后才能再次强制分片
         // for restoreDuration
         int64_t nAudioDuration;
         int64_t nVideoDuration;
@@ -188,6 +188,13 @@ static void resetSessionReportScope(LinkSession *pSession) {
         pSession->nAudioGapFromLastReport = 0;
         pSession->nVideoGapFromLastReport = 0;
 }
+
+static void resetSessionScope(LinkSession *pSession) {
+        resetSessionReportScope(pSession);
+        pSession->nAccSessionAudioDuration = 0;
+        pSession->nAccSessionVideoDuration = 0;
+}
+
 static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t nCurTsDuration) {
         
         if (nCurTsDuration < 4500) {
@@ -364,9 +371,11 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                                                         LINK_UPLOAD_TS, uploadResult);
         }
         
-        if ((shouldReport || pKodoUploader->isReport) && reportType & 0x4) {
+        if (pKodoUploader->isSegStartReport && reportType & 0x4) {
                 pSession->coverStatus = 0;
-                LinkLogDebug("=========================4>%s", pKodoUploader->bakSession.sessionId);
+                if (lastReportAccdu != pKodoUploader->bakSession.nAccSessionVideoDuration)
+                        LinkLogWarn("======");
+                LinkLogDebug("=========================4>%s %"PRId64"", pKodoUploader->bakSession.sessionId, pKodoUploader->bakSession.nAccSessionVideoDuration);
                 pKodoUploader->bakSession.isNewSessionStarted = 0;
                 pKodoUploader->bakSession.nSessionEndResonCode = pSession->nSessionEndResonCode;
                 assert(pKodoUploader->bakSession.nSessionEndResonCode != 0);
@@ -375,21 +384,22 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 LinkUpdateSegment(pSession->segHandle, &pKodoUploader->bakSession);
                 if (pKodoUploader->isFirstSessionPicReported)
                         pKodoUploader->bakSession.coverStatus = 0;
-                pKodoUploader->isReport = 0;
+                pKodoUploader->isSegStartReport = 0;
+                memset(&pKodoUploader->bakSession, 0, sizeof(pKodoUploader->bakSession));
         }
         
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
                 if (shouldReport){
                         if(reportType & 0x1) {
-                                LinkLogDebug("=========================1>%s", pSession->sessionId);
+                                LinkLogDebug("=========================1>%s %"PRId64"", pSession->sessionId, pSession->nAccSessionVideoDuration);
                                 pSession->isNewSessionStarted = 1;
                                 setSessionCoverStatus(pSession, upPicParam.nRetCode);
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                                 pSession->isNewSessionStarted = 0;
-                                pKodoUploader->isReport = 1;
+                                pKodoUploader->isSegStartReport = 1;
                         } else if(reportType & 0x2) {
-                                pKodoUploader->isReport = 1;
-                                LinkLogDebug("=========================2>%s %"PRId64"", pSession->sessionId, pSession->nTsSequenceNumber);
+                                LinkLogDebug("=========================2>%s %"PRId64" %"PRId64"", pSession->sessionId, pSession->nTsSequenceNumber,
+                                             pSession->nAccSessionVideoDuration);
                                 if (pKodoUploader->isFirstSessionPicReported)
                                         setSessionCoverStatus(pSession, upPicParam.nRetCode);
                                 LinkUpdateSegment(pSession->segHandle, pSession);
@@ -402,12 +412,12 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 restoreDuration(pKodoUploader);
                 if (shouldReport){
                         if(reportType & 0x1) {
-                                pKodoUploader->isReport = 1;
-                                LinkLogDebug("========================-1>%s", pSession->sessionId);
+                                LinkLogDebug("========================-1>%s %"PRId64"", pSession->sessionId, pSession->nAccSessionVideoDuration);
                                 pSession->isNewSessionStarted = 1;
                                 setSessionCoverStatus(pSession, upPicParam.nRetCode);
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                                 pSession->isNewSessionStarted = 0;
+                                pKodoUploader->isSegStartReport = 1;
                         }
                 }
         }
@@ -458,6 +468,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         pKodoUploader->nTsCacheNum--;
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
+        lastReportAccdu = pSession->nAccSessionVideoDuration;
         return NULL;
 }
 
@@ -521,6 +532,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
                 free(uploadCommand.ts.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 LinkLogError("drop ts file due to ts cache reatch max limit");
+                // TODO CALLBAK
         } else {
                 LinkLogTrace("-------->push ts to  queue\n", nCurCacheNum);
                 int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
@@ -598,8 +610,6 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         pSession->isNewSessionStarted = 1;
         
 #if 0
-        //pSession->nAudioGapFromLastReport = 0;
-        //pSession->nVideoGapFromLastReport = 0;
         
         //pSession->nAccSessionDuration = 0;
         //pSession->nAccSessionAudioDuration = 0;
@@ -628,9 +638,12 @@ static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestam
 }
 
 static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTimeInfo *pTi) {
+        resetSessionReportScope(&pKodoUploader->session); // 可能会丢弃ts，所以这里也需要reset
+        int isForceSeg = pKodoUploader->isForceSeg;
         if (pKodoUploader->isForceSeg) {
                 pKodoUploader->isForceSeg = 0;
-                handleSegTimeReport(pKodoUploader, pTi->nSystimestamp, 1);
+                LinkLogDebug("force to seg");
+                handleSegTimeReport(pKodoUploader, pTi->nSystimestamp, 0); // 属于正常的分片逻辑(是强制分片设置的标记)，所以不算强制分片
         }
         if (pKodoUploader->nFirstSystime <= 0)
                 pKodoUploader->nFirstSystime = pTi->nSystimestamp;
@@ -657,8 +670,10 @@ static void handleTsStartTimeReport(KodoUploader * pKodoUploader, LinkReportTime
                         pKodoUploader->session.nTsSequenceNumber = 1;
         } else { // 强制片段结束了
                 pKodoUploader->session.nTsSequenceNumber++;
-                int xx = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, pKodoUploader->nLastTsDuration, 0);
-                pKodoUploader->reportType |= xx;
+                if (isForceSeg == 0) {
+                        int xx = handleSessionCheck(pKodoUploader, pTi->nSystimestamp, 0, pKodoUploader->nLastTsDuration, 0);
+                        pKodoUploader->reportType |= xx;
+                }
         }
         pKodoUploader->bakSession.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
 }
@@ -703,8 +718,21 @@ static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTim
         }
         pKodoUploader->bakSession = pKodoUploader->session;
         pKodoUploader->reportType = handleSessionCheck(pKodoUploader, nCurSysTime, 1, 0, 0);
-        if (fromInternal)
+        if (fromInternal) {
                 pKodoUploader->bakSession.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
+                if (pKodoUploader->bakSession.nTsSequenceNumber > 0) // 当前切片算在新的sessoin，所以之前seq要减1
+                        pKodoUploader->bakSession.nTsSequenceNumber--;
+                
+                
+        }
+}
+
+// 第一个切片还没有开始上传任何东西就收到了强制分片相关的命令消息
+static void checkAndSetFirstSessionPicReportedStatus(KodoUploader * pKodoUploader) {
+        if (pKodoUploader->isFirstSessionPicReported) {
+                pKodoUploader->isFirstSessionPicReported = 0;
+                pKodoUploader->isSegStartReport = 0;
+        }
 }
 
 static void * listenTsUpload(void *_pOpaque)
@@ -712,6 +740,7 @@ static void * listenTsUpload(void *_pOpaque)
         KodoUploader * pKodoUploader = (KodoUploader *)_pOpaque;
         handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 1, 0, 0);
         pKodoUploader->isFirstSessionPicReported = 1;
+        pKodoUploader->isSegStartReport = 1;
         LinkUploaderStatInfo info = {0};
         while(!pKodoUploader->nQuit_ || info.nLen_ != 0) {
                 TsUploaderCommand cmd;
@@ -732,6 +761,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 break;
                         case LINK_TSU_PICTURE:
                                 if (pKodoUploader->picture.pFilename) {
+                                        LinkLogWarn("drop picture:%s", pKodoUploader->picture.pFilename);
                                         free((void*)pKodoUploader->picture.pFilename);
                                         pKodoUploader->picture.pFilename = NULL;
                                 }
@@ -740,7 +770,7 @@ static void * listenTsUpload(void *_pOpaque)
                         case LINK_TSU_QUIT:
                                 LinkLogInfo("tsuploader required to quit:%"PRId64"", pKodoUploader->session.nAccSessionDuration);
                                 if (pKodoUploader->session.nAccSessionDuration > 0) {
-                                        LinkLogDebug("=========================4>%s", pKodoUploader->session.sessionId);
+                                        LinkLogDebug("=========================4>%s", pKodoUploader->session.sessionId, pKodoUploader->session.nAccSessionVideoDuration);
                                         pKodoUploader->session.nSessionEndResonCode = 4;
                                         pKodoUploader->session.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
                                         LinkUpdateSegment(pKodoUploader->session.segHandle, &pKodoUploader->session);
@@ -753,36 +783,45 @@ static void * listenTsUpload(void *_pOpaque)
                                 handleTsEndTimeReport(pKodoUploader, &cmd.time);
                                 break;
                         case LINK_TSU_SEG_TIME:
+                                checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 handleSegTimeReport(pKodoUploader, cmd.time.nSystimestamp, 0);
                                 break;
                         case LINK_TSU_SET_META:
+                                checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 if (pKodoUploader->pSessionMeta) {
                                         free(pKodoUploader->pSessionMeta);
                                         pKodoUploader->pSessionMeta = NULL;
                                 }
                                 
-                                if (pKodoUploader->nFirstSystime > 0) { // 切片还在缓存中
-                                        if (!pKodoUploader->nInternalForceSegFlag) {
-                                                LinkLogDebug("1force seg cuz meta");
-                                                handleSegTimeReport(pKodoUploader, pKodoUploader->nFirstSystime, 1);
-                                        } else {
-                                                pKodoUploader->nInternalForceSegFlag = 1;
+                                if (!pKodoUploader->nInternalForceSegFlag) {
+                                        if (pKodoUploader->isForceSeg == 0 && pKodoUploader->nFirstSystime > 0) { // 切片还在缓存中
+                                                // 当前切片也算在新的分片中
+                                                LinkLogDebug("1force seg cuz meta:%d", pKodoUploader->session.nTsSequenceNumber);
+                                                // 可能因为其它原因刚强制分片完成，新的片段一个切片都没有上传完成
+                                                if (pKodoUploader->session.nTsSequenceNumber > 1) {
+                                                        handleSegTimeReport(pKodoUploader, pKodoUploader->nFirstSystime, 1);
+                                                }
+                                        } else { // 当前切片已结束，但是下一个切片还没有开始，设置标志到下个切片开始
+                                                LinkLogDebug("2force seg cuz meta");
+                                                pKodoUploader->isForceSeg = 1;
                                         }
-                                } else { // 当前切片已结束，但是下一个切片还没有开始
-                                        LinkLogDebug("2force seg cuz meta");
-                                        pKodoUploader->isForceSeg = 1;
                                 }
+                                pKodoUploader->nInternalForceSegFlag = 1;
                                 
                                 pKodoUploader->pSessionMeta = cmd.pSessionMeta;
                                 break;
                         case LINK_TSU_CLR_META:
+                                checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 if (pKodoUploader->pSessionMeta) {
                                         pKodoUploader->pSessionMeta->isOneShot = 1;
                                 }
-                                if (pKodoUploader->nFirstSystime > 0) {
-                                        LinkLogDebug("3force seg cuz meta");
-                                        pKodoUploader->isForceSeg = 1;
+                                if (!pKodoUploader->nInternalForceSegFlag) {
+                                        if (pKodoUploader->nFirstSystime > 0) {
+                                                LinkLogDebug("3force seg cuz meta");
+                                                pKodoUploader->isForceSeg = 1;
+                                        }
                                 }
+                                pKodoUploader->nInternalForceSegFlag = 1;
                                 break;
                         case LINK_TSU_SET_PLAN_TYPE:
                                 pKodoUploader->planType = cmd.planType;
@@ -970,7 +1009,8 @@ int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic) {
         
         int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
         if (ret <= 0) {
-                LinkLogError("ts queue error. push pic meta", ret);
+                LinkLogError("ts queue error. push pic meta:%s", ret, pic.pFilename);
+                free(pFileName);
                 return ret;
         }
         return LINK_SUCCESS;
