@@ -1,8 +1,4 @@
-*.a
-*.o
-*.lo
-*.swp
 build*/
-tags
-libs
+output*/
 doc/html/
+libs/

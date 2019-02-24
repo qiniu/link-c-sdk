@@ -1,68 +1,76 @@
-cmake_minimum_required (VERSION 2.8)
+# ------------------------------------------------------------------------------
+# link-c-sdk/libtsuploader CMakeLists.txt
+# ------------------------------------------------------------------------------
 
-project(tsuploader)
+set(CURRENT_TARGET "tsuploader")
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libghttp")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/")
+# ------------------------------------------------------------------------------
+# Build target
+# ------------------------------------------------------------------------------
 
-if (WITH_OPENSSL)
-    message("WITH_OPENSSL")
-    set(DISABLE_OPENSSL OFF)
-    set(OPENSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}")
-    link_directories("${OPENSSL_ROOT_DIR}/lib")
-    include_directories("${OPENSSL_ROOT_DIR}/include")
-    include_directories("${OPENSSL_ROOT_DIR}/include/wolfssl")
-elseif (WITH_WOLFSSL)
-    message("WITH_WOLFSSL")
-    set(DISABLE_OPENSSL OFF)
-    set(WOLFSSL_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}")
-    link_directories("${WOLFSSL_ROOT_DIR}/lib")
-    include_directories("${WOLFSSL_ROOT_DIR}/include")
-    include_directories("${WOLFSSL_ROOT_DIR}/include/wolfssl")
-else()
-    message("WITHOUT_OPENSSL")
-    set(DISABLE_OPENSSL ON)
-    add_definitions(-DDISABLE_OPENSSL)
-endif()
+include_directories(${TOP_DIRS})
+include_directories(${CONFIG_DIRS})
+include_directories(${DEPENDS_DIRS})
+include_directories(${LIBGHTTP_INCLUDE_DIRS})
+if(WITH_MQTT)
+  include_directories(${LIBTMQTT_INCLUDE_DIRS})
+endif(WITH_MQTT)
+if(WITH_WOLFSSL)
+  include_directories(${WOLFSSL_INCLUDE_DIRS})
+endif(WITH_WOLFSSL)
 
-add_library(tsuploader STATIC
-    resource.c
-    resource.h
-    tsuploader.h
-    tsuploader.c
-    base.h
-    adts.h
-    adts.c
-    queue.c
-    queue.h
-    kmp.h
-    kmp.c
-    log.h
-    log.c
-    sign.c
-    servertime.h
-    servertime.c
-    tsmuxuploader.c
-    tsmuxuploader.h
-    tsuploaderapi.c
-    uploader.h
-    httptools.h
-    httptools.c
-    tsmux.h
-    tsmux.c
-    mpegts.c
-    mpegts.h
-    picuploader.h
-    picuploader.c
-    segmentmgr.c
-    segmentmgr.h
-    security.h
-    security.c
-    ../b64/b64.c
-    ../b64/b64.h
-    ../b64/urlsafe_b64.c
-    ../b64/urlsafe_b64.h
-    ../cJSON/cJSON.h
-    ../cJSON/cJSON.c
-)
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} SRCS_${CURRENT_TARGET})
+
+aux_source_directory(${DEPENDS_DIRS}/log SRCS_${CURRENT_TARGET})
+aux_source_directory(${DEPENDS_DIRS}/flag SRCS_${CURRENT_TARGET})
+aux_source_directory(${DEPENDS_DIRS}/b64 SRCS_${CURRENT_TARGET})
+aux_source_directory(${DEPENDS_DIRS}/cJSON SRCS_${CURRENT_TARGET})
+aux_source_directory(${DEPENDS_DIRS}/hmac_sha1 SRCS_${CURRENT_TARGET})
+
+foreach(f IN LISTS SRCS_${CURRENT_TARGET})
+  get_filename_component(b ${f} NAME)
+  set_source_files_properties(${f} PROPERTIES
+    COMPILE_DEFINITIONS "__FILE_NAME__=\"${b}\"")
+endforeach()
+
+# build static target
+if(WITH_STATIC)
+    add_library(${CURRENT_TARGET}_STATIC STATIC ${SRCS_${CURRENT_TARGET}})
+    set_target_properties(${CURRENT_TARGET}_STATIC PROPERTIES OUTPUT_NAME ${CURRENT_TARGET})
+    target_compile_definitions(${CURRENT_TARGET}_STATIC PRIVATE "-D__PROJECT__=\"[${CURRENT_TARGET}]\"")
+    if(WITH_MQTT)
+        add_dependencies(${CURRENT_TARGET}_STATIC mqtt_STATIC)
+    endif()
+    install(TARGETS ${CURRENT_TARGET}_STATIC
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+endif(WITH_STATIC)
+
+# build shared target
+if(WITH_SHARED)
+    add_library(${CURRENT_TARGET}_SHARED SHARED ${SRCS_${CURRENT_TARGET}})
+    set_target_properties(${CURRENT_TARGET}_SHARED PROPERTIES OUTPUT_NAME ${CURRENT_TARGET})
+    set_target_properties(${CURRENT_TARGET}_SHARED PROPERTIES VERSION ${LINK_C_SDK_RELEASE_VERSION} SOVERSION ${LINK_C_SDK_VERSION_MAJOR})
+    target_compile_definitions(${CURRENT_TARGET}_SHARED PRIVATE "-D__PROJECT__=\"[${CURRENT_TARGET}]\"")
+    if(WITH_MQTT)
+        add_dependencies(${CURRENT_TARGET}_SHARED mqtt_SHARED)
+    endif()
+    install(TARGETS ${CURRENT_TARGET}_SHARED
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+endif(WITH_SHARED)
+
+# ------------------------------------------------------------------------------
+# Export head file
+# ------------------------------------------------------------------------------
+
+file(GLOB ${CURRENT_TARGET}_HEADERS
+  *.h
+  )
+install(FILES ${${CURRENT_TARGET}_HEADERS}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CURRENT_TARGET}
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+

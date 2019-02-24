@@ -1,12 +1,12 @@
-#include "wolfmqtt.h"
-#include "mqtt_types.h"
-#include "mqtt_packet.h"
-#include "mqtt_socket.h"
-#include "wolfmqtt/mqtt_client.h"
-#include "mqttnet.h"
-#include "log.h"
-
 #include <signal.h>
+#include <wolfmqtt/wolfmqtt.h>
+#include <wolfmqtt/mqtt_types.h>
+#include <wolfmqtt/mqtt_packet.h>
+#include <wolfmqtt/mqtt_socket.h>
+#include <wolfmqtt/mqtt_client.h>
+#include "mqttnet.h"
+#include "log/log.h"
+#include "config.h"
 
 #define MAX_PACKET_ID ((1<<16) -1)
 #define DEFAULT_CON_TIMEOUT_MS 2000
@@ -238,6 +238,7 @@ static int OnMessageCallback(struct _MqttClient *client, MqttMessage *_pMessage,
         return MQTT_CODE_SUCCESS;
 }
 
+#ifdef WITH_WOLFSSL
 static int mqtt_tls_verify_cb(int preverify, WOLFSSL_X509_STORE_CTX* store)
 {
         char buffer[WOLFSSL_MAX_ERROR_SZ];
@@ -280,6 +281,7 @@ int mqtt_tls_cb(MqttClient* client)
         LinkLogError("MQTT TLS Setup (%d)", rc);
         return rc;
 }
+#endif //WITH_WOLFSSL
 
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info)
 {
@@ -364,9 +366,14 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         /* Optional authentication */
         ctx->connect.username = _pInstance->options.userInfo.pUsername;
         ctx->connect.password = _pInstance->options.userInfo.pPassword;
-	LinkLogDebug("MqttConnect username %s, password %s  tls %d\n", ctx->connect.username, ctx->connect.password, ctx->use_tls); 
-	rc = MqttClient_NetConnect(client, _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort,
+        LinkLogDebug("MqttConnect username %s, password %s  tls %d\n", ctx->connect.username, ctx->connect.password, ctx->use_tls);
+#ifdef WITH_WOLFSSL
+        rc = MqttClient_NetConnect(client, _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort,
                                    5000, ctx->use_tls, mqtt_tls_cb);
+#else
+        rc = MqttClient_NetConnect(client, _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort,
+                                   5000, ctx->use_tls, NULL);
+#endif
         if (rc != MQTT_CODE_SUCCESS) {
             sleep(1);
             LinkLogError("EstablishConnect failed rc %d %s \n", rc, MqttClient_ReturnCodeToString(rc));
@@ -396,11 +403,12 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
+#ifdef WITH_WOLFSSL
         if (client->tls.ctx) {
                 wolfSSL_CTX_free(client->tls.ctx);
                 client->tls.ctx = NULL;
         }
-
+#endif
         int rc = MqttClient_NetDisconnect(client);
         if (rc != MQTT_CODE_SUCCESS) {
                 LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);

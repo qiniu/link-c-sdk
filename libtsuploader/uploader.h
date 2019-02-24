@@ -9,7 +9,7 @@
 #define __TS_UPLOADER_API__
 
 #include "tsmuxuploader.h"
-#include "log.h"
+#include "log/log.h"
 #include "base.h"
 
 /**

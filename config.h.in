@@ -1,0 +1,14 @@
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
+
+#cmakedefine LINK_C_SDK_RELEASE_VERSION "@LINK_C_SDK_RELEASE_VERSION@"
+#cmakedefine LINK_C_SDK_BUILD_VERSION   "@LINK_C_SDK_BUILD_VERSION@"
+
+#cmakedefine PROJECT_SOURCE_DIR "@PROJECT_SOURCE_DIR@"
+#cmakedefine PROJECT_BINARY_DIR "@PROJECT_BINARY_DIR@"
+
+#cmakedefine WITH_MQTT
+#cmakedefine WITH_WOLFSSL
+#cmakedefine WITH_DEMO
+
+#endif

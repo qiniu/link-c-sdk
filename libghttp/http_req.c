@@ -24,13 +24,16 @@
 #include "http_req.h"
 #include "http_trans.h"
 #include "http_global.h"
+#include "config.h"
 
-#include "version.h"
-#ifndef LINK_SDK_VERSION
-#error "must define LINK_SDK_VERSION"
-#else
-const char *gVersionAgent = LINK_SDK_VERSION;
+#ifndef LINK_C_SDK_RELEASE_VERSION
+#define LINK_C_SDK_RELEASE_VERSION
 #endif
+#ifndef LINK_C_SDK_BUILD_VERSION
+#define LINK_C_SDK_BUILD_VERSION
+#endif
+const char *gVersionAgent = "version:" LINK_C_SDK_RELEASE_VERSION "build:" LINK_C_SDK_BUILD_VERSION;
+
 
 const char *
 http_req_type_char[] = {

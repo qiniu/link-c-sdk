@@ -1,29 +1,21 @@
 #include <stdio.h>
-#ifdef TEST_WITH_FFMPEG
-#include <libavformat/avformat.h>
-#endif
 #include <assert.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <stdbool.h>
 #include <signal.h>
-#include "uploader.h"
-#include "security.h"
-#include "adts.h"
-#include "flag.h"
+#include "flag/flag.h"
+#include "libtsuploader/uploader.h"
+#include "libtsuploader/security.h"
+#include "libtsuploader/adts.h"
+#include "config.h"
 
-#ifdef __APPLE__
-#define MATERIAL_PATH "../../../../tests/functional/material/"
-#else
-#define MATERIAL_PATH "../../../tests/functional/material/"
-#endif
+#define MATERIAL_PATH PROJECT_SOURCE_DIR "/tests/material/"
 
 char *gpPictureBuf = NULL;
 int gnPictureBufLen = 0;
 
 typedef struct {
-#ifdef TEST_WITH_FFMPEG
-        bool IsInputFromFFmpeg;
-#endif
         bool IsTestAAC;
         bool IsTestAACWithoutAdts;
         bool IsTestTimestampRollover;
@@ -485,103 +477,6 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
         return 0;
 }
 
-#ifdef TEST_WITH_FFMPEG
-int start_ffmpeg_test(char * _pUrl, DataCallback callback, void *opaque)
-{
-        AVFormatContext *pFmtCtx = NULL;
-        int ret = avformat_open_input(&pFmtCtx, _pUrl, NULL, NULL);
-        if (ret != 0) {
-                char msg[128] = {0};
-                av_strerror(ret, msg, sizeof(msg)) ;
-                printf("ffmpeg err:%s (%s)\n", msg, _pUrl);
-                return ret;
-        }
-        
-        AVBSFContext *pBsfCtx = NULL;
-        if ((ret = avformat_find_stream_info(pFmtCtx, 0)) < 0) {
-                printf("Failed to retrieve input stream information");
-                goto end;
-        }
-
-        printf("===========Input Information==========\n");
-        av_dump_format(pFmtCtx, 0, _pUrl, 0);
-        printf("======================================\n");
-        
-        int nAudioIndex = 0;
-        int nVideoIndex = 0;
-        for (size_t i = 0; i < pFmtCtx->nb_streams; ++i) {
-                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-                        printf("find audio\n");
-                        nAudioIndex = i;
-                        continue;
-                }
-                if (pFmtCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-                        printf("find video\n");
-                        nVideoIndex = i;
-                        continue;
-                }
-                printf("other type:%d\n", pFmtCtx->streams[i]->codecpar->codec_type);
-        }
-
-        const AVBitStreamFilter *filter = av_bsf_get_by_name("h264_mp4toannexb");
-        if(!filter){
-                av_log(NULL,AV_LOG_ERROR,"Unkonw bitstream filter");
-                goto end;
-        }
-        
-        ret = av_bsf_alloc(filter, &pBsfCtx);
-        if (ret != 0) {
-                goto end;
-        }
-        avcodec_parameters_copy(pBsfCtx->par_in, pFmtCtx->streams[nVideoIndex]->codecpar);
-        av_bsf_init(pBsfCtx);
-        
-        AVPacket pkt;
-        av_init_packet(&pkt);
-        while((ret = av_read_frame(pFmtCtx, &pkt)) == 0){
-                if(nVideoIndex == pkt.stream_index) {
-                        ret = av_bsf_send_packet(pBsfCtx, &pkt);
-                        if(ret < 0) {
-                                fprintf(stderr, "av_bsf_send_packet fail: %d\n", ret);
-                                goto end;
-                        }
-                        ret = av_bsf_receive_packet(pBsfCtx, &pkt);
-                        if (AVERROR(EAGAIN) == ret){
-                                av_packet_unref(&pkt);
-                                continue;
-                        }
-                        if(ret < 0){
-                                fprintf(stderr, "av_bsf_receive_packet: %d\n", ret);
-                                goto end;
-                        }
-                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_VIDEO, pkt.pts, pkt.flags == 1);
-                } else if (nAudioIndex == pkt.stream_index) {
-                        ret = callback(opaque, pkt.data, pkt.size, THIS_IS_AUDIO, pkt.pts, 0);
-                }
-
-                av_packet_unref(&pkt);
-        }
-        if (ret != 0 && cbRet != LINK_PAUSED) {
-                char msg[128] = {0};
-                av_strerror(ret, msg, sizeof(msg)) ;
-                printf("ffmpeg end:%s\n", msg);
-        }
-
-end:
-        if (pBsfCtx)
-                av_bsf_free(&pBsfCtx);
-        if (pFmtCtx)
-                avformat_close_input(&pFmtCtx);
-        /* close output */
-        if (ret < 0 && ret != AVERROR_EOF) {
-                printf("Error occurred.\n");
-                return -1;
-        }
-        
-        
-        return 0;
-}
-#endif
 
 static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame)
 {
@@ -732,13 +627,6 @@ static void checkCmdArg(const char * name)
                 }
         }
 
-#ifdef TEST_WITH_FFMPEG
-        if (cmdArg.IsInputFromFFmpeg) {
-                cmdArg.IsTestAAC = true;
-                cmdArg.IsTestAACWithoutAdts = false;
-                LinkLogError("input from ffmpeg");
-        }
-#endif
         if (cmdArg.IsTestTimestampRollover) {
                 cmdArg.nRolloverTestBase = 95437000;
 	}
@@ -759,32 +647,6 @@ static void checkCmdArg(const char * name)
         return;
 }
 
-#ifdef TEST_WITH_FFMPEG
-static void * second_test(void * opaque) {
-        AVuploader avuploader;
-        memset(&avuploader, 0, sizeof(avuploader));
-        
-        avuploader.avArg.nAudioFormat = LINK_AUDIO_AAC;
-        avuploader.avArg.nSamplerate = 16000;
-        avuploader.avArg.nChannels = 1;
-        avuploader.avArg.nVideoFormat = LINK_VIDEO_H264;
-
-        avuploader.userUploadArg.pToken_ = gtestToken;
-        avuploader.userUploadArg.nTokenLen_ = strlen(gtestToken);
-        avuploader.userUploadArg.nNewSegmentInterval = cmdArg.nNewSetIntval;
-        
-        int ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.avArg, &avuploader.userUploadArg);
-        if (ret != 0) {
-                fprintf(stderr, "CreateAndStartAVUploader err:%d\n", ret);
-                return NULL;
-        }
-        
-        start_ffmpeg_test("rtmp://localhost:1935/live/movie", dataCallback, &avuploader);
-        sleep(1);
-        LinkFreeUploader(&avuploader.pTsMuxUploader);
-        return NULL;
-}
-#endif
 
 static void do_start_file_test(AVuploader *pAvuploader){
         printf("%s\n%s\n", pAvuploader->pAFile, pAvuploader->pVFile);
@@ -838,9 +700,6 @@ static void uploadStatisticCallback(void *pUserOpaque, LinkUploadKind uploadKind
 extern const char *gVersionAgent;
 int main(int argc, const char** argv)
 {
-#ifdef TEST_WITH_FFMPEG
-        flag_bool(&cmdArg.IsInputFromFFmpeg, "ffmpeg", "is input from ffmpeg. will set --testaac and not set noadts");
-#endif
         flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
         flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
         flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
@@ -920,17 +779,7 @@ int main(int argc, const char** argv)
                 pVFile = NULL;
 
         int ret = 0;
-#ifdef TEST_WITH_FFMPEG
-      #if LIBAVFORMAT_VERSION_MAJOR < 58
-        av_register_all();
-	printf("av_register_all\n");
-      #endif
 
-        if (cmdArg.IsInputFromFFmpeg) {
-                avformat_network_init();
- 	        printf("avformat_network_init\n");
-	}
-#endif
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);

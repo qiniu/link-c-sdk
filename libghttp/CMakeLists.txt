@@ -1,54 +1,71 @@
-cmake_minimum_required (VERSION 2.8)
+# ------------------------------------------------------------------------------
+# link-c-sdk/libghttp CMakeLists.txt
+# ------------------------------------------------------------------------------
 
-project(libghttp)
+set(CURRENT_TARGET "ghttp")
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+# ------------------------------------------------------------------------------
+# Build target
+# ------------------------------------------------------------------------------
 
-add_definitions("-Wall -g")
-if (WITH_WOLFSSL)
-    add_definitions(-DUSE_WOLFSSL)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CONFIG_DIRS})
+include_directories(${DEPENDS_DIRS})
+include_directories(${LIBGHTTP_INCLUDE_DIRS})
 
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include")
-endif()
+if(WITH_WOLFSSL)
+  include_directories(${WOLFSSL_INCLUDE_DIRS})
+endif(WITH_WOLFSSL)
 
-if (WITH_OPENSSL)
-    add_definitions(-DUSE_OPENSSL)
+aux_source_directory(${CMAKE_CURRENT_LIST_DIR} SRCS_${CURRENT_TARGET})
 
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include")
-    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/include/wolfssl")
-endif()
+foreach(f IN LISTS SRCS_${CURRENT_TARGET})
+  get_filename_component(b ${f} NAME)
+  set_source_files_properties(${f} PROPERTIES
+    COMPILE_DEFINITIONS "__FILE_NAME__=\"${b}\"")
+endforeach()
 
-add_library(ghttp STATIC
-	ghttp.c
-	ghttp.h
-	ghttp_constants.h
-	http_base64.c
-	http_base64.h
-	http_date.c
-	http_date.h
-	http_global.h
-	http_hdrs.c
-	http_hdrs.h
-	http_req.c
-	http_req.h
-	http_resp.c
-	http_resp.h
-	http_trans.c
-	http_trans.h
-	http_uri.c
-	http_uri.h
-	qupload.h
-	qupload.c
-)
+# build static target
+if(WITH_STATIC)
+    add_library(${CURRENT_TARGET}_STATIC STATIC ${SRCS_${CURRENT_TARGET}})
+    set_target_properties(${CURRENT_TARGET}_STATIC PROPERTIES OUTPUT_NAME ${CURRENT_TARGET})
+    target_compile_definitions(${CURRENT_TARGET}_STATIC PRIVATE "-D__PROJECT__=\"[${CURRENT_TARGET}]\"")
+    if(WITH_WOLFSSL)
+        add_dependencies(${CURRENT_TARGET}_STATIC external-wolfSSL)
+    endif()
+    install(TARGETS ${CURRENT_TARGET}_STATIC
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+endif(WITH_STATIC)
 
+# build shared target
+if(WITH_SHARED)
+    add_library(${CURRENT_TARGET}_SHARED SHARED ${SRCS_${CURRENT_TARGET}})
+    set_target_properties(${CURRENT_TARGET}_SHARED PROPERTIES OUTPUT_NAME ${CURRENT_TARGET})
+    set_target_properties(${CURRENT_TARGET}_SHARED PROPERTIES VERSION ${LINK_C_SDK_RELEASE_VERSION} SOVERSION ${LINK_C_SDK_VERSION_MAJOR})
+    target_compile_definitions(${CURRENT_TARGET}_SHARED PRIVATE "-D__PROJECT__=\"[${CURRENT_TARGET}]\"")
+    if(WITH_WOLFSSL)
+        add_dependencies(${CURRENT_TARGET}_SHARED external-wolfSSL)
+    endif()
+    install(TARGETS ${CURRENT_TARGET}_SHARED
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+endif(WITH_SHARED)
 
-add_executable(testghttp test.c qupload.c qupload.h)
-if (WITH_OPENSSL)
-    target_link_libraries(testghttp ghttp wolfssl m)
-elseif (WITH_WOLFSSL)
-	target_link_libraries(testghttp ghttp wolfssl m)
-else()
-    target_link_libraries(testghttp ghttp m)
-endif()
+# ------------------------------------------------------------------------------
+# Export head file
+# ------------------------------------------------------------------------------
+
+file(GLOB ${CURRENT_TARGET}_HEADERS
+  ghttp.h
+  ghttp_constants.h
+  )
+install(FILES ${${CURRENT_TARGET}_HEADERS}
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${CURRENT_TARGET}
+  PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ
+  )
+
+#############################################################################
+

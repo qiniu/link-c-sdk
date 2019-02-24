@@ -5,7 +5,7 @@
 #include "control.h"
 #include "control_internal.h"
 #include "queue.h"
-#include "log.h"
+#include "log/log.h"
 #include "cJSON/cJSON.h"
 
 #define MQTT_IOCTRL_RESP_TOPIC  "linking/v1/%s/%s/rpc/response/"

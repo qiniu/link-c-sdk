@@ -1,13 +1,17 @@
+#include <assert.h>
+#include <signal.h>
+#include <pthread.h>
+#include "log/log.h"
+#include "cJSON/cJSON.h"
+#include "b64/urlsafe_b64.h"
+#include "hmac_sha1/hmac_sha1.h"
 #include "tsuploader.h"
 #include "tsmuxuploader.h"
-#include <assert.h>
-#include "log.h"
-#include <pthread.h>
 #include "servertime.h"
 #include "segmentmgr.h"
 #include "httptools.h"
-#include "cJSON/cJSON.h"
-#include <signal.h>
+#include "config.h"
+
 #include <libmqtt/linking-emitter-api.h>
 #include <qupload.h>
 
@@ -118,10 +122,12 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
         *_pTsMuxUploader = pTsMuxUploader;
         
+#ifdef WITH_MQTT
         /* Initial link emitter service */
         LinkEmitter_Init(_pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen,
                         _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
         LinkSetLogCallback(LinkEmitter_SendLog);
+#endif
         return LINK_SUCCESS;
 }
 
@@ -170,10 +176,11 @@ void LinkCleanup()
         nProcStatus = 2;
         LinkStopMgr();
         LinkUninitSegmentMgr();
-
+#ifdef WITH_MQTT
         /* stop emitter service */
         LinkEmitter_Cleanup();
         LinkSetLogCallback(NULL);
+#endif
         return;
 }
 
@@ -202,3 +209,66 @@ int LinkGetUploadToken(cJSON ** pJsonRoot,const char *pUrl, const char *pReqToke
         *pJsonRoot = (void *)pJRoot;
         return LINK_SUCCESS;
 }
+
+
+int LinkVerify(const char *_ak, size_t _akLen, const char *_sk, size_t _skLen, const char* _token, size_t _tokenLen)
+{
+        if (_ak == NULL || _sk == NULL || _token == NULL) {
+                return LINK_ERROR;
+        }
+        if (_akLen > 512 || _skLen > 512 || _tokenLen > 4096) {
+                return LINK_ERROR;
+        }
+        char ak[512] = {0};
+        strncpy(ak, _ak, _akLen);
+        char sk[512] = {0};
+        strncpy(sk, _sk, _skLen);
+        char token[4096] = {0};
+        strncpy(token, _token, _tokenLen);
+
+
+        char* EncodedSign = NULL;
+        char* encodedPutPolicy = NULL;
+        char *delim = ":";
+        char *p = strtok(token, delim);
+        int index = 0;
+        char * parserDak;
+        while(p != NULL) {
+              printf("%s \n", p);
+              if (index == 0) {
+                      parserDak = p;
+              } else if (index == 1) {
+                      EncodedSign = p;
+              } else if (index == 2) {
+                      encodedPutPolicy = p;
+              }
+              p = strtok(NULL, delim);
+              ++index;
+        }
+        if (EncodedSign == NULL || encodedPutPolicy == NULL) {
+              return LINK_ERROR;
+        }
+        int ret = memcmp(ak, parserDak, strlen(ak));
+        if (ret != 0) {
+                printf("DAK is not correct\n");
+                return LINK_ERROR;
+        }
+
+        unsigned char md[20] = {0};
+
+        ret = hmac_sha1(sk, strlen(sk), encodedPutPolicy, strlen(encodedPutPolicy), md, sizeof(md));
+        if (ret != 20) {
+                printf("get hmac-sha1 sign failed\n");
+                return LINK_FALSE;
+        }
+        char test[100] = {0};
+        int testlen = 100;
+        int realsize = urlsafe_b64_encode(md, sizeof(md), test, testlen);
+        ret = memcmp(test, EncodedSign, realsize);
+        if (ret != 0) {
+                printf("token is not correct\n");
+                return LINK_FALSE;
+        }
+        return LINK_TRUE;
+}
+

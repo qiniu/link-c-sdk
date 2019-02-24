@@ -263,13 +263,13 @@ ghttp_set_proxy_authinfo(ghttp_request *a_request,
 
 /* some SSL hooks */
 
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
 #include <openssl/x509.h>
 
 typedef int (* ghttp_ssl_cert_cb)(ghttp_request *a_request, 
                                   X509 *certificate, 
                                   void * user_data);
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
 

@@ -22,6 +22,7 @@
 
 #include <sys/time.h>
 #include <sys/types.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,7 +33,7 @@
 #include "http_global.h"
 #include "qupload.h"
 
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
 #include <openssl/crypto.h>
 #include <openssl/x509.h>
 #include <openssl/pem.h>
@@ -43,7 +44,7 @@ static int          ssl_initialized = 0;
 static SSL_METHOD * ssl_method = NULL;
 static SSL_CTX    * ssl_context = NULL;
 
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
 
@@ -195,7 +196,7 @@ http_trans_connect(http_trans_conn *a_conn)
       goto ec;
      }
     }
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
   /* initialize the SSL data structures */
   if (a_conn->USE_SSL)
     {
@@ -235,7 +236,7 @@ http_trans_connect(http_trans_conn *a_conn)
       }
   }
 
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
   /* initialize the SSL data structures */
   if (a_conn->USE_SSL)
     {
@@ -289,10 +290,10 @@ http_trans_conn_new(int nTimeoutInSecond)
   /* don't use SSL until told to */
   l_return->USE_SSL = 0;
   l_return->nTimeoutInSecond = nTimeoutInSecond;
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
   l_return->ssl_conn = NULL;
   l_return->ssl_cert = NULL;
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
   l_return->ssl_conn = NULL;
 #endif  
   return l_return;
@@ -321,7 +322,7 @@ http_trans_conn_close(http_trans_conn * a_conn)
   if(a_conn == NULL) 
     return;
   
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
   if(a_conn->USE_SSL)
     {
       if(a_conn->ssl_conn) 
@@ -342,7 +343,7 @@ http_trans_conn_close(http_trans_conn * a_conn)
         }
       a_conn->USE_SSL = 0;
     }
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
   if(a_conn->USE_SSL)
     {
       if(a_conn->ssl_conn)
@@ -376,7 +377,7 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int USE_SSL)
   if(USE_SSL == a_conn->USE_SSL)
     return -2;
 
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
   if(USE_SSL) {
     a_conn->USE_SSL = 1;
 
@@ -408,7 +409,7 @@ http_trans_conn_set_ssl(http_trans_conn * a_conn, int USE_SSL)
       }    
   }
 
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
   if(USE_SSL) {
     a_conn->USE_SSL = 1;
 
@@ -505,7 +506,7 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
   /* read in some data */
   if(a_conn->USE_SSL)
     {
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
       if ((a_conn->last_read = l_read = 
            SSL_read(a_conn->ssl_conn,
                     &a_conn->io_buf[a_conn->io_buf_alloc],
@@ -524,7 +525,7 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
         return HTTP_TRANS_DONE;
       }
 
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
       if ((a_conn->last_read = l_read =
            wolfSSL_read(a_conn->ssl_conn,
                     &a_conn->io_buf[a_conn->io_buf_alloc],
@@ -587,7 +588,7 @@ http_trans_write_buf(http_trans_conn *a_conn)
   /* write out some data */
   if(a_conn->USE_SSL)
     {
-#ifdef USE_OPENSSL
+#ifdef WITH_OPENSSL
       if ((a_conn->last_read = l_written = 
            SSL_write(a_conn->ssl_conn, 
                      &a_conn->io_buf[a_conn->io_buf_io_done],
@@ -603,7 +604,7 @@ http_trans_write_buf(http_trans_conn *a_conn)
             return HTTP_TRANS_ERR;
         }
 
-#elif defined (USE_WOLFSSL)
+#elif defined (WITH_WOLFSSL)
       if ((a_conn->last_read = l_written =
            wolfSSL_write(a_conn->ssl_conn,
                      &a_conn->io_buf[a_conn->io_buf_io_done],

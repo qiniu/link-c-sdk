@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "mqtt_client.h"
+#include <wolfmqtt/mqtt_client.h>
 #include "mqttnet.h"
 #include "../mqtt.h"
 #include "../mqtt_internal.h"
