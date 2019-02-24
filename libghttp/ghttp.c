@@ -77,7 +77,7 @@ ghttp_request_new(void)
   l_return->proxy = http_uri_new();
   l_return->req = http_req_new();
   l_return->resp = http_resp_new();
-  l_return->nTimeoutInSecond = 10;
+  l_return->nTimeoutInSecond = 15;
   l_return->conn = http_trans_conn_new(l_return->nTimeoutInSecond);
   l_return->secure_uri = 0;
   return l_return;
