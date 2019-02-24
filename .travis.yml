@@ -11,14 +11,11 @@ branches:
     - dev
 
 install:
-  - mkdir build-travis
-  - cd build-travis
-  - cmake .. -DWITH_WOLFSSL=ON -DWITH_MQTT=ON
+  - cmake .
   - make
 
 before_script:
   - pip install --user cpp-coveralls
 
 script:
-  - ./tests/unit/link_unit_test
 
