@@ -11,7 +11,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
-#include "mqtt.h"
+#include "libmqtt/mqtt.h"
 #include "tools/queue.h"
 
 typedef struct {

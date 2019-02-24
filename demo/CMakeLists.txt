@@ -1,10 +1,37 @@
-cmake_minimum_required (VERSION 2.8)
+# ------------------------------------------------------------------------------
+# link-c-sdk/demo CMakeLists.txt
+# ------------------------------------------------------------------------------
 
-project(demo)
+execute_process(
+  COMMAND git describe --abbrev=8 --dirty --always --tags
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_CODE_VERSION
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+add_definitions("-DCODE_VERSION=\"${GIT_CODE_VERSION}\"")
 
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libmqtt")
-include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../libtsuploader/c-sdk/")
+include_directories(${TOP_DIRS})
+include_directories(${CONFIG_DIRS})
+include_directories(${DEPENDS_DIRS})
+
+include_directories(${LIBTSUPLOADER_INCLUDE_DIRS})
+link_directories(${LIBTSUPLOADER_LIBRARIES})
+
+include_directories(${LIBGHTTP_INCLUDE_DIRS})
+link_directories(${LIBGHTTP_LIBRARIES})
+
+if(WITH_MQTT)
+  include_directories(${LIBTMQTT_INCLUDE_DIRS})
+  link_directories(${LIBTMQTT_LIBRARIES})
+  include_directories(${WOLFMQTT_INCLUDE_DIRS})
+  link_directories(${WOLFMQTT_LIBRARIES})
+endif()
+
+if(WITH_WOLFSSL)
+  include_directories(${WOLFSSL_INCLUDE_DIRS})
+  link_directories(${WOLFSSL_LIBRARIES})
+endif()
+
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/devices")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/tools")
@@ -15,70 +42,46 @@ link_directories("${CMAKE_CURRENT_SOURCE_DIR}/libs")
 include_directories(${THIRD_INC_PATH})
 link_directories(${THIRD_LIB_PATH})
 
-
 message( ${CMAKE_CURRENT_SOURCE_DIR}/tools )
 
-if (WITH_OPENSSL)
-    set(DISABLE_OPENSSL OFF)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
-elseif (WITH_WOLFSSL)
-    set(DISABLE_OPENSSL OFF)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfssl/output/${HOST}/lib")
-else()
-    set(DISABLE_OPENSSL ON)
-    add_definitions(-DDISABLE_OPENSSL)
-endif()
-
-if (WITH_MQTT)
-    link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfMQTT/output/${HOST}/lib")
-    link_directories("${CMAKE_CURRENT_BINARY_DIR}/../libmqtt")
-endif()
-
-if (CMAKE_TOOLCHAIN_FILE)
+if (C_COMPILER_PREFIX)
     set( DEV_FILE ${THIRD_CODE_PATH} )
     add_definitions(-DENABLE_IPC)
 else()
     set( DEV_FILE devices/sim_dev.c )
 endif()
 
-AUX_SOURCE_DIRECTORY( ./ SOURCE_LIST )
-AUX_SOURCE_DIRECTORY( ./devices SOURCE_LIST )
-AUX_SOURCE_DIRECTORY( ./log SOURCE_LIST )
-AUX_SOURCE_DIRECTORY( ./tools SOURCE_LIST )
-AUX_SOURCE_DIRECTORY( ./ota SOURCE_LIST )
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR} SOURCE_LIST )
+aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/devices SOURCE_LIST )
+aux_source_directory( ${CMAKE_CURRENT_SOURCE_DIR}/log SOURCE_LIST )
+aux_source_directory( ${CMAKE_CURRENT_SOURCE_DIR}/tools SOURCE_LIST )
+aux_source_directory( ${CMAKE_CURRENT_SOURCE_DIR}/ota SOURCE_LIST )
 
-if (WITH_MQTT)
-	link_directories("${CMAKE_CURRENT_SOURCE_DIR}/../third_party/wolfMQTT/output/${HOST}/lib")
-	link_directories("${CMAKE_CURRENT_BINARY_DIR}/../libmqtt")
-endif()
-			
-add_executable(demo-tsupload 	${SOURCE_LIST} ${DEV_FILE})	
+foreach(f IN LISTS SOURCE_LIST)
+  get_filename_component(b ${f} NAME)
+  set_source_files_properties(${f} PROPERTIES
+    COMPILE_DEFINITIONS "__FILE_NAME__=\"${b}\"")
+endforeach()
 
-if(APPLE)
-	set(CMAKE_EXE_LINKER_FLAGS
-        "-framework AudioToolbox -framework VideoToolbox -framework CoreGraphics -framework QuartzCore -framework CoreFoundation -framework CoreMedia -framework Security")
-    if(DISABLE_OPENSSL)
-            target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp bz2 lzma iconv)
-        else()
-            target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp mqtt wolfmqtt wolfssl bz2 lzma iconv)
-        endif()
-else()
-    if(CMAKE_TOOLCHAIN_FILE)
-        if(DISABLE_OPENSSL)
-            target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp m devsdk tools pthread )
-        else()
-            if( ${HOST} STREQUAL arm-hisiv300-linux )
-                target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp mqtt wolfmqtt wolfssl  -Wl,-Bstatic U5802YMain Schedule Upgrade Iniparser IOT HiGpioReg Video2 Audio2 aacenc aacdec Hicommon goscamqrtool Qrcode zbar jpeg curl Transport Interface GoscamISP Sysctrl  Record mp4lib Ntp GVAPDevice GVAPProtocal BroadcasDiscover Motor System Ulife Aliyun apr-1 aprutil-1 curl mxml  Tutk YhzlP2P AVAPIs RDTAPIs IOTCAPIs P2PTunnelAPIs json-c Upgrade isp mpi sns_sc2135 _hiaf _hiawb _hiae _cmoscfg _hidefog _iniparser dnvqe ive md upvqe VoiceEngine vo-aacenc  -Wl,-Bdynamic z pthread m rt dl -Wl,-Bstatic stdc++ Iniparser HiGpioReg Video2 Audio2 aacenc aacdec Hicommon goscamqrtool Qrcode zbar jpeg curl Transport Interface GoscamISP Sysctrl Record mp4lib Ntp GVAPDevice GVAPProtocal BroadcasDiscover Motor System Ulife Aliyun apr-1 aprutil-1 mxml Tutk AVAPIs RDTAPIs IOTCAPIs P2PTunnelAPIs json-c isp mpi sns_sc2135 _hiaf _hiawb _hiae  _cmoscfg _hidefog _iniparser dnvqe ive md upvqe VoiceEngine vo-aacenc  -Wl,-Bdynamic z pthread m rt dl  -Wl,-Bstatic stdc++ -Wl,-Bdynamic curl  aprutil-1 apr-1 )
-            else()
-                target_link_libraries( demo-tsupload tsuploader ${LIBFFMPEG} ghttp mqtt wolfmqtt wolfssl m devsdk tools pthread )
-            endif()
-        endif()
-    else()
-        if(DISABLE_OPENSSL)
-            target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp m pthread)
-        else()
-            target_link_libraries(demo-tsupload tsuploader ${LIBFFMPEG} ghttp mqtt wolfmqtt wolfssl m pthread)
-        endif()
-    endif()
+add_executable(demo-tsupload ${SOURCE_LIST} ${DEV_FILE})
+target_compile_options(demo-tsupload PRIVATE -std=c99)
+#libtsuploader
+target_link_libraries(demo-tsupload tsuploader pthread m)
+#libghttp
+target_link_libraries(demo-tsupload ghttp)
+#libmqtt
+if(WITH_MQTT)
+  target_link_libraries(demo-tsupload mqtt wolfmqtt pthread)
 endif()
+#wolfssl
+if(WITH_WOLFSSL)
+  target_link_libraries(demo-tsupload wolfssl m)
+endif()
+
+if("${C_COMPILER_PREFIX}" STREQUAL "arm-hisiv300-linux")
+  target_link_libraries( demo-tsupload -Wl,-Bstatic U5802YMain Schedule Upgrade Iniparser IOT HiGpioReg Video2 Audio2 aacenc aacdec Hicommon goscamqrtool Qrcode zbar jpeg curl Transport Interface GoscamISP Sysctrl  Record mp4lib Ntp GVAPDevice GVAPProtocal BroadcasDiscover Motor System Ulife Aliyun apr-1 aprutil-1 curl mxml  Tutk YhzlP2P AVAPIs RDTAPIs IOTCAPIs P2PTunnelAPIs json-c Upgrade isp mpi sns_sc2135 _hiaf _hiawb _hiae _cmoscfg _hidefog _iniparser dnvqe ive md upvqe VoiceEngine vo-aacenc  -Wl,-Bdynamic z pthread m rt dl -Wl,-Bstatic stdc++ Iniparser HiGpioReg Video2 Audio2 aacenc aacdec Hicommon goscamqrtool Qrcode zbar jpeg curl Transport Interface GoscamISP Sysctrl Record mp4lib Ntp GVAPDevice GVAPProtocal BroadcasDiscover Motor System Ulife Aliyun apr-1 aprutil-1 mxml Tutk AVAPIs RDTAPIs IOTCAPIs P2PTunnelAPIs json-c isp mpi sns_sc2135 _hiaf _hiawb _hiae  _cmoscfg _hidefog _iniparser dnvqe ive md upvqe VoiceEngine vo-aacenc  -Wl,-Bdynamic z pthread m rt dl  -Wl,-Bstatic stdc++ -Wl,-Bdynamic curl  aprutil-1 apr-1 )
+elseif("${C_COMPILER_PREFIX}" STREQUAL "arm-linux-gnueabihf" )
+  target_link_libraries( demo-tsupload devsdk tools pthread )
+endif()
+
 

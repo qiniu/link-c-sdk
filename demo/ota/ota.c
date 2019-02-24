@@ -24,7 +24,7 @@
 #include "ota.h"
 #include "httptools.h"
 #include "queue.h"
-#include "mqtt.h"
+#include "libmqtt/mqtt.h"
 
 typedef struct {
     void *pMqttInstance;

@@ -10,7 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include "mqtt.h"
+#include "libmqtt/mqtt.h"
 #include "queue.h"
 #include "main.h"
 
