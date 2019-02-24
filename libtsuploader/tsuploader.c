@@ -83,6 +83,8 @@ typedef struct _KodoUploader{
         LinkMediaArg mediaArg;
         LinkSessionMeta *pSessionMeta;
         LinkPicture picture;
+        
+        int64_t nTsLastStartTime;
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -229,6 +231,36 @@ static void setSessionCoverStatus(LinkSession *pSession, int nPicUploadStatus) {
                 pSession->coverStatus = -2;
         } else if (nPicUploadStatus < 1000)
                 pSession->coverStatus = nPicUploadStatus;
+}
+
+static void doTsOutput(KodoUploader * pKodoUploader, int lenOfBufData, char *bufData,
+                       int64_t tsStartTime, int64_t tsEndTime, const LinkSessionMeta * pMeta,
+                       char *sessionId) {
+        
+        if (pKodoUploader->output && lenOfBufData > 0 && bufData) {
+                LinkMediaInfo mediaInfo;
+                memset(&mediaInfo, 0, sizeof(mediaInfo));
+                mediaInfo.startTime = tsStartTime / 1000000;
+                mediaInfo.endTime = tsEndTime / 1000000;
+                mediaInfo.pSessionMeta = pMeta;
+                memcpy(mediaInfo.sessionId, sessionId, LINK_MAX_SESSION_ID_LEN);
+                int idx = 0;
+                if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
+                        mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
+                        mediaInfo.media[idx].nAudioFormat = pKodoUploader->mediaArg.nAudioFormat;
+                        mediaInfo.media[idx].nSamplerate = pKodoUploader->mediaArg.nSamplerate;
+                        mediaInfo.mediaType[idx] = LINK_MEDIA_AUDIO;
+                        mediaInfo.nCount++;
+                        idx++;
+                }
+                if (pKodoUploader->mediaArg.nVideoFormat != LINK_VIDEO_NONE) {
+                        mediaInfo.media[idx].nVideoFormat = pKodoUploader->mediaArg.nVideoFormat;
+                        mediaInfo.mediaType[idx] = LINK_MEDIA_VIDEO;
+                        mediaInfo.nCount++;
+                }
+                
+                pKodoUploader->output(bufData, lenOfBufData, pKodoUploader->pOutputUserArg, mediaInfo);
+        }
 }
 
 static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
@@ -428,30 +460,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 pKodoUploader->pTsEndUploadCallback(pKodoUploader->pTsEndUploadCallbackArg, tsStartTime / 1000000);
         }
         
-        if (pKodoUploader->output && lenOfBufData > 0 && bufData) {
-                LinkMediaInfo mediaInfo;
-                memset(&mediaInfo, 0, sizeof(mediaInfo));
-                mediaInfo.startTime = tsStartTime / 1000000;
-                mediaInfo.endTime = tsEndTime / 1000000;
-                mediaInfo.pSessionMeta = (const LinkSessionMeta *)pKodoUploader->pSessionMeta;
-                memcpy(mediaInfo.sessionId, pSession->sessionId, sizeof(mediaInfo.sessionId) - 1);
-                int idx = 0;
-                if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
-                        mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
-                        mediaInfo.media[idx].nAudioFormat = pKodoUploader->mediaArg.nAudioFormat;
-                        mediaInfo.media[idx].nSamplerate = pKodoUploader->mediaArg.nSamplerate;
-                        mediaInfo.mediaType[idx] = LINK_MEDIA_AUDIO;
-                        mediaInfo.nCount++;
-                        idx++;
-                }
-                if (pKodoUploader->mediaArg.nVideoFormat != LINK_VIDEO_NONE) {
-                        mediaInfo.media[idx].nVideoFormat = pKodoUploader->mediaArg.nVideoFormat;
-                        mediaInfo.mediaType[idx] = LINK_MEDIA_VIDEO;
-                        mediaInfo.nCount++;
-                }
-                
-                pKodoUploader->output(bufData, lenOfBufData, pKodoUploader->pOutputUserArg, mediaInfo);
-        }
+       doTsOutput(pKodoUploader, lenOfBufData, bufData, tsStartTime,  tsEndTime,
+                  (const LinkSessionMeta *)pKodoUploader->pSessionMeta, pSession->sessionId);
 
         LinkDestroyQueue(&pDataQueue);
         free(pUpMeta);
@@ -511,7 +521,7 @@ static int streamPushData(LinkTsUploader *pTsUploader, const char * pData, int n
         return ret;
 }
 
-static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
+static void notifyDataPrapared(LinkTsUploader *pTsUploader, int64_t nEndTime) {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
@@ -529,10 +539,18 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader) {
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
+                int lenOfBufData = 0;
+                char *bufData = NULL;
+                if ( LinkGetQueueBuffer((LinkCircleQueue *)&uploadCommand.ts.pData, &bufData, &lenOfBufData) > 0) {
+                        doTsOutput(pKodoUploader, lenOfBufData, bufData, pKodoUploader->nTsLastStartTime, nEndTime,
+                                   (const LinkSessionMeta *)pKodoUploader->pSessionMeta, NULL); // 得不到准确的session id
+                } else {
+                        LinkLogError("drop ts file callback not get data");
+                }
+                
                 free(uploadCommand.ts.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 LinkLogError("drop ts file due to ts cache reatch max limit");
-                // TODO CALLBAK
         } else {
                 LinkLogTrace("-------->push ts to  queue\n", nCurCacheNum);
                 int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
@@ -566,6 +584,7 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
         TsUploaderCommand tmcmd;
         int isNotifyDataPrepared = 0;
         if (tmtype == LINK_TS_START) {
+                pKodoUploader->nTsLastStartTime = pTinfo->nSystimestamp;
                 tmcmd.nCommandType = LINK_TSU_START_TIME;
         }
         else if (tmtype == LINK_TS_END) {
@@ -583,7 +602,7 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
                 LinkLogError("ts queue error. push report time:%d", ret);
         }
         if (isNotifyDataPrepared) {
-                notifyDataPrapared(_pTsUploader);
+                notifyDataPrapared(_pTsUploader, pTinfo->nSystimestamp);
         }
         
         return;
