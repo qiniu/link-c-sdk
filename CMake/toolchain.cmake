@@ -1,13 +1,16 @@
+# ------------------------------------------------------------------------------
+# toolchain.cmake
+# ------------------------------------------------------------------------------
+
 # this is required
-SET(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_NAME Linux)
 
 # specify the cross compiler
-SET(CMAKE_C_COMPILER   arm-linux-gnueabihf-gcc )
-SET(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++ )
+set(TOOLCHAIN_PREFIX arm-linux-gnueabihf)
+set(CMAKE_C_COMPILER ${TOOLCHAIN_PREFIX}-gcc)
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++)
 
-# search for programs in the build host directories (not necessary)
-SET(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-# for libraries and headers in the target directories
-SET(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-SET(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
