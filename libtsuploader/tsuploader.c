@@ -155,24 +155,23 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                 realKey = NULL;
         int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
                                    customMagic, nCustomMagicLen, /*mimetype*/NULL, &putret);
-
-        
-
+        char resDesc[32] = {0};
+        snprintf(resDesc, sizeof(resDesc), "upload.file[%"PRId64"]", LinkGetCurrentNanosecond()/1000000);
         int retCode = -1;
         if (ret != 0) { //http error
-                LinkLogError("upload.file :%s[%d] errorcode=%d errmsg=%s", key, datasize, ret, putret.error);
+                LinkLogError("%s :%s[%d] errorcode=%d errmsg=%s",resDesc, key, datasize, ret, putret.error);
                 return LINK_GHTTP_FAIL;
         } else {
                 if (putret.code / 100 == 2) {
                         retCode = LINK_SUCCESS;
-                        LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
+                        LinkLogDebug("%s size:exp:%d key:%s success",resDesc, datasize, key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s",
+                                LinkLogError("%s :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s", resDesc,
                                              key, datasize, putret.reqid, putret.xreqid,putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
-                                             key, datasize, putret.reqid, putret.xreqid, putret.code);
+                                LinkLogError("%s :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
+                                             resDesc, key, datasize, putret.reqid, putret.xreqid, putret.code);
                         }
                 }
         }
@@ -270,6 +269,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         int ret = 0, getUploadParamOk = 0;
         int getBufDataRet, lenOfBufData = 0;
         char *bufData = NULL;
+        
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
         KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
         TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
@@ -342,7 +342,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
 
         snprintf(key, sizeof(key), "ts/%"PRId64"-%"PRId64"-%s.ts", tsStartTime / 1000000, tsEndTime / 1000000, pSession->sessionId);
         
-        LinkLogDebug("upload prepared:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
+        LinkLogDebug("upload prepared:[%"PRId64"] %s q:%p  len:%d",LinkGetCurrentNanosecond()/1000000, key, pDataQueue, lenOfBufData);
         if (shouldUpload) {
                 if (pKodoUploader->picture.pFilename) {
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
