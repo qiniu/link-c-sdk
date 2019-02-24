@@ -521,7 +521,7 @@ static int streamPushData(LinkTsUploader *pTsUploader, const char * pData, int n
         return ret;
 }
 
-static void notifyDataPrapared(LinkTsUploader *pTsUploader, int64_t nEndTime) {
+static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *pTinfo) {
         KodoUploader * pKodoUploader = (KodoUploader *)pTsUploader;
         
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
@@ -542,7 +542,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, int64_t nEndTime) {
                 int lenOfBufData = 0;
                 char *bufData = NULL;
                 if ( LinkGetQueueBuffer((LinkCircleQueue *)&uploadCommand.ts.pData, &bufData, &lenOfBufData) > 0) {
-                        doTsOutput(pKodoUploader, lenOfBufData, bufData, pKodoUploader->nTsLastStartTime, nEndTime,
+                        doTsOutput(pKodoUploader, lenOfBufData, bufData, pKodoUploader->nTsLastStartTime, pTinfo->nSystimestamp,
                                    (const LinkSessionMeta *)pKodoUploader->pSessionMeta, NULL); // 得不到准确的session id
                 } else {
                         LinkLogError("drop ts file callback not get data");
@@ -550,14 +550,24 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, int64_t nEndTime) {
                 
                 free(uploadCommand.ts.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
-                LinkLogError("drop ts file due to ts cache reatch max limit");
+                LinkLogError("ts queue cmd:drop ts file due to ts cache reatch max limit");
         } else {
-                LinkLogTrace("-------->push ts to  queue\n", nCurCacheNum);
-                int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
-                if (ret > 0)
-                        pKodoUploader->nTsCacheNum++;
-                else {
-                        LinkLogError("ts queue error. push ts to upload:%d", ret);
+                TsUploaderCommand tmcmd = {0};
+                tmcmd.nCommandType = LINK_TSU_END_TIME;
+                tmcmd.time = *pTinfo;
+                int ret = 0;
+                ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(tmcmd));
+                if (ret <= 0) {
+                        LinkLogError("ts queue error. push report time:%d", ret);
+                } else {
+                        LinkLogTrace("-------->push ts to  queue\n", nCurCacheNum);
+                        ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
+                        if (ret > 0)
+                                pKodoUploader->nTsCacheNum++;
+                        else
+                                LinkLogError("ts queue error. push ts to upload:%d", ret);
+                }
+                if (ret <= 0) {
                         LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 }
         }
@@ -589,6 +599,7 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
         }
         else if (tmtype == LINK_TS_END) {
                 tmcmd.nCommandType = LINK_TSU_END_TIME;
+                notifyDataPrapared(_pTsUploader, pTinfo);
                 isNotifyDataPrepared = 1;
         }
         else if (tmtype == LINK_SEG_TIMESTAMP) {
@@ -596,14 +607,14 @@ void reportTimeInfo(LinkTsUploader *_pTsUploader, LinkReportTimeInfo *pTinfo,
         }
         tmcmd.time = *pTinfo;
         
-        int ret;
-        ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
-        if (ret <= 0) {
-                LinkLogError("ts queue error. push report time:%d", ret);
+        if (!isNotifyDataPrepared) {
+                int ret;
+                ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&tmcmd, sizeof(TsUploaderCommand));
+                if (ret <= 0) {
+                        LinkLogError("ts queue error. push report time:%d", ret);
+                }
         }
-        if (isNotifyDataPrepared) {
-                notifyDataPrapared(_pTsUploader, pTinfo->nSystimestamp);
-        }
+        
         
         return;
 }
