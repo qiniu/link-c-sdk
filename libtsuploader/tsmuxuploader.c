@@ -239,6 +239,7 @@ static void switchTs(FFTsMuxUploader *_pFFTsMuxUploader, int64_t nSysNanotime)
                 if (_pFFTsMuxUploader->pTsMuxCtx) {
                         if (nSysNanotime <= 0) {
                                 nSysNanotime = LinkGetCurrentNanosecond();
+                                LinkLogInfo("nSysNanotime %"PRId64"", nSysNanotime);
                         }
                         LinkReportTimeInfo tinfo;
                         getLinkReportTimeInfo(_pFFTsMuxUploader, &tinfo, nSysNanotime);

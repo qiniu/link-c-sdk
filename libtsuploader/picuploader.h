@@ -23,6 +23,14 @@ typedef struct {
         int useHttps;
 }LinkPicUploadFullArg;
 
+typedef struct _LinkPicUploadParam {
+        LinkUploadParamCallback getUploadParamCallback;
+        UploadStatisticCallback pUploadStatisticCb;
+        void *pParamOpaque;
+        void *pStatOpauqe;
+        int nRetCode;
+}LinkPicUploadParam;
+
 int LinkNewPictureUploader(PictureUploader **pPicUploader, LinkPicUploadFullArg *pArg);
 
 int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysTimestamp);
@@ -30,7 +38,7 @@ int LinkSendItIsTimeToCaptureSignal(PictureUploader *pPicUploader, int64_t nSysT
 //  getPicCallback return , should invoke this function to notify picuploader to upload picture
 int LinkSendUploadPictureToPictureUploader(PictureUploader *pPicUploader, const char *pFileName, int nFileNameLen, const char *pBuf, int nBuflen);
 int LinkSendPictureToPictureUploader(PictureUploader *pPicUploader, LinkPicture pic);
-
+int LinkUploadPicture(LinkPicture *pic, LinkPicUploadParam *upParam);
 void LinkDestroyPictureUploader(PictureUploader **pPicUploader);
 
 

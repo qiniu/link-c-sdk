@@ -279,6 +279,7 @@ static int linkUpload(const char *filepathOrBufer, int bufferLen, const char * u
         if (status == ghttp_error) {
                 if (ghttp_is_timeout(request)) {
                         snprintf(put_ret->error, sizeof(put_ret->error), "ghttp_process timeout[%s]", ghttp_get_error(request));
+                        put_ret->isTimeout = 1;
                 } else {
                         snprintf(put_ret->error, sizeof(put_ret->error), "%s", ghttp_get_error(request));
                         getReqidAndResponse(request, put_ret);
