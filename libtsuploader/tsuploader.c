@@ -420,6 +420,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 memset(&pKodoUploader->bakSession, 0, sizeof(pKodoUploader->bakSession));
         }
         
+        pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
                 if (shouldReport){
                         if(reportType & 0x1) {
@@ -437,8 +438,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                         }
                 }
-                
-                pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
                 //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
         } else {
                 restoreDuration(pKodoUploader);
