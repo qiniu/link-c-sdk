@@ -159,7 +159,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         snprintf(resDesc, sizeof(resDesc), "upload.file[%"PRId64"]", LinkGetCurrentNanosecond()/1000000);
         int retCode = -1;
         if (ret != 0) { //http error
-                LinkLogError("%s :%s[%d] errorcode=%d errmsg=%s",resDesc, key, datasize, ret, putret.error);
+                LinkLogError("%s :%s[%d] errcode=%d rcode:%d errmsg=%s",resDesc, key, datasize, ret, putret.code, putret.error);
                 return LINK_GHTTP_FAIL;
         } else {
                 if (putret.code / 100 == 2) {
