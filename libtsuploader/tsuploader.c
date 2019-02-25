@@ -750,8 +750,10 @@ static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTim
         pKodoUploader->reportType = handleSessionCheck(pKodoUploader, nCurSysTime, 1, 0, 0);
         if (fromInternal) {
                 pKodoUploader->bakSession.nSessionEndTime = pKodoUploader->session.nLastTsEndTime;
-                if (pKodoUploader->bakSession.nTsSequenceNumber > 0) // 当前切片算在新的sessoin，所以之前seq要减1
+                if (pKodoUploader->bakSession.nTsSequenceNumber > 1) {// 当前切片算在新的sessoin，所以之前seq要减1
                         pKodoUploader->bakSession.nTsSequenceNumber--;
+                        pKodoUploader->session.nTsSequenceNumber++;
+                }
                 
                 
         }
