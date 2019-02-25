@@ -13,7 +13,7 @@
 #include "picuploader.h"
 #include "segmentmgr.h"
 
-static int64_t lastReportAccdu  = 0; // for test
+static int64_t lastReportAccDuration  = 0; // for test
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
@@ -155,24 +155,23 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
                 realKey = NULL;
         int ret = LinkUploadBuffer(data, datasize, uphost, token, realKey, (const char **)pp, 8,
                                    customMagic, nCustomMagicLen, /*mimetype*/NULL, &putret);
-
-        
-
+        char resDesc[32] = {0};
+        snprintf(resDesc, sizeof(resDesc), "upload.file[%"PRId64"]", LinkGetCurrentNanosecond()/1000000);
         int retCode = -1;
         if (ret != 0) { //http error
-                LinkLogError("upload.file :%s[%d] errorcode=%d errmsg=%s", key, datasize, ret, putret.error);
+                LinkLogError("%s :%s[%d] errorcode=%d errmsg=%s",resDesc, key, datasize, ret, putret.error);
                 return LINK_GHTTP_FAIL;
         } else {
                 if (putret.code / 100 == 2) {
                         retCode = LINK_SUCCESS;
-                        LinkLogDebug("upload.file size:exp:%d key:%s success",datasize, key);
+                        LinkLogDebug("%s size:exp:%d key:%s success",resDesc, datasize, key);
                 } else {
                         if (putret.body != NULL) {
-                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s",
+                                LinkLogError("%s :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg=%s", resDesc,
                                              key, datasize, putret.reqid, putret.xreqid,putret.code, putret.body);
                         } else {
-                                LinkLogError("upload.file :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
-                                             key, datasize, putret.reqid, putret.xreqid, putret.code);
+                                LinkLogError("%s :%s[%d] reqid:%s xreqid:%s rcope=%d errmsg={not receive response}",
+                                             resDesc, key, datasize, putret.reqid, putret.xreqid, putret.code);
                         }
                 }
         }
@@ -224,9 +223,9 @@ static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t n
 
 static void setSessionCoverStatus(LinkSession *pSession, int nPicUploadStatus) {
         if (nPicUploadStatus == LINK_SUCCESS) {
-                pSession->coverStatus = 1;
+                pSession->coverStatus = 0;
         } else if (nPicUploadStatus == LINK_TIMEOUT) {
-                pSession->coverStatus = -1;
+                pSession->coverStatus = 1;
         } else if (nPicUploadStatus < 0) {
                 pSession->coverStatus = -2;
         } else if (nPicUploadStatus < 1000)
@@ -243,7 +242,8 @@ static void doTsOutput(KodoUploader * pKodoUploader, int lenOfBufData, char *buf
                 mediaInfo.startTime = tsStartTime / 1000000;
                 mediaInfo.endTime = tsEndTime / 1000000;
                 mediaInfo.pSessionMeta = pMeta;
-                memcpy(mediaInfo.sessionId, sessionId, LINK_MAX_SESSION_ID_LEN);
+                if (sessionId)
+                        memcpy(mediaInfo.sessionId, sessionId, LINK_MAX_SESSION_ID_LEN);
                 int idx = 0;
                 if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
                         mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
@@ -270,6 +270,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         int ret = 0, getUploadParamOk = 0;
         int getBufDataRet, lenOfBufData = 0;
         char *bufData = NULL;
+        
         LinkCircleQueue *pDataQueue = (LinkCircleQueue *)pUploadCmd->ts.pData;
         KodoUploader *pKodoUploader = (KodoUploader*)pUploadCmd->ts.pKodoUploader;
         TsUploaderMeta* pUpMeta = pUploadCmd->ts.pUpMeta;
@@ -342,7 +343,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
 
         snprintf(key, sizeof(key), "ts/%"PRId64"-%"PRId64"-%s.ts", tsStartTime / 1000000, tsEndTime / 1000000, pSession->sessionId);
         
-        LinkLogDebug("upload prepared:%s q:%p  len:%d", key, pDataQueue, lenOfBufData);
+        LinkLogDebug("upload prepared:[%"PRId64"] %s q:%p  len:%d",LinkGetCurrentNanosecond()/1000000, key, pDataQueue, lenOfBufData);
         if (shouldUpload) {
                 if (pKodoUploader->picture.pFilename) {
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
@@ -404,9 +405,9 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         }
         
         if (pKodoUploader->isSegStartReport && reportType & 0x4) {
-                pSession->coverStatus = 0;
-                if (lastReportAccdu != pKodoUploader->bakSession.nAccSessionVideoDuration)
-                        LinkLogWarn("======");
+                pSession->coverStatus = 1000;
+                if (lastReportAccDuration != pKodoUploader->bakSession.nAccSessionVideoDuration)
+                        LinkLogWarn("abnormal report duration:%"PRId64" %"PRId64"", lastReportAccDuration,  pKodoUploader->bakSession.nAccSessionVideoDuration);
                 LinkLogDebug("=========================4>%s %"PRId64"", pKodoUploader->bakSession.sessionId, pKodoUploader->bakSession.nAccSessionVideoDuration);
                 pKodoUploader->bakSession.isNewSessionStarted = 0;
                 pKodoUploader->bakSession.nSessionEndResonCode = pSession->nSessionEndResonCode;
@@ -420,6 +421,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 memset(&pKodoUploader->bakSession, 0, sizeof(pKodoUploader->bakSession));
         }
         
+        pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
         if (uploadResult == LINK_UPLOAD_RESULT_OK) {
                 if (shouldReport){
                         if(reportType & 0x1) {
@@ -437,8 +439,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                                 LinkUpdateSegment(pSession->segHandle, pSession);
                         }
                 }
-                
-                pSession->nLastTsEndTime = pKodoUploader->nLastTsEndTime;
                 //handleSessionCheck(pKodoUploader, LinkGetCurrentNanosecond(), 0, 0);
         } else {
                 restoreDuration(pKodoUploader);
@@ -478,7 +478,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         pKodoUploader->nTsCacheNum--;
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
-        lastReportAccdu = pSession->nAccSessionVideoDuration;
+        lastReportAccDuration = pSession->nAccSessionVideoDuration;
         return NULL;
 }
 

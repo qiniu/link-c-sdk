@@ -167,7 +167,6 @@ http_trans_connect(http_trans_conn *a_conn)
   tv.tv_sec = a_conn->nTimeoutInSecond;
   tv.tv_usec = 0;
   setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-  setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
   /* set up the socket */
   int connBeginTime = time(NULL);
