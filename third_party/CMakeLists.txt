@@ -5,9 +5,11 @@ if (WITH_OPENSSL OR WITH_WOLFSSL)
             SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wolfssl
             CONFIGURE_COMMAND ./autogen.sh &&
                 ./configure
+                CC=${CMAKE_C_COMPILER}
+                CXX=${CMAKE_CXX_COMPILER}
                 --enable-small-stack
                 --prefix=${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/output/${HOST}
-                --host=${HOST}
+                --host=${C_COMPILER_MACHINE}
                 --enable-static
                 --disable-shared
                 --disable-debug
@@ -21,9 +23,11 @@ if (WITH_OPENSSL OR WITH_WOLFSSL)
                 SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT
                 CONFIGURE_COMMAND ./autogen.sh &&
                     ./configure
+                    CC=${CMAKE_C_COMPILER}
+                    CXX=${CMAKE_CXX_COMPILER}
                     --prefix=${CMAKE_CURRENT_SOURCE_DIR}/wolfMQTT/output/${HOST}
                     --with-lib-prefix=${CMAKE_CURRENT_SOURCE_DIR}/wolfssl/output/${HOST}
-                    --host=${HOST}
+                    --host=${C_COMPILER_MACHINE}
                     --enable-static
                     --disable-shared
                     --disable-examples

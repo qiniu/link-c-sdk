@@ -17,6 +17,21 @@ c_compiler_prefix(C_COMPILER_PREFIX)
 set(HOST ${C_COMPILER_PREFIX})
 message( "HOST is " ${HOST} )
 
+# Returns the ${CMAKE_C_COMPILER} machine infomation
+function(c_compiler_machine output_machine)
+  execute_process(
+    COMMAND ${CMAKE_C_COMPILER} -dumpmachine
+    OUTPUT_VARIABLE compiler_machine
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  set(${output_machine} ${compiler_machine} PARENT_SCOPE)
+endfunction()
+
+c_compiler_machine(C_COMPILER_MACHINE)
+if(C_COMPILER_MACHINE)
+  message(STATUS "C compiler machine infomation: " ${C_COMPILER_MACHINE})
+endif()
+
 add_custom_target(all-clean
         COMMAND echo "CLEAN WOLFSSL"
         COMMAND cd ${CMAKE_HOME_DIRECTORY}/third_party/wolfssl && git clean -dxf
