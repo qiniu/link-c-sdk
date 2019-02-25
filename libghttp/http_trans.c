@@ -99,14 +99,6 @@ static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
     return 0;
 }
 
-static socket_is_nonblock(int fd) {
-        int flags;
-        if((flags = fcntl(fd, F_GETFL, 0)) < 0) {
-                return -1;
-        }
-        return flags & O_NONBLOCK;
-}
-
 int
 http_trans_connect(http_trans_conn *a_conn)
 {
