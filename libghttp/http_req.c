@@ -249,26 +249,35 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             int io_buf_alloc = a_conn->io_buf_alloc;
             int io_buf_io_done = a_conn->io_buf_io_done;
             int io_buf_io_left = a_conn->io_buf_io_left;
-            int i;
+            int i, remain, offset, l;
+            struct timeval tv;
+            tv.tv_sec = 5;
+            tv.tv_usec = 0;
+            setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
             for (i = 0; i < 3; i++) {
-                    if (dataArr[i]) {
-                            a_conn->io_buf = (char *)dataArr[i];
-                            a_conn->io_buf_len = dataLens[i];
-                            a_conn->io_buf_alloc = dataLens[i];
-                            a_conn->io_buf_io_left = dataLens[i];
+                    remain = dataLens[i];
+                    offset = 0;
+                    while (dataArr[i] && remain > 0) {
+                            l = remain > 256 * 1024 ? 256 * 1024 : remain;
+                            a_conn->io_buf = (char *)dataArr[i]+offset;
+                            a_conn->io_buf_len = l;
+                            a_conn->io_buf_alloc = l;
+                            a_conn->io_buf_io_left = l;
                             a_conn->io_buf_io_done = 0;
                             do {
                                     l_rv = http_trans_write_buf(a_conn);
                                     if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0))
                                             return HTTP_TRANS_ERR;
                             } while (l_rv == HTTP_TRANS_NOT_DONE);
+                            remain -= l;
+                            offset += l;
                     }
             }
             a_conn->io_buf = io_buf;
             a_conn->io_buf_len = io_buf_len;
             a_conn->io_buf_alloc = io_buf_alloc;
             a_conn->io_buf_io_left = io_buf_io_left;
-            a_conn->io_buf_io_done = io_buf_io_left;
+            a_conn->io_buf_io_done = io_buf_io_done;
       }
     }
   return HTTP_TRANS_DONE;
