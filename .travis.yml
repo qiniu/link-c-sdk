@@ -10,11 +10,6 @@ branches:
   only:
     - develop
 
-install:
+script:
   - cmake .
   - make
-
-before_script:
-  - pip install --user cpp-coveralls
-
-script:
