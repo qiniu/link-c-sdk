@@ -11,7 +11,7 @@
 #define IN
 #endif
 
-#define MAX_LOG_LENGTH 512
+#define MAX_LOG_LENGTH (256)
 
 #define LOG_WITH_TIME
 
