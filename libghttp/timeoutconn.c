@@ -101,7 +101,7 @@ int timeout_connect(int sockfd, struct sockaddr_in * serv_addr, int timeout) {
         if ((ret = set_socket_to_nonblock(sockfd)) != 0)
                 return ret;
         
-        if(connect(sockfd, (struct sockaddr*)serv_addr, sizeof(struct sockaddr_in)) == -1) {
+        if(connect(sockfd, (struct sockaddr*)serv_addr, sizeof(struct sockaddr_in)) < 0) {
                 
                 if (errno != EINPROGRESS) {
                         return errno;

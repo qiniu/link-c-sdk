@@ -167,12 +167,14 @@ http_trans_connect(http_trans_conn *a_conn)
   tv.tv_sec = a_conn->nTimeoutInSecond;
   tv.tv_usec = 0;
   setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  tv.tv_sec = 5;
+  setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
   /* set up the socket */
   int connBeginTime = time(NULL);
-  if (connect(a_conn->sock,
-	      (struct sockaddr *)&a_conn->saddr,
-	      sizeof(struct sockaddr)) < 0)
+  if (timeout_connect(a_conn->sock,
+	      &a_conn->saddr,
+	      a_conn->nTimeoutInSecond) < 0)
     {
       int connEndTime = time(NULL);
       int notok = 1;

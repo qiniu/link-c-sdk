@@ -250,10 +250,6 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             int io_buf_io_done = a_conn->io_buf_io_done;
             int io_buf_io_left = a_conn->io_buf_io_left;
             int i, remain, offset, l;
-            struct timeval tv;
-            tv.tv_sec = 5;
-            tv.tv_usec = 0;
-            setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
             for (i = 0; i < 3; i++) {
                     remain = dataLens[i];
                     offset = 0;
