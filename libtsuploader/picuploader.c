@@ -4,7 +4,8 @@
 #include "uploader.h"
 #include <qupload.h>
 #include "httptools.h"
- #include <unistd.h>
+#include <unistd.h>
+#include "servertime.h"
 
 #define LINK_PIC_UPLOAD_MAX_FILENAME 256
 enum LinkPicUploadSignalType {
@@ -206,6 +207,7 @@ static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam) {
         
         char uptoken[1024] = {0};
         char upHost[192] = {0};
+        char upDesc[32];
         LinkUploadParam param;
         memset(&param, 0, sizeof(param));
         param.pTokenBuf = uptoken;
@@ -295,8 +297,9 @@ static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam) {
         else
                 nCusMagics = 0;
 
+        LinkLogDebug("upload pic start:[%"PRId64"] %s", LinkGetCurrentMillisecond(), key);
         ret = LinkUploadBuffer(pSig->pData, pSig->nDataLen, upHost, uptoken, realKey, NULL, 0, cusMagics, nCusMagics, NULL, &putret);
-        
+        snprintf(upDesc, sizeof(upDesc), "upload pic end:[%"PRId64"]", LinkGetCurrentMillisecond());
         LinkUploadResult uploadResult = LINK_UPLOAD_RESULT_FAIL;
         
         if (ret != 0) { //http error
@@ -304,20 +307,20 @@ static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam) {
                         upParam->nRetCode = LINK_TIMEOUT;
                 else
                         upParam->nRetCode = ret;
-                LinkLogError("upload picture:%s errorcode=%d error:%s", key, ret, putret.error);
+                LinkLogError("%s :%s errorcode=%d error:%s",upDesc, key, ret, putret.error);
         } else {
                 if (putret.code == 200) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
                         upParam->nRetCode = LINK_SUCCESS;
-                        LinkLogDebug("upload picture: %s success", key);
+                        LinkLogDebug("%s :%s success",upDesc, key);
                 } else {
                         upParam->nRetCode = putret.code;
                         if (putret.body != NULL) {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg=%s",
+                                LinkLogError("%s :%s httpcode=%d reqid:%s errmsg=%s", upDesc,
                                              key, putret.code, putret.reqid, putret.body);
                         } else {
-                                LinkLogError("upload pic:%s httpcode=%d reqid:%s errmsg={not receive response}",
-                                             key, putret.code, putret.reqid);
+                                LinkLogError("%s :%s httpcode=%d reqid:%s errmsg={not receive response}",
+                                             upDesc, key, putret.code, putret.reqid);
                         }
                 }
         }
