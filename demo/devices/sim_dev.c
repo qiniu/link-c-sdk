@@ -293,10 +293,11 @@ int start_video_file_test(void *opaque)
                                  }
                          }
                  }
-                 nNextVideoTime += 40;
                  if (shouldReset){
                          videoOffset = 0;
+                         continue;
                  }
+                 nNextVideoTime += 40;
                  
                  int64_t nSleepTime = 0;
                  nSleepTime = (nNextVideoTime - nNow - 1) * 1000;
@@ -371,15 +372,15 @@ int start_audio_file_test(void *opaque)
                                         int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
                                         nNextAudioTime = nSysTimeBase + d;
                                 } else {
-                                        aacFrameCount++;
-                                        int64_t d = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]) * aacFrameCount;
-                                        nNextAudioTime = nSysTimeBase + d;
+                                        audioOffset = 0;
+                                        continue;
                                 }
                                 if (duration == 0) {
                                         duration = ((1024*1000.0)/aacfreq[adts.fix.sampling_frequency_index]);
                                 }
                         } else {
-                                nNextAudioTime = nSysTimeBase + duration;
+                                audioOffset = 0;
+                                continue;
                         }
                 } else {
                         duration = 20;
@@ -392,8 +393,8 @@ int start_audio_file_test(void *opaque)
                                 audioOffset += 160;
                                 nNextAudioTime += 20;
                         } else {
-                                nNextAudioTime += 20;
                                 audioOffset = 0;
+                                continue;
                         }
                 }
                
