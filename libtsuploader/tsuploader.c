@@ -242,7 +242,8 @@ static void doTsOutput(KodoUploader * pKodoUploader, int lenOfBufData, char *buf
                 mediaInfo.startTime = tsStartTime / 1000000;
                 mediaInfo.endTime = tsEndTime / 1000000;
                 mediaInfo.pSessionMeta = pMeta;
-                memcpy(mediaInfo.sessionId, sessionId, LINK_MAX_SESSION_ID_LEN);
+                if (sessionId)
+                        memcpy(mediaInfo.sessionId, sessionId, LINK_MAX_SESSION_ID_LEN);
                 int idx = 0;
                 if (pKodoUploader->mediaArg.nAudioFormat != LINK_AUDIO_NONE) {
                         mediaInfo.media[idx].nChannels = pKodoUploader->mediaArg.nChannels;
