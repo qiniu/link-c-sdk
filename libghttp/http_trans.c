@@ -46,6 +46,7 @@ static SSL_CTX    * ssl_context = NULL;
 #elif defined (USE_WOLFSSL)
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
+#include "timeoutconn.h"
 
 static int          ssl_initialized = 0;
 static WOLFSSL_METHOD * ssl_method = NULL;
