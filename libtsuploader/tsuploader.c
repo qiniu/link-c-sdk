@@ -13,7 +13,7 @@
 #include "picuploader.h"
 #include "segmentmgr.h"
 
-static int64_t lastReportAccdu  = 0; // for test
+static int64_t lastReportAccDuration  = 0; // for test
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);
 
 #define TS_DIVIDE_LEN 4096
@@ -223,9 +223,9 @@ static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t n
 
 static void setSessionCoverStatus(LinkSession *pSession, int nPicUploadStatus) {
         if (nPicUploadStatus == LINK_SUCCESS) {
-                pSession->coverStatus = 1;
+                pSession->coverStatus = 0;
         } else if (nPicUploadStatus == LINK_TIMEOUT) {
-                pSession->coverStatus = -1;
+                pSession->coverStatus = 1;
         } else if (nPicUploadStatus < 0) {
                 pSession->coverStatus = -2;
         } else if (nPicUploadStatus < 1000)
@@ -405,9 +405,9 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         }
         
         if (pKodoUploader->isSegStartReport && reportType & 0x4) {
-                pSession->coverStatus = 0;
-                if (lastReportAccdu != pKodoUploader->bakSession.nAccSessionVideoDuration)
-                        LinkLogWarn("======");
+                pSession->coverStatus = 1000;
+                if (lastReportAccDuration != pKodoUploader->bakSession.nAccSessionVideoDuration)
+                        LinkLogWarn("abnormal report duration:%"PRId64" %"PRId64"", lastReportAccDuration,  pKodoUploader->bakSession.nAccSessionVideoDuration);
                 LinkLogDebug("=========================4>%s %"PRId64"", pKodoUploader->bakSession.sessionId, pKodoUploader->bakSession.nAccSessionVideoDuration);
                 pKodoUploader->bakSession.isNewSessionStarted = 0;
                 pKodoUploader->bakSession.nSessionEndResonCode = pSession->nSessionEndResonCode;
@@ -478,7 +478,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
         pthread_mutex_lock(&pKodoUploader->uploadMutex_);
         pKodoUploader->nTsCacheNum--;
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
-        lastReportAccdu = pSession->nAccSessionVideoDuration;
+        lastReportAccDuration = pSession->nAccSessionVideoDuration;
         return NULL;
 }
 
