@@ -12,10 +12,18 @@
 #include "httptools.h"
 #include "config.h"
 
-#include <libmqtt/linking-emitter-api.h>
+#include <libmqtt/qnlinking_mqtt.h>
 #include <qupload.h>
 
-extern const char *gVersionAgent;
+#ifndef LINK_C_SDK_RELEASE_VERSION
+#define LINK_C_SDK_RELEASE_VERSION
+#endif
+#ifndef LINK_C_SDK_BUILD_VERSION
+#define LINK_C_SDK_BUILD_VERSION
+#endif
+
+const char *gSDKVersion = "version:" LINK_C_SDK_RELEASE_VERSION " build:" LINK_C_SDK_BUILD_VERSION;
+
 
 static int volatile nProcStatus = 0;
 
@@ -56,7 +64,7 @@ int LinkInit()
                 return ret;
         }
         nProcStatus = 1;
-        LinkLogInfo("main thread id:%ld(version:%s)", (long)pthread_self(), gVersionAgent);
+        LinkLogInfo("main thread id:%ld(version:%s)", (long)pthread_self(), gSDKVersion);
 
         return LINK_SUCCESS;
 
@@ -124,9 +132,9 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         
 #ifdef WITH_MQTT
         /* Initial link emitter service */
-        LinkEmitter_Init(_pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen,
+        QnlinkingMQTT_Init(_pUserUploadArg->pDeviceAk, _pUserUploadArg->nDeviceAkLen,
                         _pUserUploadArg->pDeviceSk, _pUserUploadArg->nDeviceSkLen);
-        LinkSetLogCallback(LinkEmitter_SendLog);
+        LinkSetLogCallback(QnlinkingMQTT_SendLog);
 #endif
         return LINK_SUCCESS;
 }
@@ -178,7 +186,7 @@ void LinkCleanup()
         LinkUninitSegmentMgr();
 #ifdef WITH_MQTT
         /* stop emitter service */
-        LinkEmitter_Cleanup();
+        QnlinkingMQTT_Cleanup();
         LinkSetLogCallback(NULL);
 #endif
         return;

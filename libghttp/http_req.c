@@ -32,7 +32,7 @@
 #ifndef LINK_C_SDK_BUILD_VERSION
 #define LINK_C_SDK_BUILD_VERSION
 #endif
-const char *gVersionAgent = "version:" LINK_C_SDK_RELEASE_VERSION "build:" LINK_C_SDK_BUILD_VERSION;
+const char *gVersionAgent = "version:" LINK_C_SDK_RELEASE_VERSION " build:" LINK_C_SDK_BUILD_VERSION;
 
 
 const char *
