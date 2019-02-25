@@ -12,11 +12,26 @@ include(GNUInstallDirs)
 project (link-c-sdk)
 
 # ------------------------------------------------------------------------------
+# Cross compile
+# ------------------------------------------------------------------------------
+
+if(CROSS_COMPILE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+  set(CMAKE_C_COMPILER ${CROSS_COMPILE}-gcc)
+  set(CMAKE_CXX_COMPILER ${CROSS_COMPILE}-g++)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+  set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+  set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+  set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
+endif()
+
+# ------------------------------------------------------------------------------
 # Get and Display infomation
 # ------------------------------------------------------------------------------
 
 message(STATUS "CMake version: " ${CMAKE_VERSION})
 message(STATUS "CMake system name: " ${CMAKE_SYSTEM_NAME})
+message(STATUS "C compiler: " ${CMAKE_C_COMPILER})
+message(STATUS "CXX compiler: " ${CMAKE_CXX_COMPILER})
 
 c_compiler_prefix(C_COMPILER_PREFIX)
 if(C_COMPILER_PREFIX)

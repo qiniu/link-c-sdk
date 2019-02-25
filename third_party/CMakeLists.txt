@@ -31,10 +31,12 @@ if(WITH_WOLFSSL)
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ./autogen.sh &&
       ./configure
+        CC=${CMAKE_C_COMPILER}
+        CXX=${CMAKE_CXX_COMPILER}
         --enable-static=${THIRDPARTY_WITH_STATIC}
         --enable-shared=${THIRDPARTY_WITH_SHARED}
         --disable-debug
-        --host=${C_COMPILER_PREFIX}
+        --host=${C_COMPILER_MACHINE}
         --prefix=${WOLFSSL_PREFIX}
     BUILD_COMMAND make
     INSTALL_COMMAND make install
@@ -53,9 +55,11 @@ if(WITH_MQTT)
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ./autogen.sh &&
       ./configure
+        CC=${CMAKE_C_COMPILER}
+        CXX=${CMAKE_CXX_COMPILER}
         --enable-tls=${WOLFMQTT_WITH_TLS}
         --prefix=${WOLFMQTT_PREFIX}
-        --host=${C_COMPILER_PREFIX}
+        --host=${C_COMPILER_MACHINE}
         --enable-static=${THIRDPARTY_WITH_STATIC}
         --enable-shared=${THIRDPARTY_WITH_SHARED}
         --disable-examples
