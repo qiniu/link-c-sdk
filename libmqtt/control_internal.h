@@ -2,7 +2,7 @@
 #define __IO_CTRL_INTERNAL__
 
 #define MAX_SESSION_ID  10
-#define MESSAGE_QUEUE_MAX (32)
+#define MESSAGE_QUEUE_MAX (64)
 
 #define RESPONSE_ERROR_CODE "errorCode"
 #define RESPONSE_VALUE  "value"
