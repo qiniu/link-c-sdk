@@ -1,0 +1,9 @@
+# Ignore conditional for libghttp on ubutnu trusty
+{
+   eglibc/2.19/free
+   Memcheck:Free
+   fun:free
+   fun:__libc_freeres
+   fun:_vgnU_freeres
+   fun:__run_exit_handlers
+}
