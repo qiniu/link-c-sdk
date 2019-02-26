@@ -159,7 +159,7 @@ static int linkPutBuffer(const char * uphost, const char *token, const char * ke
         snprintf(resDesc, sizeof(resDesc), "upload.file[%"PRId64"]", LinkGetCurrentNanosecond()/1000000);
         int retCode = -1;
         if (ret != 0) { //http error
-                LinkLogError("%s :%s[%d] errorcode=%d errmsg=%s",resDesc, key, datasize, ret, putret.error);
+                LinkLogError("%s :%s[%d] retcode=%d rcode:%d eno:%d errmsg=%s",resDesc, key, datasize, ret, putret.code, errno, putret.error);
                 return LINK_GHTTP_FAIL;
         } else {
                 if (putret.code / 100 == 2) {
@@ -539,13 +539,13 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
-                int lenOfBufData = 0;
+                int lenOfBufData = 0, getBufRet = 0;
                 char *bufData = NULL;
-                if ( LinkGetQueueBuffer((LinkCircleQueue *)&uploadCommand.ts.pData, &bufData, &lenOfBufData) > 0) {
+                if ( (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)uploadCommand.ts.pData, &bufData, &lenOfBufData)) > 0) {
                         doTsOutput(pKodoUploader, lenOfBufData, bufData, pKodoUploader->nTsLastStartTime, pTinfo->nSystimestamp,
                                    (const LinkSessionMeta *)pKodoUploader->pSessionMeta, NULL); // 得不到准确的session id
                 } else {
-                        LinkLogError("drop ts file callback not get data");
+                        LinkLogError("drop ts file callback not get data:%d", getBufRet);
                 }
                 
                 free(uploadCommand.ts.pUpMeta);
@@ -1021,6 +1021,15 @@ void LinkClearSessionMeta(IN LinkTsUploader * _pUploader) {
 
 int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
+        int nCurCacheNum = pKodoUploader->nTsCacheNum;
+        if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
+                LinkLogWarn("drop pic:%s", pic.pFilename);
+                pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
+                return LINK_MAX_CACHE;
+        }
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
         
         TsUploaderCommand uploadCommand;
         uploadCommand.nCommandType = LINK_TSU_PICTURE;
