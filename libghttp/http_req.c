@@ -25,6 +25,7 @@
 #include "http_trans.h"
 #include "http_global.h"
 #include "config.h"
+#include "timeoutconn.h"
 
 #ifndef LINK_C_SDK_RELEASE_VERSION
 #define LINK_C_SDK_RELEASE_VERSION
@@ -108,6 +109,13 @@ http_req_prepare(http_req *a_req)
     http_hdr_set_value(a_req->headers, http_hdr_User_Agent,
 		       gVersionAgent);
   return l_return;
+}
+
+#include <sys/time.h>
+static inline int64_t getCurMilliSec() {
+        struct  timeval    tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec*(int64_t)(1000)+tv.tv_usec/(int64_t)(1000);
 }
 
 int
@@ -237,6 +245,9 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
       http_trans_buf_reset(a_conn);
                     
     }else {
+            int64_t startT = 0;
+            int64_t endT = 0;
+            int totalTime = 0;
             
             const char *dataArr[3];
             int dataLens[3];
@@ -253,10 +264,32 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             int io_buf_io_done = a_conn->io_buf_io_done;
             int io_buf_io_left = a_conn->io_buf_io_left;
             int i, remain, offset, l;
+            
+            return remain=0;
+            for (i = 0; i < 3; i++) {
+                    while (dataArr[i] && remain > 0) {
+                            remain += dataLens[i];
+                    }
+            }
+            totalTime += (remain/(256*1024) + 1)*5000;
+            
+            struct timeval tv;
+            
+            startT = getCurMilliSec();
             for (i = 0; i < 3; i++) {
                     remain = dataLens[i];
                     offset = 0;
+                    
                     while (dataArr[i] && remain > 0) {
+                            if (totalTime <= 0) {
+                                    tv.tv_sec = 0;
+                                    tv.tv_usec = 1000;
+                            } else {
+                                    tv.tv_sec = totalTime/1000;
+                                    tv.tv_usec = (totalTime%1000)*1000;
+                            }
+                            setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+                            
                             l = remain > 256 * 1024 ? 256 * 1024 : remain;
                             a_conn->io_buf = (char *)dataArr[i]+offset;
                             a_conn->io_buf_len = l;
@@ -270,6 +303,10 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                             } while (l_rv == HTTP_TRANS_NOT_DONE);
                             remain -= l;
                             offset += l;
+                            
+                            endT = getCurMilliSec();
+                            totalTime -= (endT - startT);
+                            startT = endT;
                     }
             }
             a_conn->io_buf = io_buf;
