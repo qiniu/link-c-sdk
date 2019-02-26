@@ -36,20 +36,22 @@ set(SRCS_${TEST_TARGET_1} libghttp_test.c)
 # Test libmqtt
 # ------------------------------------------------------------------------------
 
-set(TEST_TARGET_2 "testmqtt")
-set(SRCS_${TEST_TARGET_2} libmqtt_test.c)
-aux_source_directory(${DEPENDS_DIRS}/flag SRCS_${TEST_TARGET_2})
-add_executable(${TEST_TARGET_2} ${SRCS_${TEST_TARGET_2}})
-#libmqtt
 if(WITH_MQTT)
-  target_link_libraries(${TEST_TARGET_2} mqtt wolfmqtt pthread m)
-endif()
-#wolfssl
-if(WITH_WOLFSSL)
-  target_link_libraries(${TEST_TARGET_2} wolfssl m)
-endif()
-
-add_test(NAME qnlinking_mqtt COMMAND testmqtt --loop 3)
+    set(TEST_TARGET_2 "testmqtt")
+    set(SRCS_${TEST_TARGET_2} libmqtt_test.c)
+    aux_source_directory(${DEPENDS_DIRS}/flag SRCS_${TEST_TARGET_2})
+    add_executable(${TEST_TARGET_2} ${SRCS_${TEST_TARGET_2}})
+    #libmqtt
+    if(WITH_MQTT)
+      target_link_libraries(${TEST_TARGET_2} mqtt wolfmqtt pthread m)
+    endif()
+    #wolfssl
+    if(WITH_WOLFSSL)
+      target_link_libraries(${TEST_TARGET_2} wolfssl m)
+    endif()
+    
+    add_test(NAME qnlinking_mqtt COMMAND testmqtt --loop 3)
+endif(WITH_MQTT)
 
 # ------------------------------------------------------------------------------
 # Test libtsuploader

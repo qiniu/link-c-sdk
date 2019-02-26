@@ -729,7 +729,7 @@ int main(int argc, const char** argv)
                 flag_write_usage(argv[0]);
                 return 0;
         }
-        // check dak and dsk.
+        // check dak dsk configurl.
         if (!cmdArg.pDak) {
                 cmdArg.pDak = getenv("LINK_TEST_DAK");
                 if (!cmdArg.pDak) {
@@ -741,6 +741,13 @@ int main(int argc, const char** argv)
                 cmdArg.pDsk = getenv("LINK_TEST_DSK");
                 if (!cmdArg.pDsk) {
                         printf("No DSK specified.\n");
+                        exit(EXIT_FAILURE);
+                }
+        }
+        if (!cmdArg.pConfigUrl) {
+                cmdArg.pConfigUrl = getenv("LINK_TEST_CONFIG_URL");
+                if (!cmdArg.pConfigUrl) {
+                        printf("No Config URL specified.\n");
                         exit(EXIT_FAILURE);
                 }
         }
