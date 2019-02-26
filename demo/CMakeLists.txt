@@ -64,6 +64,7 @@ foreach(f IN LISTS SOURCE_LIST)
 endforeach()
 
 add_executable(demo-tsupload ${SOURCE_LIST} ${DEV_FILE})
+add_dependencies(demo-tsupload lib)
 target_compile_options(demo-tsupload PRIVATE -std=c99)
 #libtsuploader
 target_link_libraries(demo-tsupload tsuploader pthread m)

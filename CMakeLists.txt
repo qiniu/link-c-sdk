@@ -9,7 +9,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake" ${CMAKE_MODULE_PATH})
 include(Utilities)
 include(GNUInstallDirs)
 
-project (link-c-sdk)
+project (link-c-sdk C)
 
 # ------------------------------------------------------------------------------
 # Cross compile
@@ -199,6 +199,27 @@ set(LIBGHTTP_LIBRARIES ${PROJECT_BINARY_DIR}/libghttp)
 
 set(LIBTSUPLOADER_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/libtsuploader)
 set(LIBTSUPLOADER_LIBRARIES ${PROJECT_BINARY_DIR}/libtsuploader)
+
+
+# ------------------------------------------------------------------------------
+# Library target
+# ------------------------------------------------------------------------------
+
+add_custom_target(lib)
+if(WITH_STATIC)
+  if(WITH_MQTT)
+    add_dependencies(lib mqtt_STATIC)
+  endif()
+    add_dependencies(lib ghttp_STATIC)
+    add_dependencies(lib tsuploader_STATIC)
+endif()
+if(WITH_SHARED)
+  if(WITH_MQTT)
+    add_dependencies(lib mqtt_SHARED)
+  endif()
+    add_dependencies(lib ghttp_SHARED)
+    add_dependencies(lib tsuploader_SHARED)
+endif()
 
 # ------------------------------------------------------------------------------
 # Subdirectory

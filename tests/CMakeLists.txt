@@ -62,7 +62,10 @@ aux_source_directory(${DEPENDS_DIRS}/flag SRCS_${TEST_TARGET_3})
 add_executable(${TEST_TARGET_3} ${SRCS_${TEST_TARGET_3}})
 target_compile_options(${TEST_TARGET_3} PRIVATE -std=c99)
 #libtsuploader
-target_link_libraries(${TEST_TARGET_3} tsuploader pthread m rt)
+target_link_libraries(${TEST_TARGET_3} tsuploader pthread m)
+if(NOT APPLE)
+    target_link_libraries(${TEST_TARGET_3} rt)
+endif()
 #libghttp
 target_link_libraries(${TEST_TARGET_3} ghttp)
 #libmqtt

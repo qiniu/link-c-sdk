@@ -32,8 +32,8 @@ typedef struct {
         const char *pAFilePath;
         const char *pVFilePath;
         const char *pConfigUrl;
-        const char *pAk;
-        const char *pSk;
+        const char *pDak;
+        const char *pDsk;
         bool IsFileLoop;
         int  nLoopSleeptime;
         int nRoundCount;
@@ -314,8 +314,9 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                         break;
                                 }
                                 
-                                if (!cmdArg.IsTestH265) {
-                                        if(start[2] == 0x01){//0x 00 00 01
+                                if (!cmdArg.IsTestH265) {    // test h264
+
+                                        if(start[2] == 0x01){ //0x 00 00 01
                                                 type = start[3] & 0x1F;
                                         }else{ // 0x 00 00 00 01
                                                 type = start[4] & 0x1F;
@@ -363,7 +364,7 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                 nNextVideoTime += 40;
                                                 break;
                                         }
-                                }else{
+                                }else{   // test h265
                                         if(start[2] == 0x01){//0x 00 00 01
                                                 type = start[3] & 0x7E;
                                         }else{ // 0x 00 00 00 01
@@ -717,8 +718,8 @@ int main(int argc, const char** argv)
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
-        flag_str(&cmdArg.pAk, "ak", "device access token(not kodo ak)");
-        flag_str(&cmdArg.pSk, "sk", "device secret token(not kodo sk)");
+        flag_str(&cmdArg.pDak, "dak", "device access token");
+        flag_str(&cmdArg.pDsk, "dsk", "device secret token");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
@@ -728,7 +729,21 @@ int main(int argc, const char** argv)
                 flag_write_usage(argv[0]);
                 return 0;
         }
-
+        // check dak and dsk.
+        if (!cmdArg.pDak) {
+                cmdArg.pDak = getenv("LINK_TEST_DAK");
+                if (!cmdArg.pDak) {
+                        printf("No DAK specified.\n");
+                        exit(EXIT_FAILURE);
+                }
+        }
+        if (!cmdArg.pDsk) {
+                cmdArg.pDsk = getenv("LINK_TEST_DSK");
+                if (!cmdArg.pDsk) {
+                        printf("No DSK specified.\n");
+                        exit(EXIT_FAILURE);
+                }
+        }
 
         printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
@@ -816,10 +831,10 @@ int main(int argc, const char** argv)
         //avuploader.userUploadArg.pUploadStatArg = (void *)10;
         avuploader.userUploadArg.pConfigRequestUrl = cmdArg.pConfigUrl;
         avuploader.userUploadArg.nConfigRequestUrlLen = strlen(cmdArg.pConfigUrl);
-        avuploader.userUploadArg.pDeviceAk = cmdArg.pAk;
-        avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pAk);
-        avuploader.userUploadArg.pDeviceSk = cmdArg.pSk;
-        avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pSk);
+        avuploader.userUploadArg.pDeviceAk = cmdArg.pDak;
+        avuploader.userUploadArg.nDeviceAkLen = strlen(cmdArg.pDak);
+        avuploader.userUploadArg.pDeviceSk = cmdArg.pDsk;
+        avuploader.userUploadArg.nDeviceSkLen = strlen(cmdArg.pDsk);
         
         ret = wrapLinkCreateAndStartAVUploader(&avuploader.pTsMuxUploader, &avuploader.userUploadArg);
         if (ret != 0) {
