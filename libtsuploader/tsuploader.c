@@ -539,13 +539,13 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
-                int lenOfBufData = 0;
+                int lenOfBufData = 0, getBufRet = 0;
                 char *bufData = NULL;
-                if ( LinkGetQueueBuffer((LinkCircleQueue *)&uploadCommand.ts.pData, &bufData, &lenOfBufData) > 0) {
+                if ( (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)uploadCommand.ts.pData, &bufData, &lenOfBufData)) > 0) {
                         doTsOutput(pKodoUploader, lenOfBufData, bufData, pKodoUploader->nTsLastStartTime, pTinfo->nSystimestamp,
                                    (const LinkSessionMeta *)pKodoUploader->pSessionMeta, NULL); // 得不到准确的session id
                 } else {
-                        LinkLogError("drop ts file callback not get data");
+                        LinkLogError("drop ts file callback not get data:%d", getBufRet);
                 }
                 
                 free(uploadCommand.ts.pUpMeta);
@@ -1021,6 +1021,15 @@ void LinkClearSessionMeta(IN LinkTsUploader * _pUploader) {
 
 int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic) {
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        
+        pthread_mutex_lock(&pKodoUploader->uploadMutex_);
+        int nCurCacheNum = pKodoUploader->nTsCacheNum;
+        if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
+                LinkLogWarn("drop pic:%s", pic.pFilename);
+                pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
+                return LINK_MAX_CACHE;
+        }
+        pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
         
         TsUploaderCommand uploadCommand;
         uploadCommand.nCommandType = LINK_TSU_PICTURE;
