@@ -40,6 +40,9 @@ if(WITH_WOLFSSL)
     INSTALL_COMMAND make install
     TEST_COMMAND ""
     )
+  install(DIRECTORY ${WOLFSSL_PREFIX}/include ${WOLFSSL_PREFIX}/lib
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+    )
 endif()
 
 if(WITH_MQTT)
@@ -65,4 +68,8 @@ if(WITH_MQTT)
     INSTALL_COMMAND make install
     TEST_COMMAND ""
     )
+  install(DIRECTORY ${WOLFMQTT_PREFIX}/include ${WOLFMQTT_PREFIX}/lib
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+    )
+
 endif(WITH_MQTT)
