@@ -43,7 +43,6 @@ typedef struct {
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
         
-        bool IsWithPicUpload;
         bool IsPicUploadSyncMode;
         
         LinkTsMuxUploader * pFirstUploader;
@@ -328,11 +327,11 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                                         nIDR++;
                                                         if(cmdArg.IsTestMove && !IsFirst) {;
                                                                 printf("sleep %dms to wait timeout start:%"PRId64"\n", cmdArg.nSleeptime, nNextVideoTime);
-                                                                if (cmdArg.IsWithPicUpload) {
-                                                                        fprintf(stderr, "----->stop push(motion stop)");
-                                                                        AVuploader *pAvuploader = (AVuploader*)opaque;
-                                                                        LinkFlushUploader(pAvuploader->pTsMuxUploader);
-                                                                }
+
+                                                                fprintf(stderr, "----->stop push(motion stop)");
+                                                                AVuploader *pAvuploader = (AVuploader*)opaque;
+                                                                LinkFlushUploader(pAvuploader->pTsMuxUploader);
+
                                                                 usleep(cmdArg.nSleeptime * 1000);
                                                                 printf("sleep to wait timeout end\n");
                                                                 nNextVideoTime += cmdArg.nSleeptime;
@@ -601,19 +600,16 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
         avArg.nChannels = _pUserUploadArg->nChannels;
         avArg.nSamplerate = _pUserUploadArg->nSampleRate;
         avArg.nVideoFormat = _pUserUploadArg->nVideoFormat;
-        if (!cmdArg.IsWithPicUpload)
-                //TODO not work now, with no pic and seg
-                ret = LinkCreateAndStartAVUploader(_pTsMuxUploader, &avArg, _pUserUploadArg);
-        else {
-                GetPicSaver * saver = malloc(sizeof(GetPicSaver));
-                memset(saver, 0, sizeof(GetPicSaver));
-                _pUserUploadArg->pGetPictureCallbackUserData = saver;
-                ret = LinkNewUploader(_pTsMuxUploader, _pUserUploadArg);
-                if (cmdArg.IsEnableTsCb) {
-                        LinkUploaderSetTsOutputCallback(*_pTsMuxUploader,tsToFile, NULL);
-                }
-                saver->pData = *_pTsMuxUploader;
+
+        GetPicSaver * saver = malloc(sizeof(GetPicSaver));
+        memset(saver, 0, sizeof(GetPicSaver));
+        _pUserUploadArg->pGetPictureCallbackUserData = saver;
+        ret = LinkNewUploader(_pTsMuxUploader, _pUserUploadArg);
+        if (cmdArg.IsEnableTsCb) {
+                LinkUploaderSetTsOutputCallback(*_pTsMuxUploader,tsToFile, NULL);
         }
+        saver->pData = *_pTsMuxUploader;
+
         return ret;
 }
 
@@ -709,7 +705,6 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
         flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
         flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
-        flag_bool(&cmdArg.IsWithPicUpload, "withpic", "with picture upload start");
         flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
         flag_bool(&cmdArg.IsEnableTsCb, "tscb", "enable ts callback");
         
