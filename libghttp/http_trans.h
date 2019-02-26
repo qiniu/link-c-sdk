@@ -66,6 +66,8 @@ typedef struct http_trans_conn_tag {
   int                  last_read;         /* the size of the last read */
   int                  chunk_len;         /* length of a chunk. */
   int                  nTimeoutInSecond;
+  int64_t              nStartTime;
+  int                  nRemainMilliTime;
   char                *errstr;            /* a hint as to an error */
 
   /* SSL support. we always have a USE_SSL var, even if compiled

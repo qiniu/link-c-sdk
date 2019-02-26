@@ -26,6 +26,7 @@
 #include "http_global.h"
 #include "config.h"
 #include "timeoutconn.h"
+#include <errno.h>
 
 #ifndef LINK_C_SDK_RELEASE_VERSION
 #define LINK_C_SDK_RELEASE_VERSION
@@ -118,6 +119,14 @@ static inline int64_t getCurMilliSec() {
         return tv.tv_sec*(int64_t)(1000)+tv.tv_usec/(int64_t)(1000);
 }
 
+static void restoreConn(http_trans_conn *a_conn, http_trans_conn *bak) {
+        a_conn->io_buf = bak->io_buf;
+        a_conn->io_buf_len = bak->io_buf_len;
+        a_conn->io_buf_alloc = bak->io_buf_alloc;
+        a_conn->io_buf_io_left = bak->io_buf_io_left;
+        a_conn->io_buf_io_done = bak->io_buf_io_done;
+}
+
 int
 http_req_send(http_req *a_req, http_trans_conn *a_conn)
 {
@@ -128,6 +137,7 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
   int         l_headers_len = 0;
   int         l_rv = 0;
   char       *l_content = NULL;
+  int64_t startT = getCurMilliSec();
 
   /* see if we need to jump into the function somewhere */
   if (a_conn->sync == HTTP_TRANS_ASYNC)
@@ -245,9 +255,9 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
       http_trans_buf_reset(a_conn);
                     
     }else {
-            int64_t startT = 0;
-            int64_t endT = 0;
+            int64_t endT = getCurMilliSec();
             int totalTime = 0;
+            http_trans_conn bakConn = *a_conn;
             
             const char *dataArr[3];
             int dataLens[3];
@@ -258,24 +268,19 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
             dataLens[1] = a_req->body1_len;
             dataLens[2] = a_req->body2_len;
             
-            char *io_buf= a_conn->io_buf;
-            int io_buf_len = a_conn->io_buf_len;
-            int io_buf_alloc = a_conn->io_buf_alloc;
-            int io_buf_io_done = a_conn->io_buf_io_done;
-            int io_buf_io_left = a_conn->io_buf_io_left;
             int i, remain, offset, l;
             
-            return remain=0;
+            remain=0;
             for (i = 0; i < 3; i++) {
-                    while (dataArr[i] && remain > 0) {
+                    if (dataArr[i] && dataLens[i] > 0) {
                             remain += dataLens[i];
                     }
             }
-            totalTime += (remain/(256*1024) + 1)*5000;
+            totalTime += ((remain/(256*1024) + 1)*5300 + a_conn->nRemainMilliTime);
+            totalTime -= (endT - startT);
             
             struct timeval tv;
             
-            startT = getCurMilliSec();
             for (i = 0; i < 3; i++) {
                     remain = dataLens[i];
                     offset = 0;
@@ -283,12 +288,13 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                     while (dataArr[i] && remain > 0) {
                             if (totalTime <= 0) {
                                     tv.tv_sec = 0;
-                                    tv.tv_usec = 1000;
+                                    tv.tv_usec = 2000;
                             } else {
                                     tv.tv_sec = totalTime/1000;
                                     tv.tv_usec = (totalTime%1000)*1000;
                             }
                             setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+                            
                             
                             l = remain > 256 * 1024 ? 256 * 1024 : remain;
                             a_conn->io_buf = (char *)dataArr[i]+offset;
@@ -298,8 +304,14 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                             a_conn->io_buf_io_done = 0;
                             do {
                                     l_rv = http_trans_write_buf(a_conn);
-                                    if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0))
+                                    if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0)) {
+                                            restoreConn(a_conn, &bakConn);
                                             return HTTP_TRANS_ERR;
+                                    }
+                                    if (a_conn->error == EAGAIN || a_conn->error == EWOULDBLOCK) {
+                                            restoreConn(a_conn, &bakConn);
+                                            return HTTP_TRANS_ERR;
+                                    }
                             } while (l_rv == HTTP_TRANS_NOT_DONE);
                             remain -= l;
                             offset += l;
@@ -309,11 +321,8 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
                             startT = endT;
                     }
             }
-            a_conn->io_buf = io_buf;
-            a_conn->io_buf_len = io_buf_len;
-            a_conn->io_buf_alloc = io_buf_alloc;
-            a_conn->io_buf_io_left = io_buf_io_left;
-            a_conn->io_buf_io_done = io_buf_io_done;
+            restoreConn(a_conn, &bakConn);
+            a_conn->nRemainMilliTime = totalTime < 0 ? 0 : totalTime;
       }
     }
   return HTTP_TRANS_DONE;
