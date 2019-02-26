@@ -5,7 +5,7 @@
 #include <qupload.h>
 #include "httptools.h"
 #include <unistd.h>
-#include "servertime.h"
+#include "utils.h"
 
 #define LINK_PIC_UPLOAD_MAX_FILENAME 256
 enum LinkPicUploadSignalType {

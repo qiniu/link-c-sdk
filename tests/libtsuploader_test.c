@@ -6,7 +6,6 @@
 #include <signal.h>
 #include "flag/flag.h"
 #include "libtsuploader/uploader.h"
-#include "libtsuploader/security.h"
 #include "libtsuploader/adts.h"
 #include "config.h"
 
@@ -21,7 +20,6 @@ typedef struct {
         bool IsTestTimestampRollover;
         bool IsTestH265;
         bool IsNoAudio;
-        bool IsNoVideo;
         bool IsTestMove;
         bool IsTwoFileUpload;
         bool IsWriteVideoFrame;
@@ -43,8 +41,6 @@ typedef struct {
         int64_t nBaseAudioTime; //for loop test
         int64_t nBaseVideoTime; //for loop test
         
-        bool IsPicUploadSyncMode;
-        
         LinkTsMuxUploader * pFirstUploader;
         LinkTsMuxUploader * pSecondUploader;
         int nSigQuitTimes;
@@ -60,7 +56,6 @@ typedef struct {
         const char * pAFile;
         const char * pVFile;
         char * pUrl;
-        
 }AVuploader;
 
 CmdArg cmdArg;
@@ -138,7 +133,7 @@ static const uint8_t *ff_avc_find_startcode_internal(const uint8_t *p, const uin
                 if (p[0] == 0 && p[1] == 0 && p[2] == 1)
                         return p;
         }
-        
+
         for (end -= 3; p < end; p += 4) {
                 uint32_t x = *(const uint32_t*)p;
                 //      if ((x - 0x01000100) & (~x) & 0x80008000) // little endian
@@ -631,10 +626,6 @@ static void checkCmdArg(const char * name)
                 LinkLogError("sleep time is milliseond. should great than 1000");
                 exit(4);
 	}
-        if (cmdArg.IsNoAudio && cmdArg.IsNoVideo) {
-                LinkLogError("no audio and video");
-                exit(5);
-        }
        
         if (cmdArg.pConfigUrl == NULL) {
                 LinkLogError("must specify confurl ak and sk");
@@ -697,27 +688,28 @@ static void uploadStatisticCallback(void *pUserOpaque, LinkUploadKind uploadKind
 extern const char *gVersionAgent;
 int main(int argc, const char** argv)
 {
+        // default test v: H.264  a: G711
         flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
         flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
-        flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
         flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
+
         flag_bool(&cmdArg.IsNoAudio, "na", "no audio");
-        flag_bool(&cmdArg.IsNoVideo, "nv", "no video(not support now)");
-        flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
         flag_bool(&cmdArg.IsWriteVideoFrame, "vwrite", "write every video frame");
-        flag_bool(&cmdArg.IsPicUploadSyncMode, "picsync", "get picture sync mode. default is async");
         flag_bool(&cmdArg.IsEnableTsCb, "tscb", "enable ts callback");
-        
+        flag_bool(&cmdArg.IsTestMove, "testmove", "testmove seperated by key frame");
+        flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
+        flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
+        flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
+
+        flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
+
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
         flag_str(&cmdArg.pDak, "dak", "device access token");
         flag_str(&cmdArg.pDsk, "dsk", "device secret token");
-        flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
-        flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
-        flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
 
         flag_parse(argc, argv, gVersionAgent);
         if (argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "-help") == 0)) {
@@ -749,12 +741,12 @@ int main(int argc, const char** argv)
 
         printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
-        printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
         printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
         printf("cmdArg.pAFilePath=%s\n", cmdArg.pAFilePath);
         printf("cmdArg.pVFilePath=%s\n", cmdArg.pVFilePath);
         printf("cmdArg.pConfigUrl=%s\n", cmdArg.pConfigUrl);
         printf("cmdArg.IsFileLoop=%d\n", cmdArg.IsFileLoop);
+        printf("cmdArg.IsTestTimestampRollover=%d\n", cmdArg.IsTestTimestampRollover);
 
         checkCmdArg(argv[0]);
         
@@ -792,15 +784,12 @@ int main(int argc, const char** argv)
         }
         if (cmdArg.IsNoAudio)
                 pAFile = NULL;
-        if (cmdArg.IsNoVideo)
-                pVFile = NULL;
 
         int ret = 0;
 
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);
-        
         
         AVuploader avuploader;
         
@@ -815,14 +804,13 @@ int main(int argc, const char** argv)
                         avuploader.userUploadArg.nSampleRate = 8000;
                 }
         }
-        if (!cmdArg.IsNoVideo) {
-                if(cmdArg.IsTestH265) {
-                        avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H265;
-                } else {
-                        avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H264;
-                }
+
+        if(cmdArg.IsTestH265) {
+                avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H265;
+        } else {
+                avuploader.userUploadArg.nVideoFormat = LINK_VIDEO_H264;
         }
-         
+
         ret = LinkInit();
         if (ret != 0) {
                 fprintf(stderr, "InitUploader err:%d\n", ret);
@@ -845,7 +833,7 @@ int main(int argc, const char** argv)
         }
         cmdArg.pFirstUploader = avuploader.pTsMuxUploader;
         
-        
+
         avuploader.pAFile = pAFile;
         avuploader.pVFile = pVFile;
 

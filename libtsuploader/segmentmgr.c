@@ -2,11 +2,10 @@
 #include "resource.h"
 #include "queue.h"
 #include "uploader.h"
-#include "servertime.h"
+#include "utils.h"
 #include "b64/urlsafe_b64.h"
 #include <qupload.h>
 #include "httptools.h"
-#include "security.h"
 #include <unistd.h>
 #include "cJSON/cJSON.h"
 
