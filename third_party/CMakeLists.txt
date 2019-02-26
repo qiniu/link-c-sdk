@@ -25,7 +25,7 @@ if(WITH_WOLFSSL)
   ExternalProject_Add(external-wolfSSL
     EXCLUDE_FROM_ALL TRUE
     BUILD_IN_SOURCE TRUE
-    URL https://github.com/wolfSSL/wolfssl/archive/v3.15.7-stable.zip
+    URL https://github.com/wolfSSL/wolfssl/archive/v3.15.7-stable.tar.gz
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ./autogen.sh &&
       ./configure
