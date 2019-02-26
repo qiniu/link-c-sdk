@@ -25,9 +25,7 @@ if(WITH_WOLFSSL)
   ExternalProject_Add(external-wolfSSL
     EXCLUDE_FROM_ALL TRUE
     BUILD_IN_SOURCE TRUE
-    GIT_REPOSITORY https://github.com/wolfSSL/wolfssl.git
-    GIT_TAG v3.15.7-stable
-    GIT_PROGRESS TRUE
+    URL https://github.com/wolfSSL/wolfssl/archive/v3.15.7-stable.zip
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ./autogen.sh &&
       ./configure
@@ -49,9 +47,7 @@ if(WITH_MQTT)
     DEPENDS ${WOLFMQTT_DEPENDS}
     EXCLUDE_FROM_ALL TRUE
     BUILD_IN_SOURCE TRUE
-    GIT_REPOSITORY https://github.com/wolfSSL/wolfMQTT.git
-    GIT_TAG v1.2
-    GIT_PROGRESS TRUE
+    URL https://github.com/wolfSSL/wolfMQTT/archive/v1.2.tar.gz
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ./autogen.sh &&
       ./configure
