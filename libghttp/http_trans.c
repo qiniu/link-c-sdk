@@ -32,6 +32,7 @@
 #include "http_trans.h"
 #include "http_global.h"
 #include "qupload.h"
+#include <stdio.h>
 
 #ifdef WITH_OPENSSL
 #include <openssl/crypto.h>
@@ -78,9 +79,44 @@ void ghttp_set_global_cert_file_path(const char *file, const char *path)
     return;
 }
 
-static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
+static void set_rcv_timeout(int fd, int tm) {
+        struct timeval tv;
+        if (tm <= 0) {
+                tv.tv_sec = 0;
+                tv.tv_usec = 2000;
+        } else {
+                tv.tv_sec = tm/1000;
+                tv.tv_usec = (tm%1000)*1000;
+        }
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
+
+static void set_snd_timeout(int fd, int tm) {
+        struct timeval tv;
+        if (tm <= 0) {
+                tv.tv_sec = 0;
+                tv.tv_usec = 2000;
+        } else {
+                tv.tv_sec = tm/1000;
+                tv.tv_usec = (tm%1000)*1000;
+        }
+        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+}
+
+#include <pthread.h>
+pthread_mutex_t dnsCacheMutex = PTHREAD_MUTEX_INITIALIZER;
+typedef struct _DnsCacheItem {
+        char host[128];
+        int updateTime;
+        struct addrinfo *addrs;
+        unsigned char status; //2 modified; 1 ready to use
+        unsigned char isValid;
+}DnsCacheItem;
+DnsCacheItem dnsItems[10];
+
+static int get_host_by_name(const char *host, struct addrinfo **pInfo, struct sockaddr_in *sinp)
 {
-    struct addrinfo        *ailist, *aip;
+    struct addrinfo        *alist = NULL, *aip;
     struct addrinfo        hint;
     int                 err;
 
@@ -93,24 +129,98 @@ static int get_host_by_name(const char *host, struct sockaddr_in *sinp)
     hint.ai_addr = NULL;
     hint.ai_next = NULL;
 
-    if ((err = getaddrinfo(host, NULL, &hint, &ailist)) != 0)
+    if ((err = getaddrinfo(host, NULL, &hint, &alist)) != 0)
             return err;
 
-    for (aip = ailist; aip != NULL; aip = aip->ai_next) {
+    for (aip = alist; aip != NULL; aip = aip->ai_next) {
         if (aip->ai_family == AF_INET) {
             memcpy(sinp, (struct sockaddr_in *)aip->ai_addr, sizeof(struct sockaddr_in));
             break;
         }
     }
-    freeaddrinfo(ailist);
+
+    if (pInfo != NULL) {
+        *pInfo = alist;
+    } else {
+        freeaddrinfo(alist);
+    }
+        
+    if (aip == NULL) {
+        return -1;
+    }
     return 0;
+}
+
+static int update_dns_cache(DnsCacheItem *pItem, const char *host, struct sockaddr_in *sinp) {
+        if (pItem->addrs) {
+                freeaddrinfo(pItem->addrs);
+                pItem->addrs = NULL;
+        }
+        memset(pItem->host, 0, sizeof(pItem->host));
+        
+        int ret = get_host_by_name(host, &pItem->addrs, sinp);
+        if (ret != 0) {
+                if (pItem->addrs) {
+                        freeaddrinfo(pItem->addrs);
+                        pItem->addrs = NULL;
+                }
+                pItem->isValid = 0;
+        } else {
+                snprintf(pItem->host, sizeof(pItem->host), "%s", host);
+                pItem->updateTime = time(NULL);
+                pItem->isValid = 1;
+        }
+        pItem->status = 0;
+        return ret;
+}
+
+static int get_host_by_name_from_cache(const char *host, struct sockaddr_in *sinp) {
+
+        struct addrinfo  *aip = NULL;
+        int i = 0, inValidIndex = -1;
+        int max = sizeof(dnsItems)/sizeof(DnsCacheItem);
+        
+        pthread_mutex_lock(&dnsCacheMutex);
+        for (i = 0; i < max; i++) {
+                if (dnsItems[i].isValid == 0 && dnsItems[i].status == 0 && inValidIndex == -1) {//backup first invlaid item
+                        inValidIndex = i;
+                        dnsItems[i].status = 1;
+                }
+                if (dnsItems[i].isValid && dnsItems[i].status == 0 && strcmp(host,dnsItems[i].host) == 0) {
+                        dnsItems[i].status = 2;
+                        break;
+                }
+        }
+        pthread_mutex_unlock(&dnsCacheMutex);
+        
+        
+        if (i < max) {
+                if (time(NULL) - dnsItems[i].updateTime > 7200) {
+                        return update_dns_cache(&dnsItems[i], host, sinp);
+                } else {
+                        for (aip = dnsItems[i].addrs; aip != NULL; aip = aip->ai_next) {
+                                if (aip->ai_family == AF_INET) {
+                                        memcpy(sinp, (struct sockaddr_in *)aip->ai_addr, sizeof(struct sockaddr_in));
+                                        dnsItems[i].status = 0;
+                                        return 0;
+                                }
+                        }
+                        if (aip == NULL) {
+                                return update_dns_cache(&dnsItems[i], host, sinp);
+                        }
+                }
+        } else if (inValidIndex > -1) {
+                return update_dns_cache(&dnsItems[inValidIndex], host, sinp);
+        }
+
+        return -1;
 }
 
 int
 http_trans_connect(http_trans_conn *a_conn)
 {
   int dnserr = 0;
-
+  a_conn->nStartTime = getCurMilliSec();
   if ((a_conn == NULL) || (a_conn->host == NULL))
     goto ec;
       /* look up the name of the proxy if it's there. */
@@ -119,7 +229,7 @@ http_trans_connect(http_trans_conn *a_conn)
           char *tmp = strrchr(a_conn->host, ':');
           if (tmp) 
             *tmp = 0;
-	  if ((dnserr = get_host_by_name(a_conn->proxy_host, &a_conn->saddr)) != 0)
+	  if ((dnserr = get_host_by_name_from_cache(a_conn->proxy_host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
@@ -136,7 +246,7 @@ http_trans_connect(http_trans_conn *a_conn)
           char *tmp = strrchr(a_conn->host, ':');
           if (tmp) 
             *tmp = 0;
-	  if ((dnserr = get_host_by_name(a_conn->host, &a_conn->saddr)) != 0)
+	  if ((dnserr = get_host_by_name_from_cache(a_conn->host, &a_conn->saddr)) != 0)
 	    {
 	      a_conn->error_type = http_trans_err_type_host;
 	      a_conn->error = dnserr;
@@ -154,6 +264,18 @@ http_trans_connect(http_trans_conn *a_conn)
 	a_conn->saddr.sin_port = htons(a_conn->proxy_port);
       else
 	a_conn->saddr.sin_port = htons(a_conn->port);
+        
+        int64_t endDnsTime = getCurMilliSec();
+        int64_t nElapsedTime = endDnsTime - a_conn->nStartTime;
+        if (nElapsedTime >= a_conn->nTimeoutInSecond * 1000) {
+                a_conn->error_type = http_trans_err_type_errno;
+                a_conn->error = EAGAIN;
+                char dnsTimeout[64] = {0};
+                sprintf(dnsTimeout, "dns timeout. it tooks:%lldms", nElapsedTime);
+                LinkGhttpLogger(dnsTimeout);
+                goto ec;
+        }
+        
   /* set up the socket */
   if ((a_conn->sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
@@ -161,12 +283,9 @@ http_trans_connect(http_trans_conn *a_conn)
       a_conn->error = errno;
       goto ec;
     }
-
-  struct timeval tv;
-  tv.tv_sec =  tv.tv_sec = a_conn->nTimeoutInSecond;
-  setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-  setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-  a_conn->nStartTime = getCurMilliSec();
+        
+        set_rcv_timeout(a_conn->sock, 5000);
+ 
   /* set up the socket */
   int connRet = timeout_connect(a_conn->sock,
 	      &a_conn->saddr,
@@ -194,7 +313,13 @@ http_trans_connect(http_trans_conn *a_conn)
       goto ec;
      }
     }
-    a_conn->nRemainMilliTime = a_conn->nTimeoutInSecond * 1000 - (connEndTime - a_conn->nStartTime);
+        a_conn->nRemainMilliTime = (a_conn->nTimeoutInSecond+5) * 1000 - (connEndTime - a_conn->nStartTime);
+        if (a_conn->nRemainMilliTime < 0) {
+                a_conn->error_type = http_trans_err_type_errno;
+                a_conn->error = EAGAIN;
+                goto ec;
+        }
+        set_snd_timeout(a_conn->sock, a_conn->nRemainMilliTime);
 #ifdef WITH_OPENSSL
   /* initialize the SSL data structures */
   if (a_conn->USE_SSL)
@@ -476,7 +601,7 @@ http_trans_append_data_to_buf(http_trans_conn *a_conn,
   a_conn->io_buf_alloc += a_data_len;
   return 1;
 }
-#include <stdio.h>
+
 int
 http_trans_read_into_buf(http_trans_conn *a_conn)
 {
@@ -501,15 +626,8 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
     l_bytes_to_read = a_conn->io_buf_chunksize;
   else
     l_bytes_to_read = a_conn->io_buf_io_left;
-        struct timeval tv;
-        if (a_conn->nRemainMilliTime <= 0) {
-                tv.tv_sec = 0;
-                tv.tv_usec = 2000;
-        } else {
-                tv.tv_sec = a_conn->nRemainMilliTime/1000;
-                tv.tv_usec = (a_conn->nRemainMilliTime%1000)*1000;
-        }
-        setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        
+        set_rcv_timeout(a_conn->sock, a_conn->nRemainMilliTime);
         
   /* read in some data */
   if(a_conn->USE_SSL)
@@ -574,7 +692,6 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
   a_conn->io_buf_io_left -= l_read;
   a_conn->io_buf_io_done += l_read;
   a_conn->io_buf_alloc += l_read;
-  
   /* generate the result */
   if (a_conn->io_buf_io_left == 0)
     return HTTP_TRANS_DONE;
@@ -582,10 +699,19 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
   return HTTP_TRANS_NOT_DONE;
 }
 
+static inline int64_t reqCurMilliSec() {
+        struct  timeval    tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec*(int64_t)(1000)+tv.tv_usec/(int64_t)(1000);
+}
+
 int
 http_trans_write_buf(http_trans_conn *a_conn)
 {
   int l_written = 0;
+  int64_t endT = 0;
+  int64_t startT = reqCurMilliSec();
+  set_snd_timeout(a_conn->sock, a_conn->nRemainMilliTime);
 
   if (a_conn->io_buf_io_left == 0)
     {
@@ -635,6 +761,8 @@ http_trans_write_buf(http_trans_conn *a_conn)
                                                    &a_conn->io_buf[a_conn->io_buf_io_done],
                                                    a_conn->io_buf_io_left)) <= 0)
     {
+            endT = reqCurMilliSec();
+            a_conn->nRemainMilliTime -= (endT - startT);
       a_conn->error_type = http_trans_err_type_errno;
       a_conn->error = errno;
       if (errno == EINTR)
@@ -643,7 +771,10 @@ http_trans_write_buf(http_trans_conn *a_conn)
         return HTTP_TRANS_ERR;
       }
     }
-  
+        
+  endT = reqCurMilliSec();
+  a_conn->nRemainMilliTime -= (endT - startT);
+        
   if (l_written == 0)
     return HTTP_TRANS_DONE;
   /* advance the counters */
