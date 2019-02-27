@@ -1,23 +1,27 @@
+# ------------------------------------------------------------------------------
+# link-c-sdk/third_party CMakeLists.txt
+# ------------------------------------------------------------------------------
+
 include(ExternalProject)
 
 if(WITH_STATIC)
-  set(THIRDPARTY_WITH_STATIC, "yes")
+  set(THIRDPARTY_WITH_STATIC "yes")
 else()
-  set(THIRDPARTY_WITH_STATIC, "no")
+  set(THIRDPARTY_WITH_STATIC "no")
 endif()
 
 if(WITH_SHARED)
-  set(THIRDPARTY_WITH_SHARED, "yes")
+  set(THIRDPARTY_WITH_SHARED "yes")
 else()
-  set(THIRDPARTY_WITH_SHARED, "no")
+  set(THIRDPARTY_WITH_SHARED "no")
 endif()
 
 if(WITH_WOLFSSL)
-    set(WOLFMQTT_WITH_TLS, "yes")
-    set(WOLFMQTT_DEPENDS, "external-wolfSSL")
+    set(WOLFMQTT_WITH_TLS "yes")
+    set(WOLFMQTT_DEPENDS "external-wolfSSL")
 else()
-    set(WOLFMQTT_WITH_TLS, "no")
-    set(WOLFMQTT_DEPENDS, "")
+    set(WOLFMQTT_WITH_TLS "no")
+    set(WOLFMQTT_DEPENDS "")
 endif()
 
 
@@ -40,8 +44,11 @@ if(WITH_WOLFSSL)
     INSTALL_COMMAND make install
     TEST_COMMAND ""
     )
-  install(DIRECTORY ${WOLFSSL_PREFIX}/include ${WOLFSSL_PREFIX}/lib
-    DESTINATION ${CMAKE_INSTALL_PREFIX}
+  install(DIRECTORY ${WOLFSSL_PREFIX}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+  install(DIRECTORY ${WOLFSSL_PREFIX}/lib/
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
     )
 endif()
 
@@ -68,8 +75,11 @@ if(WITH_MQTT)
     INSTALL_COMMAND make install
     TEST_COMMAND ""
     )
-  install(DIRECTORY ${WOLFMQTT_PREFIX}/include ${WOLFMQTT_PREFIX}/lib
-    DESTINATION ${CMAKE_INSTALL_PREFIX}
+    
+  install(DIRECTORY ${WOLFMQTT_PREFIX}/include/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
     )
-
+  install(DIRECTORY ${WOLFMQTT_PREFIX}/lib/
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    )
 endif(WITH_MQTT)

@@ -9,7 +9,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake" ${CMAKE_MODULE_PATH})
 include(Utilities)
 include(GNUInstallDirs)
 
-project (link-c-sdk C)
+project (link-c-sdk)
 
 # ------------------------------------------------------------------------------
 # Cross compile
@@ -31,9 +31,7 @@ endif()
 message(STATUS "CMake version: " ${CMAKE_VERSION})
 message(STATUS "CMake system name: " ${CMAKE_SYSTEM_NAME})
 message(STATUS "C compiler: " ${CMAKE_C_COMPILER})
-if(CMAKE_CXX_COMPILER)
-  message(STATUS "CXX compiler: " ${CMAKE_CXX_COMPILER})
-endif()
+message(STATUS "CXX compiler: " ${CMAKE_CXX_COMPILER})
 c_compiler_prefix(C_COMPILER_PREFIX)
 if(C_COMPILER_PREFIX)
   message(STATUS "C compiler prefix: " ${C_COMPILER_PREFIX})
