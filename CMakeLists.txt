@@ -81,9 +81,9 @@ endif()
 # Version
 # ------------------------------------------------------------------------------
 
-set(LINK_C_SDK_VERSION_MAJOR 0)
-set(LINK_C_SDK_VERSION_MINOR 1)
-set(LINK_C_SDK_VERSION_PATCH 2)
+set(LINK_C_SDK_VERSION_MAJOR 1)
+set(LINK_C_SDK_VERSION_MINOR 0)
+set(LINK_C_SDK_VERSION_PATCH 0)
 set(LINK_C_SDK_RELEASE_VERSION ${LINK_C_SDK_VERSION_MAJOR}.${LINK_C_SDK_VERSION_MINOR}.${LINK_C_SDK_VERSION_PATCH})
 message(STATUS "link-c-sdk release version: " ${LINK_C_SDK_RELEASE_VERSION})
 

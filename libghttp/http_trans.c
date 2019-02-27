@@ -59,6 +59,12 @@ static int http_trans_buf_free(http_trans_conn *a_conn);
 static char cert_file[256]={"/etc/ssl/certs/ca-certificates.crt"};
 static char cert_path[256];
 
+static inline int64_t getCurMilliSec() {
+        struct  timeval    tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec*(int64_t)(1000)+tv.tv_usec/(int64_t)(1000);
+}
+
 void ghttp_set_global_cert_file_path(const char *file, const char *path)
 {
     int lenf = strlen(file);
@@ -157,18 +163,17 @@ http_trans_connect(http_trans_conn *a_conn)
     }
 
   struct timeval tv;
-  tv.tv_sec = 5;
-  tv.tv_usec = 0;
+  tv.tv_sec =  tv.tv_sec = a_conn->nTimeoutInSecond;
   setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
   setsockopt(a_conn->sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
+  a_conn->nStartTime = getCurMilliSec();
   /* set up the socket */
-  int connBeginTime = time(NULL);
-  if (timeout_connect(a_conn->sock,
+  int connRet = timeout_connect(a_conn->sock,
 	      &a_conn->saddr,
-	      a_conn->nTimeoutInSecond) < 0)
+        a_conn->nTimeoutInSecond);
+  int64_t connEndTime = getCurMilliSec();
+  if (connRet < 0)
     {
-      int connEndTime = time(NULL);
       int notok = 1;
       int errnobak = errno;
       const char * blkMode = "blksock";
@@ -179,8 +184,8 @@ http_trans_connect(http_trans_conn *a_conn)
       }
       char connErr[128]={0};
       unsigned char * sockip = (unsigned char *)&a_conn->saddr.sin_addr.s_addr;
-            snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1:%d en2:%d time:%d-%d=%d notok:%d ip:%d.%d.%d.%d\n",
-               blkMode, a_conn->sock, errnobak, errno, connEndTime, connBeginTime, connEndTime - connBeginTime, notok,
+            snprintf(connErr, sizeof(connErr), "######%s:%d connect fail:en1:%d en2:%d time:%lld-%lld=%lld notok:%d ip:%d.%d.%d.%d\n",
+               blkMode, a_conn->sock, errnobak, errno, connEndTime, a_conn->nStartTime, connEndTime - a_conn->nStartTime, notok,
                sockip[0], sockip[1], sockip[2], sockip[3]);
       LinkGhttpLogger(connErr);
      if (notok) {
@@ -189,6 +194,7 @@ http_trans_connect(http_trans_conn *a_conn)
       goto ec;
      }
     }
+    a_conn->nRemainMilliTime = a_conn->nTimeoutInSecond * 1000 - (connEndTime - a_conn->nStartTime);
 #ifdef WITH_OPENSSL
   /* initialize the SSL data structures */
   if (a_conn->USE_SSL)
@@ -470,7 +476,7 @@ http_trans_append_data_to_buf(http_trans_conn *a_conn,
   a_conn->io_buf_alloc += a_data_len;
   return 1;
 }
-
+#include <stdio.h>
 int
 http_trans_read_into_buf(http_trans_conn *a_conn)
 {
@@ -495,7 +501,16 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
     l_bytes_to_read = a_conn->io_buf_chunksize;
   else
     l_bytes_to_read = a_conn->io_buf_io_left;
-  
+        struct timeval tv;
+        if (a_conn->nRemainMilliTime <= 0) {
+                tv.tv_sec = 0;
+                tv.tv_usec = 2000;
+        } else {
+                tv.tv_sec = a_conn->nRemainMilliTime/1000;
+                tv.tv_usec = (a_conn->nRemainMilliTime%1000)*1000;
+        }
+        setsockopt(a_conn->sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+        
   /* read in some data */
   if(a_conn->USE_SSL)
     {
@@ -555,7 +570,6 @@ http_trans_read_into_buf(http_trans_conn *a_conn)
     }
   else if (l_read == 0)
     return HTTP_TRANS_DONE;
-  
   /* mark the buffer */
   a_conn->io_buf_io_left -= l_read;
   a_conn->io_buf_io_done += l_read;
@@ -625,8 +639,9 @@ http_trans_write_buf(http_trans_conn *a_conn)
       a_conn->error = errno;
       if (errno == EINTR)
         l_written = 0;
-      else
+      else {
         return HTTP_TRANS_ERR;
+      }
     }
   
   if (l_written == 0)
