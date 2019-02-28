@@ -10,7 +10,7 @@ OBJS    := $(patsubst %.c,%.o,$(SOURCE))
 TARGET  := sample
 
 #compile and lib parameter
-LIBS    := -ltsuploader -lmqtt -lwolfmqtt -lpthread -lrt -lm
+LIBS    := -ltsuploader -lghttp -lmqtt -lwolfmqtt -lpthread -lrt -lm
 LDFLAGS := -L../lib
 DEFINES := -DSAMPLE
 INCLUDE := -I../include
