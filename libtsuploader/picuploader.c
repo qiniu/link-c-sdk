@@ -307,7 +307,7 @@ static void * uploadPicture(void *_pOpaque, LinkPicUploadParam *upParam) {
                         upParam->nRetCode = LINK_TIMEOUT;
                 else
                         upParam->nRetCode = ret;
-                LinkLogError("%s :%s errorcode=%d error:%s",upDesc, key, ret, putret.error);
+                LinkLogError("%s :%s[%d] retcode=%d rcode:%d eno:%d errmsg=%s",upDesc, key, pSig->nDataLen, ret, putret.code, errno, putret.error);
         } else {
                 if (putret.code == 200) {
                         uploadResult = LINK_UPLOAD_RESULT_OK;
