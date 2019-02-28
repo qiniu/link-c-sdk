@@ -551,7 +551,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
                 
                 free(uploadCommand.ts.pUpMeta);
                 LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
-                LinkLogError("ts queue cmd:drop ts file due to ts cache reatch max limit");
+                LinkLogError("ts queue cmd:drop ts file due to ts cache reatch max limit:%lld", pTinfo->nSystimestamp/1000000);
         } else {
                 TsUploaderCommand tmcmd = {0};
                 tmcmd.nCommandType = LINK_TSU_END_TIME;
@@ -649,6 +649,8 @@ void LinkUpdateSessionId(LinkSession *pSession, int64_t nTsStartSystime) {
         pSession->nAccSessionDuration = pSession->nTsDuration;
         pSession->nAccSessionAudioDuration = pSession->nAudioGapFromLastReport;
         pSession->nAccSessionVideoDuration = pSession->nVideoGapFromLastReport;
+        pSession->nTotalSessionAudioDuration = pSession->nAudioGapFromLastReport;
+        pSession->nTotalSessionVideoDuration = pSession->nVideoGapFromLastReport;
 #endif
         
         pSession->nSessionEndTime = 0;
@@ -728,6 +730,8 @@ static void handleTsEndTimeReport(KodoUploader * pKodoUploader, LinkReportTimeIn
         
         pKodoUploader->session.nAccSessionVideoDuration += pTi->nVideoDuration;
         pKodoUploader->session.nAccSessionAudioDuration += pTi->nAudioDuration;
+        pKodoUploader->session.nTotalSessionVideoDuration += pTi->nVideoDuration;
+        pKodoUploader->session.nTotalSessionAudioDuration += pTi->nAudioDuration;
         pKodoUploader->session.nVideoGapFromLastReport += pTi->nVideoDuration;
         pKodoUploader->session.nAudioGapFromLastReport += pTi->nAudioDuration;
         pKodoUploader->session.nTsDuration = pTi->nVideoDuration;
