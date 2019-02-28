@@ -235,3 +235,11 @@ if(WITH_DEMO)
 	add_subdirectory(demo)
 endif()
 
+# ------------------------------------------------------------------------------
+# Sample
+# ------------------------------------------------------------------------------
+
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/sample/
+  DESTINATION sample
+  )
+

@@ -2,6 +2,7 @@
 #include "libghttp/ghttp.h"
 #include "hmac_sha1/hmac_sha1.h"
 #include "b64/urlsafe_b64.h"
+#include "log/log.h"
 
 int GetHttpRequestSign(const char * pKey, int nKeyLen, char *method, char *pUrlWithPathAndQuery, char *pContentType,
                               char *pData, int nDataLen, char *pOutput, int *pOutputLen) {

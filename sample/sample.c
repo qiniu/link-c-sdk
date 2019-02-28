@@ -4,10 +4,8 @@
 
 #include "stdio.h"
 #include "stdlib.h"
-#include "uploader.h"
-#include "adts.h"
-#include "sample_ver.h"
-
+#include "tsuploader/uploader.h"
+#include "tsuploader/adts.h"
 
 #define THIS_IS_AUDIO 1
 #define THIS_IS_VIDEO 2

@@ -1,5 +1,6 @@
 #include "resource.h"
 #include "base.h"
+#include "log/log.h"
 
 typedef struct _ResourceMgr
 {

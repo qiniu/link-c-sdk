@@ -9,7 +9,6 @@
 #define __TS_UPLOADER_API__
 
 #include "tsmuxuploader.h"
-#include "log/log.h"
 #include "base.h"
 
 /**
@@ -33,15 +32,6 @@ int LinkInit();
 int LinkNewUploader(LinkTsMuxUploader **pTsMuxUploader,
                     LinkUploadArg *pUserUploadArg
                     );
-
-/**
- * 设置日志回调函数
- *
- * 此函数不是线程安全函数。
- *
- * @param[in]  pLogCb 回调函数
- */
-void LinkSetLogCallback(IN LinkLogFunc pLogCb);
 
 /**
  * 设置ts切片数据回调

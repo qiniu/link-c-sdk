@@ -1,5 +1,6 @@
 #include "queue.h"
 #include "base.h"
+#include "log/log.h"
 
 
 #define QUEUE_READ_ONLY_STATE 1
