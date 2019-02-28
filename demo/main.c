@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "uploader.h"
+#include "utils.h"
 #include "main.h"
 #include "log2file.h"
 #include "dbg.h"
@@ -446,9 +447,11 @@ int main()
         logFile = gIpc.config.defaultLogFile;
     }
 
+/*
     if ( fork() == 0 ) {
         TelnetdProcess();
     }
+*/
 
     MqttParam params;
     params.server = gIpc.config.mqtt_server;
