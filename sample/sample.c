@@ -11,11 +11,13 @@
 #define THIS_IS_VIDEO 2
 
 //模拟用的数据文件
+#define SAMPLE_DIR "./material/"
 #define JPG_FILE "3c.jpg"
 #define VIDEO_H264_FILE "h265_aac_1_16000_h264.h264"
 #define AUDIO_AAC_FILE "h265_aac_1_16000_a.aac"
 
-
+char * DAK = NULL;
+char * DSK = NULL;
 
 //sample模拟视音频流用到的类型
 typedef struct {
@@ -40,8 +42,7 @@ typedef enum {
 
 //link-c-sdk使用相关
 //使用link-c-sdk时的设备标识
-#define DAK ""
-#define DSK ""
+
 typedef int (*DataCallback)(void *opaque, void *pData,
                             int nDataLen, int nFlag, int64_t timestamp, int nIsKeyFrame);
 
@@ -556,6 +557,17 @@ static void ts_upload_release()
 
 int main(void)
 {
+    //获取 dak dsk
+    DAK = getenv("LINK_TEST_DAK");
+    if (!DAK) {
+        printf("No DAK specified.\n");
+        exit(EXIT_FAILURE);
+    }
+    DSK = getenv("LINK_TEST_DSK");
+    if (!DSK) {
+        printf("No DSK specified.\n");
+        exit(EXIT_FAILURE);
+    }
 
     //上传视频+音频+缩略图
     upload_av_with_picture_init();

@@ -242,4 +242,6 @@ endif()
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/sample/
   DESTINATION sample
   )
-
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/tests/material
+  DESTINATION sample
+  )
