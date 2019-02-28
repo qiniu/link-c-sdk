@@ -14,6 +14,7 @@
 #include "httptools.h"
 #include "cJSON/cJSON.h"
 #include "b64/urlsafe_b64.h"
+#include "log/log.h"
 #include "tsmux.h"
 
 #define FF_OUT_LEN 4096

@@ -7,7 +7,6 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <inttypes.h>
-#include "log/log.h"
 #ifndef __APPLE__
 #include <stdint.h>
 #endif

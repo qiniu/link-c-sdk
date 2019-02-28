@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <signal.h>
 #include "flag/flag.h"
+#include "log/log.h"
 #include "libtsuploader/uploader.h"
 #include "libtsuploader/adts.h"
 #include "config.h"
@@ -758,9 +759,6 @@ int main(int argc, const char** argv)
                         return -22;
                 }
         }
-        
-        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
-        //LinkSetLogLevel(LINK_LOG_LEVEL_ERROR);
 
         const char *pVFile = NULL;
         const char *pAFile = NULL;

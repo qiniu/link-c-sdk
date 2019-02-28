@@ -6,6 +6,7 @@
 #include "httptools.h"
 #include <unistd.h>
 #include "utils.h"
+#include "log/log.h"
 
 #define LINK_PIC_UPLOAD_MAX_FILENAME 256
 enum LinkPicUploadSignalType {

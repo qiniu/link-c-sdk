@@ -12,6 +12,7 @@
 #include "httptools.h"
 #include "picuploader.h"
 #include "segmentmgr.h"
+#include "log/log.h"
 
 static int64_t lastReportAccDuration  = 0; // for test
 size_t getDataCallback(void* buffer, size_t size, size_t n, void* rptr);

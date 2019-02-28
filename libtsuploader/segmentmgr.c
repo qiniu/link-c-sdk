@@ -7,6 +7,7 @@
 #include <qupload.h>
 #include "httptools.h"
 #include <unistd.h>
+#include "log/log.h"
 #include "cJSON/cJSON.h"
 
 #define SEGMENT_RELEASE 1
