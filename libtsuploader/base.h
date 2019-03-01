@@ -176,8 +176,10 @@ typedef struct _LinkSession { // seg report info
         int coverStatus;
         int segHandle;
         int64_t nAccSessionDuration;
-        int64_t nAccSessionAudioDuration; // tad
-        int64_t nAccSessionVideoDuration; // tvd
+        int64_t nAccSessionAudioDuration; // aad
+        int64_t nAccSessionVideoDuration; // avd
+        int64_t nTotalSessionAudioDuration; // tad
+        int64_t nTotalSessionVideoDuration; // tvd
         
         // report scope
         int64_t nAudioGapFromLastReport; // ad

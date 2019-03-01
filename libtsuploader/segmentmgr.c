@@ -56,6 +56,8 @@ static int checkShouldReport(Seg* pSeg, LinkSession *pCurSession) {
         }
         pSeg->tmpSession.nAccSessionAudioDuration = pCurSession->nAccSessionAudioDuration;
         pSeg->tmpSession.nAccSessionVideoDuration = pCurSession->nAccSessionVideoDuration;
+        pSeg->tmpSession.nTotalSessionAudioDuration = pCurSession->nTotalSessionAudioDuration;
+        pSeg->tmpSession.nTotalSessionVideoDuration = pCurSession->nTotalSessionVideoDuration;
 
         if (pCurSession->nSessionEndResonCode == 0) {
                 if (pSeg->nNextUpdateSegTimeInSecond > nNow) {
@@ -108,11 +110,12 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
                 }
                 
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
-                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"end\":"
-                        " %"PRId64", \"endReason\": \"%s\",\"frameStatus\":%d",
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"avd\": %"PRId64", \"aad\": %"PRId64", \"end\":"
+                        " %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64", \"endReason\": \"%s\",\"frameStatus\":%d",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000, reason,
+			s->nAccSessionVideoDuration, s->nAccSessionAudioDuration, s->nSessionEndTime/1000000,
+                                   s->nTotalSessionVideoDuration, s->nTotalSessionAudioDuration, reason,
                                    s->coverStatus);
                 segmentMgr.handles[idx].tmpSession.nAccSessionVideoDuration = 0;
                 segmentMgr.handles[idx].tmpSession.nAccSessionAudioDuration = 0;
@@ -120,10 +123,12 @@ static int reportSegInfo(LinkSession *s , int idx, int rtype) {
                 segmentMgr.handles[idx].tmpSession.coverStatus = 0;
         } else {
                 nBodyLen = sprintf(body, "{ \"session\": \"%s\", \"start\": %"PRId64", \"current\": %"PRId64", \"sequence\": %"PRId64","
-                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"tvd\": %"PRId64", \"tad\": %"PRId64",\"frameStatus\":%d",
+                        " \"vd\": %"PRId64", \"ad\": %"PRId64", \"avd\": %"PRId64", \"aad\": %"PRId64",\"frameStatus\":%d,"
+                                   "\"tvd\": %"PRId64", \"tad\": %"PRId64"",
                         s->sessionId, s->nSessionStartTime/1000000, LinkGetCurrentNanosecond()/1000000, s->nTsSequenceNumber,
                         s->nVideoGapFromLastReport, s->nAudioGapFromLastReport,
-                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration,  s->coverStatus);
+                        s->nAccSessionVideoDuration, s->nAccSessionAudioDuration,  s->coverStatus,
+                                   s->nTotalSessionVideoDuration, s->nTotalSessionAudioDuration);
         }
         
         if (smeta && smeta->len > 0) {
@@ -481,16 +486,6 @@ int LinkUpdateSegment(SegmentHandle seg, const LinkSession *pSession) {
         SegInfo segInfo = {0};
         segInfo.handle = seg;
         segInfo.session = *pSession;
-        /*
-        if (pSession->nSessionEndResonCode != 0) {
-                segInfo.session.nAccSessionAudioDuration -= segInfo.session.nAudioGapFromLastReport ;
-                segInfo.session.nAccSessionVideoDuration -= segInfo.session.nVideoGapFromLastReport ;
-                segInfo.session.nAccSessionDuration -= segInfo.session.nTsDuration;
-                segInfo.session.nTsDuration = 0;
-                segInfo.session.nVideoGapFromLastReport = 0;
-                segInfo.session.nAudioGapFromLastReport = 0;
-        }
-        */
         segInfo.nOperation = SEGMENT_UPDATE;
         int ret = segmentMgr.pSegQueue_->Push(segmentMgr.pSegQueue_, (char *)&segInfo, sizeof(segInfo));
         if (ret <= 0) {
