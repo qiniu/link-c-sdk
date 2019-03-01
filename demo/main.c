@@ -18,7 +18,6 @@
 #include <unistd.h>
 
 #include "uploader.h"
-#include "security.h"
 #include "main.h"
 #include "log2file.h"
 #include "dbg.h"
@@ -33,6 +32,7 @@
 #include "ota.h"
 #include "log2mqtt.h"
 #include "telnetd.h"
+#include "log/log.h"
 
 /* global variable */
 App gIpc;

@@ -19,6 +19,7 @@
 #include "dbg.h"
 #include "dev_core.h"
 #include "mymalloc.h"
+#include "log/log.h"
 
 #define VERSION "v1.0.0"
 
