@@ -32,4 +32,4 @@ distclean : clean
 	rm -fr $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)

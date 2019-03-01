@@ -64,6 +64,7 @@ if(WITH_MQTT)
         CC=${CMAKE_C_COMPILER}
         CXX=${CMAKE_CXX_COMPILER}
         --enable-tls=${WOLFMQTT_WITH_TLS}
+        --with-lib-prefix=${WOLFSSL_PREFIX}
         --prefix=${WOLFMQTT_PREFIX}
         --host=${C_COMPILER_MACHINE}
         --enable-static=${THIRDPARTY_WITH_STATIC}
