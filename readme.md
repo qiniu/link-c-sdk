@@ -1,32 +1,24 @@
 
 # 编译
 
-## x86
-- mkdir build
-- cd build
+### x86
+
 ```
- cmake ../ \
-    -DWITH_DEMO=ON \
-    -DWITH_WOLFSSL=ON \
-    -DWITH_MQTT=ON
- make
+mkdir build
+cd build
+cmake ../ -DCMAKE_INSTALL_PREFIX=/your/install/path/
+make
+make install
 ```
 
-## 交叉编译
-- 修改toolchain.cmake,修改CMAKE\_C\_COMPILER和CMAKE\_CXX\_COMPILER为平台相关工具链
-- mkdir build
-- cd build
-```
- cmake ../ \
-    -DWITH_DEMO=ON \
-    -DWITH_WOLFSSL=ON \
-    -DWITH_MQTT=ON \
-    -DCROSS_COMPILE=your-compile-toolchain-prefix \
-    -DTHIRD_INC_PATH=/your/ipc/include/path \
-    -DTHIRD_LIB_PATH=/your/ipc/lib/path \
-    -DTHIRD_CODE_PATH=/your/ipc/code/path
+### 交叉编译
 
- make
+```
+mkdir build
+cd build
+cmake ../ -DCMAKE_INSTALL_PREFIX=/your/install/path/ -DCROSS_COMPILE=/you/toolchain/prefix/
+make
+make install
 ```
 
 ## 发布
