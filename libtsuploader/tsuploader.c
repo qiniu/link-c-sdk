@@ -346,7 +346,7 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
 
         snprintf(key, sizeof(key), "ts/%"PRId64"-%"PRId64"-%s.ts", tsStartTime / 1000000, tsEndTime / 1000000, pSession->sessionId);
         
-        LinkLogDebug("upload prepared:[%"PRId64"] %s q:%p  len:%d",LinkGetCurrentNanosecond()/1000000, key, pDataQueue, lenOfBufData);
+        LinkLogDebug("upload prepared:[%"PRId64"] %s q:%p  len:%d up:%d",LinkGetCurrentNanosecond()/1000000, key, pDataQueue, lenOfBufData, shouldUpload);
         if (shouldUpload) {
                 if (pKodoUploader->picture.pFilename) {
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
@@ -1075,7 +1075,7 @@ int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic) {
         
         int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pCommandQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
         if (ret <= 0) {
-                LinkLogError("ts queue error. push pic meta:%s", ret, pic.pFilename);
+                LinkLogError("ts queue error. push pic meta:%d %s", ret, pic.pFilename);
                 free(pFileName);
                 return ret;
         }
