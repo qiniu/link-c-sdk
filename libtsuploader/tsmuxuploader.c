@@ -1392,7 +1392,7 @@ int LinkPauseUpload(IN LinkTsMuxUploader *_pTsMuxUploader) {
         pFFTsMuxUploader->nKeyFrameCount = 0;
         pFFTsMuxUploader->nFrameCount = 0;
         LinkLogDebug("pause switchts");
-        switchTs(pFFTsMuxUploader, 0);
+        switchTs(pFFTsMuxUploader, pFFTsMuxUploader->nLastVideoFrameTsForCheckSysTime);
         
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
 
@@ -1453,7 +1453,7 @@ void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
         LinkLogDebug("LinkFlushUploader switchts");
-        switchTs(pFFTsMuxUploader, 0);
+        switchTs(pFFTsMuxUploader, pFFTsMuxUploader->nLastVideoFrameTsForCheckSysTime);
         pFFTsMuxUploader->nKeyFrameCount = 0;
         pFFTsMuxUploader->nFrameCount = 0;
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
