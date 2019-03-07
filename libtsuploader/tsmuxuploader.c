@@ -119,6 +119,10 @@ typedef struct _FFTsMuxUploader{
         
         LinkCircleQueue *pUpdateQueue_; //for token and remteconfig update
         char sessionId[LINK_MAX_SESSION_ID_LEN + 1];
+
+	LinkCloudStorageStateCallback pCloudStorageStateCb;
+	void *pCloudStorageOpaue;
+	LinkCloudStorageState cloudStorageState;
 }FFTsMuxUploader;
 
 //static int aAacfreqs[13] = {96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050 ,16000 ,12000, 11025, 8000, 7350};
@@ -970,6 +974,32 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
         return;
 }
 
+void LinkSetCloudStorageStateCallback(LinkTsMuxUploader *_pTsMuxUploader,
+        LinkCloudStorageStateCallback cb, void *pOpaue) {
+
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        pFFTsMuxUploader->pCloudStorageStateCb = cb;
+        pFFTsMuxUploader->pCloudStorageOpaue = pOpaue;
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+}
+
+static void doCloudStorageStateCallback(FFTsMuxUploader *pFFTsMuxUploader, LinkCloudStorageState state) {
+
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        if (pFFTsMuxUploader->pCloudStorageStateCb != NULL) {
+                if (pFFTsMuxUploader->cloudStorageState ==  LinkCloudStorageStateNone) {
+                        pFFTsMuxUploader->pCloudStorageStateCb(pFFTsMuxUploader->pCloudStorageOpaue, state);
+                } else if (pFFTsMuxUploader->cloudStorageState !=  state) {
+                        pFFTsMuxUploader->pCloudStorageStateCb(pFFTsMuxUploader->pCloudStorageOpaue, state);
+                }
+        }
+
+        pFFTsMuxUploader->cloudStorageState = state;
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+        return;
+}
+
 static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
         if (pFFTsMuxUploader->tmpRemoteConfig.planType != pFFTsMuxUploader->remoteConfig.planType) {
                 if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
@@ -1801,6 +1831,8 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                         getRcOk = 0;
                         ret = getRemoteConfig(pFFTsMuxUploader, &nUpdateConfigInterval);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
+                        doCloudStorageStateCallback(pFFTsMuxUploader, ret == LINK_SUCCESS ?
+                                LinkCloudStorageStateOn : LinkCloudStorageStateOff);
                         if (ret != LINK_SUCCESS) {
                           
                                 if (nNextTryRcTime > 16)
