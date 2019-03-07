@@ -26,6 +26,7 @@ typedef struct _LinkReportTimeInfo {
         int64_t nVideoDuration;
         int64_t nMediaDuation;
         int64_t nSystimestamp;
+        int64_t _nReserved;
 }LinkReportTimeInfo;
 
 typedef struct _LinkTsUploader LinkTsUploader;
@@ -47,7 +48,7 @@ int LinkNewTsUploader(OUT LinkTsUploader ** _pUploader, IN const LinkTsUploadArg
 void LinkTsUploaderSetTsEndUploadCallback(IN LinkTsUploader * _pUploader, IN LinkEndUploadCallback cb, IN void *pOpaque);
 void LinkDestroyTsUploader(IN OUT LinkTsUploader ** _pUploader);
 void LinkAppendKeyframeMetaInfo(void *pOpaque, LinkKeyFrameMetaInfo *pMediaInfo);
-void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessionMeta);
+void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessionMeta, LinkSessionMeta *pSessionMeta2);
 void LinkClearSessionMeta(IN LinkTsUploader * _pUploader);
 int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic);
 void LinkTsUploaderSetPlanType(IN LinkTsUploader * _pUploader, LinkPlanType planType);

@@ -23,6 +23,13 @@
 #define LINK_MAX_DEVICE_NAME_LEN 200
 #define LINK_MAX_SESSION_ID_LEN 20
 
+typedef enum {
+        LinkCloudStorageStateNone = 0,
+        LinkCloudStorageStateOn = 1,
+        LinkCloudStorageStateOff = 2
+}LinkCloudStorageState;
+typedef void(*LinkCloudStorageStateCallback)(void *pOpaue, LinkCloudStorageState state);
+
 typedef struct {
 	void *pOpaque;
         const char *pFilename;

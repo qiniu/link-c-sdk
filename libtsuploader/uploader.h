@@ -47,6 +47,16 @@ void LinkUploaderSetTsOutputCallback(LinkTsMuxUploader *pTsMuxUploader,
                                      void * pUserArg
                                      );
 
+/**
+ * 云存储状态回调函数
+ *
+ * @param[in] pTsMuxUploader 切片上传实例
+ * @param[in] cb 回调函数
+ * @param[in] pOpaque 用户参数，会在cb回调函数的第一个参数中返回
+ * @return LINK_SUCCESS 成功; 其它值 失败
+ */
+void LinkSetCloudStorageStateCallback(LinkTsMuxUploader *pTsMuxUploader,
+	LinkCloudStorageStateCallback cb, void *pOpaue);
 
 /**
  * 发送图片上传信号

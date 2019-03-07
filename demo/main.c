@@ -273,11 +273,16 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
                 DBG_LOG("time overlap assert:%"PRId64" %"PRId64"\n", endtime, info.startTime);
                 sleep(2);
             }
-            assert(info.startTime > endtime);
+            assert(info.startTime >= endtime);
 	}
 	starttime = info.startTime;
 	endtime = info.endTime;
         return 0;
+}
+
+void cloudStateCb(void *pVoid, LinkCloudStorageState state) {
+        DBG_LOG("LinkCloudStorageState state:%d\n", state);
+        fprintf(stderr, "LinkCloudStorageState state:%d\n", state);
 }
 
 int _TsUploaderSdkInit( StreamChannel ch )
@@ -325,6 +330,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
         return ret;
     }
     LinkUploaderSetTsOutputCallback(gIpc.stream[ch].uploader, tsToFile, NULL);
+    LinkSetCloudStorageStateCallback(gIpc.stream[ch].uploader, cloudStateCb, NULL);
 
     return 0;
 }
