@@ -280,6 +280,11 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
         return 0;
 }
 
+void cloudStateCb(void *pVoid, LinkCloudStorageState state) {
+        DBG_LOG("LinkCloudStorageState state:%d\n", state);
+        fprintf(stderr, "LinkCloudStorageState state:%d\n", state);
+}
+
 int _TsUploaderSdkInit( StreamChannel ch )
 {
     int ret = 0;
@@ -325,6 +330,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
         return ret;
     }
     LinkUploaderSetTsOutputCallback(gIpc.stream[ch].uploader, tsToFile, NULL);
+    LinkSetCloudStorageStateCallback(gIpc.stream[ch].uploader, cloudStateCb, NULL);
 
     return 0;
 }
