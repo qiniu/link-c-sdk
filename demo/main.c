@@ -273,7 +273,7 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
                 DBG_LOG("time overlap assert:%"PRId64" %"PRId64"\n", endtime, info.startTime);
                 sleep(2);
             }
-            assert(info.startTime > endtime);
+            assert(info.startTime >= endtime);
 	}
 	starttime = info.startTime;
 	endtime = info.endTime;

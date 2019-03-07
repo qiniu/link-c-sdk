@@ -1072,18 +1072,20 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         
         pFFTsMuxUploader->avArg = *_pAvArg;
         
+        ret = linkTsMuxUploaderTokenThreadStart(pFFTsMuxUploader);
+        if (ret != LINK_SUCCESS){
+                pthread_mutex_destroy(&pFFTsMuxUploader->muxUploaderMutex_);
+                pthread_mutex_destroy(&pFFTsMuxUploader->tokenMutex_);
+                LinkLogError("linkTsMuxUploaderTokenThreadStart fail:%d", ret);
+                free(pFFTsMuxUploader);
+                return ret;
+        }
+        
         ret = LinkTsMuxUploaderStart((LinkTsMuxUploader *)pFFTsMuxUploader);
         if (ret != LINK_SUCCESS) {
                 LinkTsMuxUploader * pTmp = (LinkTsMuxUploader *)pFFTsMuxUploader;
                 LinkDestroyTsMuxUploader(&pTmp);
                 LinkLogError("LinkTsMuxUploaderStart fail:%d", ret);
-                return ret;
-        }
-        
-        ret = linkTsMuxUploaderTokenThreadStart(pFFTsMuxUploader);
-        if (ret != LINK_SUCCESS){
-                pthread_mutex_destroy(&pFFTsMuxUploader->muxUploaderMutex_);
-                pthread_mutex_destroy(&pFFTsMuxUploader->tokenMutex_);
                 free(pFFTsMuxUploader);
                 return ret;
         }
@@ -1374,13 +1376,19 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
         }
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
-                LinkSessionMeta *pDup2 = NULL;
+                LinkSessionMeta *pDup2 = NULL, *pDup3 = NULL;
                 ret = dupSessionMeta(metas, &pDup2);
                 if (ret != LINK_SUCCESS) {
                         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                         return ret;
                 }
-                LinkSetSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pDup2);
+                ret = dupSessionMeta(metas, &pDup3);
+                if (ret != LINK_SUCCESS) {
+                        free(pDup2);
+                        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                        return ret;
+                }
+                LinkSetSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, pDup2, pDup3);
         }
         
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
