@@ -543,5 +543,6 @@ void LinkUninitSegmentMgr() {
         }
         
         pthread_join(segmentMgr.segMgrThread_, NULL);
+        LinkDestroyQueue(&segmentMgr.pSegQueue_);
         return;
 }
