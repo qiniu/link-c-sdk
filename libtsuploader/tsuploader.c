@@ -1095,6 +1095,8 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         if (pKodoUploader->pUpMeta) {
                 free(pKodoUploader->pUpMeta);
         }
+        if (pKodoUploader->picture.pFilename)
+                free(pKodoUploader->picture.pFilename);
         pthread_mutex_destroy(&pKodoUploader->uploadMutex_);
 
         free(pKodoUploader);
