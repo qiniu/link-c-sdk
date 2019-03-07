@@ -443,9 +443,12 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                         rc = MQTT_CODE_SUCCESS;
                 }
         }
+        pthread_mutex_unlock(&_pInstance->listMutex);
         if (rc != MQTT_CODE_SUCCESS && rc != MQTT_CODE_ERROR_TIMEOUT) {
                 LinkLogError("MQTT WaitMessage error %d", rc);
         }
-        pthread_mutex_unlock(&_pInstance->listMutex);
+        if(rc == MQTT_CODE_SUCCESS) {
+                usleep(100 * 1000);
+        }
 	return MqttErrorStatusChange(rc);
 }
