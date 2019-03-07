@@ -1,7 +1,7 @@
 #include "queue.h"
 #include "base.h"
 #include "log/log.h"
-
+#include <unistd.h>
 
 #define QUEUE_READ_ONLY_STATE 1
 #define QUEUE_TIMEOUT_STATE 2
@@ -20,7 +20,9 @@ typedef struct _CircleQueueImp{
         pthread_cond_t condition_;
         CircleQueuePolicy policy;
         LinkUploaderStatInfo statInfo;
-	int nIsAvailableAfterTimeout;
+        int nIsAvailableAfterTimeout;
+        int nCount;
+        int isWait;
 }CircleQueueImp;
 
 static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen) {
@@ -185,17 +187,20 @@ static int PopQueueWithTimeout(LinkCircleQueue *_pQueue, char *pBuf_, int nBufLe
                 struct timespec timeout;
                 timeout.tv_sec = now.tv_sec + (now.tv_usec + nMicroSec) / 1000000;
                 timeout.tv_nsec = ((now.tv_usec + nMicroSec) % 1000000)*1000;
-                
+                pQueueImp->isWait = 1;
                 ret = pthread_cond_timedwait(&pQueueImp->condition_, &pQueueImp->mutex_, &timeout);
                 if (ret == ETIMEDOUT) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
+                        pQueueImp->isWait = 0;
                         pQueueImp->nQState_ = QUEUE_TIMEOUT_STATE;
                         return LINK_TIMEOUT;
                 }
                 if (pQueueImp->nLen_ == 0) {
                         pthread_mutex_unlock(&pQueueImp->mutex_);
+                        pQueueImp->isWait = 0;
                         return 0;
                 }
+                pQueueImp->isWait = 0;
         }
         assert (pQueueImp->nLen_ != 0);
         int nDataLen = 0;
@@ -248,12 +253,18 @@ static int PopQueueWithNoOverwrite(LinkCircleQueue *_pQueue, char *pBuf_, int nB
         }
 }
 
+static void stopPush(CircleQueueImp *pQueueImp)
+{
+        pQueueImp->nQState_ = QUEUE_READ_ONLY_STATE;
+        return;
+}
+
 static void StopPush(LinkCircleQueue *_pQueue)
 {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         
         pthread_mutex_lock(&pQueueImp->mutex_);
-        pQueueImp->nQState_ = QUEUE_READ_ONLY_STATE;
+        stopPush(pQueueImp);
         pthread_mutex_unlock(&pQueueImp->mutex_);
         
         pthread_cond_signal(&pQueueImp->condition_);
@@ -313,6 +324,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->nLenInByte_ = pQueueImp->nItemLen_ * _nInitItemCount;
         pQueueImp->nIsAvailableAfterTimeout = nIsAvailableAfterTimeout;
         pQueueImp->circleQueue.GetType = getQueueType;
+        pQueueImp->nCount = 1;
         
         if (TSQ_APPEND == _policy) {
                 pQueueImp->nCap_ = pQueueImp->nLenInByte_;
@@ -336,14 +348,44 @@ int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
         return *nBufLen;
 }
 
+void LinkQueueIncRefCount(LinkCircleQueue *_pQueue) {
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)(_pQueue);
+        pthread_mutex_lock(&pQueueImp->mutex_);
+        pQueueImp->nCount++;
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return;
+}
+
+void LinkQueueDecRefCount(LinkCircleQueue *_pQueue) {
+        CircleQueueImp *pQueueImp = (CircleQueueImp *)(_pQueue);
+        pthread_mutex_lock(&pQueueImp->mutex_);
+        if (pQueueImp->nCount > 1)
+                pQueueImp->nCount--;
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        return;
+}
+
 int LinkDestroyQueue(LinkCircleQueue **_pQueue)
 {
         if (NULL == _pQueue || NULL == *_pQueue) {
                 return LINK_ERROR;
         }
         CircleQueueImp *pQueueImp = (CircleQueueImp *)(*_pQueue);
+        
+        pthread_mutex_lock(&pQueueImp->mutex_);
+        pQueueImp->nCount--;
+        if (pQueueImp->nCount > 0) {
+                pthread_mutex_unlock(&pQueueImp->mutex_);
+                return LINK_SUCCESS;
+        }
 
-        StopPush(*_pQueue);
+        stopPush(pQueueImp);
+        pthread_mutex_unlock(&pQueueImp->mutex_);
+        
+        pthread_cond_signal(&pQueueImp->condition_);
+        while(pQueueImp->isWait) {
+                sleep(1);
+        }
         
         pthread_mutex_destroy(&pQueueImp->mutex_);
         pthread_cond_destroy(&pQueueImp->condition_);

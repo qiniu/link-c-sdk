@@ -455,6 +455,10 @@ int LinkNewSegmentHandle(SegmentHandle *pSeg, const SegmentArg *pArg) {
                         segmentMgr.handles[i].pUploadStatArg = pArg->pUploadStatArg;
                         segmentMgr.handles[i].nNextUpdateSegTimeInSecond = 0;
                         memset(&segmentMgr.handles[i].tmpSession, 0, sizeof(LinkSession));
+                        if (segmentMgr.handles[i].pSessionMeta) {
+                                free(segmentMgr.handles[i].pSessionMeta);
+                                segmentMgr.handles[i].pSessionMeta = NULL;
+                        }
                         pthread_mutex_unlock(&segMgrMutex);
                         return LINK_SUCCESS;
                 }

@@ -41,6 +41,8 @@ typedef struct _LinkCircleQueue{
 
 int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
 int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen); //just in append mode
+void LinkQueueIncRefCount(LinkCircleQueue *_pQueue);
+void LinkQueueDecRefCount(LinkCircleQueue *_pQueue);
 int LinkDestroyQueue(LinkCircleQueue **_pQueue);
 
 #endif

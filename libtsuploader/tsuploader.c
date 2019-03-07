@@ -541,11 +541,10 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
        
         pKodoUploader->pQueue_ = NULL;
         pKodoUploader->pUpMeta = NULL;
-        
         int nCurCacheNum = 0;
         void *bakQueue = uploadCommand.ts.pData;
         void *bakMeta = uploadCommand.ts.pUpMeta;
-        
+        LinkQueueIncRefCount((LinkCircleQueue *)uploadCommand.ts.pData);
         nCurCacheNum = pKodoUploader->nTsCacheNum;
         if (nCurCacheNum >= pKodoUploader->nTsMaxCacheNum) {
                 LinkLogInfo("1drop ts file due to ts cache reach max limit:%lld", pTinfo->nSystimestamp/1000000);
@@ -573,13 +572,15 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
                 }
                 if (ret <= 0) {
                         uploadCommand.nCommandType = LINK_DROP_TS;
-                        LinkDestroyQueue((LinkCircleQueue **)(&uploadCommand.ts.pData));
                 }
         }
         
         uploadCommand.ts.pData = bakQueue;
         uploadCommand.ts.pUpMeta = bakMeta;
         uploadCommand.time._nReserved = pKodoUploader->nTsLastStartTime;
+        if (uploadCommand.nCommandType == LINK_DROP_TS) {
+                LinkQueueDecRefCount((LinkCircleQueue *)uploadCommand.ts.pData);
+        }
         int ret = pKodoUploader->pCommandQueue_->Push(pKodoUploader->pTsCbQueue_, (char *)&uploadCommand, sizeof(TsUploaderCommand));
         if (ret <= 0) {
                 if (uploadCommand.nCommandType == LINK_DROP_TS) {
@@ -590,6 +591,7 @@ static void notifyDataPrapared(LinkTsUploader *pTsUploader, LinkReportTimeInfo *
                 }
                 LinkLogError("ts queue cmd:ts cb fail:%d %d", ret, uploadCommand.nCommandType);
         }
+        
         
         allocDataQueueAndUploadMeta(pKodoUploader);
         pthread_mutex_unlock(&pKodoUploader->uploadMutex_);
@@ -796,11 +798,11 @@ static void checkAndSetFirstSessionPicReportedStatus(KodoUploader * pKodoUploade
 static void * tsCbWorker(void *_pOpaque) {
         KodoUploader * pKodoUploader = (KodoUploader *)_pOpaque;
         LinkUploaderStatInfo info = {0};
-        LinkSessionMeta *pSMeta;
+        LinkSessionMeta *pSMeta = NULL;
         
         int recvQuit = 0;
         while(!(pKodoUploader->nQuit_ || recvQuit) || info.nLen_ != 0) {
-                TsUploaderCommand cmd;
+                TsUploaderCommand cmd = {0};
                 int ret = pKodoUploader->pTsCbQueue_->PopWithTimeout(pKodoUploader->pTsCbQueue_, (char *)(&cmd),
                                                                         sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pTsCbQueue_, &info);
@@ -815,10 +817,6 @@ static void * tsCbWorker(void *_pOpaque) {
                 char *bufData = NULL;
                 switch (cmd.nCommandType) {
                         case LINK_TSU_QUIT:
-                                if (pSMeta) {
-                                        free(pSMeta);
-                                        pSMeta = NULL;
-                                }
                                 recvQuit = 1;
                                 continue;
                         case LINK_DROP_TS:
@@ -827,6 +825,7 @@ static void * tsCbWorker(void *_pOpaque) {
                                 if (cmd.ts.pData && (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)cmd.ts.pData, &bufData, &lenOfBufData)) > 0) {
                                         doTsOutput(pKodoUploader, lenOfBufData, bufData, cmd.time._nReserved , cmd.time.nSystimestamp,
                                                    pSMeta, NULL); // 得不到准确的session id
+                                        LinkDestroyQueue((LinkCircleQueue **)(&cmd.ts.pData));
                                 }
                                 break;
                         case LINK_TSU_SET_META:
@@ -846,12 +845,14 @@ static void * tsCbWorker(void *_pOpaque) {
                 if (cmd.nCommandType == LINK_DROP_TS) {
                         if (cmd.ts.pUpMeta)
                                 free(cmd.ts.pUpMeta);
-                        if (cmd.ts.pData)
-                                LinkDestroyQueue((LinkCircleQueue **)(&cmd.ts.pData));
-                        LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
                 }
+                        
+                LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
         }
-        
+        if (pSMeta) {
+                free(pSMeta);
+                pSMeta = NULL;
+        }
         return NULL;
 }
 
@@ -1095,8 +1096,11 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
         if (pKodoUploader->pUpMeta) {
                 free(pKodoUploader->pUpMeta);
         }
+        if (pKodoUploader->pSessionMeta) {
+                free(pKodoUploader->pSessionMeta);
+        }
         if (pKodoUploader->picture.pFilename)
-                free(pKodoUploader->picture.pFilename);
+                free((void *)pKodoUploader->picture.pFilename);
         pthread_mutex_destroy(&pKodoUploader->uploadMutex_);
 
         free(pKodoUploader);
