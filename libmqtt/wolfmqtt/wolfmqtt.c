@@ -434,11 +434,11 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                         for ( ; ctx->nPingTimeoutCount * DEFAULT_CON_TIMEOUT_MS < ctx->connect.keep_alive_sec * 1000; ++ ctx->nPingTimeoutCount) {
                                 rc = MqttClient_Ping(&client);
                                 if (rc == MQTT_CODE_SUCCESS) {
-                                        ctx->nWaitTimeoutCount = 0;
-                                        ctx->nPingTimeoutCount = 0;
                                         break;
                                 }
                         }
+                        ctx->nWaitTimeoutCount = 0;
+                        ctx->nPingTimeoutCount = 0;
                 } else if (rc == MQTT_CODE_ERROR_TIMEOUT) {
                         rc = MQTT_CODE_SUCCESS;
                 }
