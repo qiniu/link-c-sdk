@@ -18,7 +18,7 @@
 
 #define QNLINKING_MQTT_SERVER "mqtt.qnlinking.com"
 #define QNLINKING_MQTT_PORT 1883
-#define QNLINKING_MQTT_KEEPALIVE 15
+#define QNLINKING_MQTT_KEEPALIVE 10
 #define MAX_LOG_LEN 256
 #define QNLINKING_MQTT_LOG_TOPIC "linking/v1/${appid}/${device}/syslog/"
 

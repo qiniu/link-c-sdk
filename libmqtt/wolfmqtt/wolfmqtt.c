@@ -9,7 +9,7 @@
 #include "config.h"
 
 #define MAX_PACKET_ID ((1<<16) -1)
-#define DEFAULT_CON_TIMEOUT_MS 2000
+#define DEFAULT_CON_TIMEOUT_MS 1000
 
 #define min(a,b) ((a)>(b)? (b):(a))
 
@@ -192,8 +192,9 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
 int ReConnect(struct MqttInstance *instance, int error_code)
 {
         struct MQTTCtx *mqttCtx = instance->mosq;
+        pthread_mutex_lock(&instance->listMutex);
         int ret = OnDisconnectCallback(&mqttCtx->client, MQTT_CODE_ERROR_NETWORK, NULL);
-
+        pthread_mutex_unlock(&instance->listMutex);
         return ret;
 }
 
@@ -341,7 +342,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
 
-        LinkLogError("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
+        LinkLogInfo("MqttConnect host %s port %d keepalive %d \n", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
         int rc = 0;
         MqttMessage lwt_msg;
         /* Define connect parameters */
@@ -426,29 +427,28 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
         pthread_mutex_lock(&_pInstance->listMutex);
         int rc = MqttClient_WaitMessage(&client, DEFAULT_CON_TIMEOUT_MS);
         if (rc == MQTT_CODE_ERROR_TIMEOUT) {
-                ++ ctx->timeoutCount;
+                ++ ctx->nWaitTimeoutCount;
                 /* Keep Alive */
-//                LinkLogError("Keep-alive timeout, sending ping , timeoutCount:%d\n", ctx->timeoutCount);
-                if (ctx->timeoutCount * DEFAULT_CON_TIMEOUT_MS
-                    > ctx->connect.keep_alive_sec * 1000) {
-                        rc = MqttClient_Ping(&client);
-                        if (rc == MQTT_CODE_CONTINUE) {
-                                return MqttErrorStatusChange(rc);
+                if (ctx->nWaitTimeoutCount * DEFAULT_CON_TIMEOUT_MS >= ctx->connect.keep_alive_sec * 1000) {
+                        /* MQTT ping operate */
+                        for ( ; ctx->nPingTimeoutCount * DEFAULT_CON_TIMEOUT_MS < ctx->connect.keep_alive_sec * 1000; ++ ctx->nPingTimeoutCount) {
+                                rc = MqttClient_Ping(&client);
+                                if (rc == MQTT_CODE_SUCCESS) {
+                                        break;
+                                }
                         }
-                        else if (rc != MQTT_CODE_SUCCESS) {
-                                LinkLogError("MQTT Ping Keep Alive Error: %s (%d)",
-                                             MqttClient_ReturnCodeToString(rc), rc);
-                                ctx->timeoutCount = 0;
-                        }
-                        ctx->timeoutCount = 0;
+                        ctx->nWaitTimeoutCount = 0;
+                        ctx->nPingTimeoutCount = 0;
                 } else if (rc == MQTT_CODE_ERROR_TIMEOUT) {
                         rc = MQTT_CODE_SUCCESS;
                 }
         }
         pthread_mutex_unlock(&_pInstance->listMutex);
-        usleep(1000);
         if (rc != MQTT_CODE_SUCCESS && rc != MQTT_CODE_ERROR_TIMEOUT) {
                 LinkLogError("MQTT WaitMessage error %d", rc);
+        }
+        if(rc == MQTT_CODE_SUCCESS) {
+                usleep(100 * 1000);
         }
 	return MqttErrorStatusChange(rc);
 }

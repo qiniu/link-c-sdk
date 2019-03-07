@@ -32,7 +32,8 @@ typedef struct MQTTCtx {
 	char message_topic[MAX_MQTT_TOPIC_LEN];
         word32 cmd_timeout_ms;
 	int use_tls;
-	int timeoutCount;
+	int nWaitTimeoutCount;
+	int nPingTimeoutCount;
 } MQTTCtx;
 
 int ClientOptSet(struct MqttInstance* _pInstance, struct MqttUserInfo info);
