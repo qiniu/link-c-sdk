@@ -102,6 +102,7 @@ static void LinkMqttInstanceInit(struct MqttInstance* _pInstance, const struct M
 
 void * LinkMqttThread(void* _pData)
 {
+        int nReconectPeriod = 1;
         int rc;
 
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pData);
@@ -114,6 +115,7 @@ void * LinkMqttThread(void* _pData)
         }
         srand(time(0));
         do {
+                /* Connect */
                 if (!pInstance->connected && pInstance->status != STATUS_CONNECTING) {
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->options.userInfo);
@@ -123,20 +125,26 @@ void * LinkMqttThread(void* _pData)
                          if (rc != MQTT_SUCCESS) {
                                  OnEventCallback(pInstance, rc, "STATUS_CONNECT_ERROR");
                                  pInstance->status = STATUS_CONNECT_ERROR;
+                                 sleep(nReconectPeriod);
+                                 nReconectPeriod = nReconectPeriod >= 512 ? nReconectPeriod : nReconectPeriod * 2;
+                         } else {
+                                 nReconectPeriod = 1;
                          }
                 } else if (pInstance->status == STATUS_CONNECTING) {
                          sleep(1);
-                }
-                rc = LinkMqttLoop(pInstance);
-                if (rc >= MQTT_ERR_NOMEM) {
-                         sleep(1);
-                }
-                if (rc == MQTT_ERR_CONN_LOST) {
-                        sleep(3);
-                        ReConnect(pInstance, MQTT_ERR_CONN_LOST);
+                } else if (pInstance->connected) {
+                        /* Process */
+                        rc = LinkMqttLoop(pInstance);
+                        if (rc >= MQTT_ERR_NOMEM) {
+                                 sleep(1);
+                        }
+                        if (rc == MQTT_ERR_CONN_LOST) {
+                                ReConnect(pInstance, MQTT_ERR_CONN_LOST);
+                                sleep(3);
+                        }
                 }
         } while (!pInstance->isDestroying);
-        printf("quite !!! \n");
+
         if (pInstance->connected) {
                 LinkMqttDisconnect(pInstance);
         }
