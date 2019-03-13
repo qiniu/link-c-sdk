@@ -56,6 +56,7 @@ typedef struct _KodoUploader{
         pthread_t tsCbWorkerId_;
         unsigned char isThreadStarted_;
         unsigned char isForceSeg;
+        unsigned char isAdjustQueueSize;
         
         LinkTsUploadArg uploadArg;
         LinkUploadState state;
@@ -369,8 +370,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 } else {
                         getUploadParamOk = 1;
                 }
-                
-                resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
+                if (pKodoUploader->isAdjustQueueSize)
+                        resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 if (getUploadParamOk) {
                         char startTs[14]={0};
                         char endTs[14]={0};
@@ -1036,6 +1037,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return LINK_THREAD_ERROR;
         }
         pKodoUploader->isThreadStarted_ = 1;
+        pKodoUploader->isAdjustQueueSize = 1;
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         
