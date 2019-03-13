@@ -5,19 +5,11 @@
 #include "resource.h"
 #include "picuploader.h"
 
-typedef struct _LinkTsMuxUploader LinkTsMuxUploader;
-
 #define LINK_AUDIO_FORMAT_G711A 1
 #define LINK_AUDIO_FORMAT_G711U 2
 #define LINK_VIDEO_FORMAT_H264 1
 #define LINK_VIDEO_FORMAT_H265 2
 
-
-typedef struct _LinkTsMuxUploader{
-        int(*PushVideo)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp, IN int nIsKeyFrame, IN int nIsSegStart, int64_t nFrameSysTime);
-        int(*PushAudio)(IN LinkTsMuxUploader *pTsMuxUploader, IN const char * pData, IN int nDataLen, IN int64_t nTimestamp, int64_t nFrameSysTime);
-        int (*GetUploaderBufferUsedSize)(IN LinkTsMuxUploader* pTsMuxUploader);
-}LinkTsMuxUploader;
 
 int LinkNewTsMuxUploader(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg, IN const LinkUserUploadArg *pUserUploadArg);
 int LinkNewTsMuxUploaderWillPicAndSeg(OUT LinkTsMuxUploader **pTsMuxUploader, IN const LinkMediaArg *pAvArg,

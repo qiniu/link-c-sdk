@@ -1,5 +1,10 @@
 #include <stdio.h>
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <assert.h>
+#include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -843,7 +848,7 @@ int main(int argc, const char** argv)
                         printf("create update token thread fail\n");
                         return ret;
                 }
-                printf("two file upload: threadid:%x\n", secondUploadThread);
+                printf("two file upload: threadid:%lx\n", secondUploadThread);
                 do_start_file_test(&avuploader);
 
         } else {
