@@ -55,7 +55,7 @@ int LinkInit()
         ret = LinkInitTime();
         if (ret != 0) {
                 LinkLogError("InitUploader gettime from server fail:%d", ret);
-                return LINK_HTTP_TIME;
+                return LINK_TIME_ERROR;
         }
         
         ret = LinkStartMgr();
