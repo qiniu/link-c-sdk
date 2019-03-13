@@ -944,15 +944,13 @@ static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
         LinkUploaderStatInfo info;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        int nUsed = 0;
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetStatInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &info);
-                nUsed = info.nPushDataBytes_ - info.nPopDataBytes_;
         } else {
                 return 0;
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-        return nUsed + (nUsed/188) * 4;
+        return info.nCap;
 }
 
 static void freeRemoteConfig(RemoteConfig *pRc) {
