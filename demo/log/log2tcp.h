@@ -10,6 +10,7 @@
 #ifndef SOCKET_LOGGING_H
 #define SOCKET_LOGGING_H
 
+#include <sys/time.h>
 #include "uploader.h"
 typedef struct {
     int connected;
