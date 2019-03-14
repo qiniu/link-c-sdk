@@ -33,8 +33,8 @@ typedef struct _QnlinkingMQTTLog {
 static bool gQnlinkingMQTTInitialized = false;
 static void *gQnlinkingMQTTInstance = NULL;
 static struct MqttOptions gQnlinkingMQTTOpt;
-static char gLinkEmitterDAK[64] = {0};
-static char gLinkEmitterDSK[64] = {0};
+static char gLinkDAK[64] = {0};
+static char gLinkDSK[64] = {0};
 static QnlinkingMQTTLog gQnlinkingMQTTLog;
 
 static int QnlinkingMQTT_GetUsernameSign(char *_pUsername, int *_pLen, const char *_pDak)
@@ -80,9 +80,9 @@ static int QnlinkingMQTT_UpdateUserPasswd(const void *_pInstance)
                 struct MqttInstance* pInstance = (struct MqttInstance*) (_pInstance);
                 int nUsernameLen = 0;
                 int nPasswdLen = 0;
-                QnlinkingMQTT_GetUsernameSign(pInstance->options.userInfo.pUsername, &nUsernameLen, gLinkEmitterDAK);
+                QnlinkingMQTT_GetUsernameSign(pInstance->options.userInfo.pUsername, &nUsernameLen, gLinkDAK);
                 QnlinkingMQTT_GetPasswordSign(pInstance->options.userInfo.pUsername, nUsernameLen,
-                                pInstance->options.userInfo.pPassword, &nPasswdLen, gLinkEmitterDSK);
+                                pInstance->options.userInfo.pPassword, &nPasswdLen, gLinkDSK);
                 return LINK_MQTT_SUCCESS;
         }
         return LINK_MQTT_ERROR;
@@ -127,15 +127,15 @@ void QnlinkingMQTT_Init(const char * pDak, int nDakLen, const char * pDsk, int n
                 /* Init libmqtt */
                 LinkMqttLibInit();
 
-                strncpy(gLinkEmitterDAK, pDak, nDakLen);
-                strncpy(gLinkEmitterDSK, pDsk, nDakLen);
+                strncpy(gLinkDAK, pDak, nDakLen);
+                strncpy(gLinkDSK, pDsk, nDakLen);
                 memset(&gQnlinkingMQTTOpt, 0, sizeof(MqttOptions));
                 gQnlinkingMQTTOpt.userInfo.nAuthenicatinMode = MQTT_AUTHENTICATION_USER;
                 gQnlinkingMQTTOpt.userInfo.pHostname = QNLINKING_MQTT_SERVER;
                 gQnlinkingMQTTOpt.userInfo.nPort = QNLINKING_MQTT_PORT;
                 gQnlinkingMQTTOpt.nKeepalive = QNLINKING_MQTT_KEEPALIVE;
                 gQnlinkingMQTTOpt.nQos = 0;
-                gQnlinkingMQTTOpt.pId = gLinkEmitterDAK;
+                gQnlinkingMQTTOpt.pId = gLinkDAK;
                 gQnlinkingMQTTOpt.bRetain = false;
                 gQnlinkingMQTTOpt.bCleanSession = false;
                 gQnlinkingMQTTOpt.callbacks.OnEvent = QnlinkingMQTT_EventCallback;
@@ -145,8 +145,8 @@ void QnlinkingMQTT_Init(const char * pDak, int nDakLen, const char * pDsk, int n
                 int nMQTTUsernameLen;
                 char MQTTpassword[256] = {0};
                 int nMQTTPasswordLen;
-                if (LINK_MQTT_SUCCESS == QnlinkingMQTT_GetUsernameSign(MQTTusername, &nMQTTUsernameLen, gLinkEmitterDAK)
-                                && LINK_MQTT_SUCCESS == QnlinkingMQTT_GetPasswordSign(MQTTusername, nMQTTUsernameLen, MQTTpassword, &nMQTTPasswordLen, gLinkEmitterDSK)) {
+                if (LINK_MQTT_SUCCESS == QnlinkingMQTT_GetUsernameSign(MQTTusername, &nMQTTUsernameLen, gLinkDAK)
+                                && LINK_MQTT_SUCCESS == QnlinkingMQTT_GetPasswordSign(MQTTusername, nMQTTUsernameLen, MQTTpassword, &nMQTTPasswordLen, gLinkDSK)) {
                         gQnlinkingMQTTOpt.userInfo.pUsername = MQTTusername;
                         gQnlinkingMQTTOpt.userInfo.pPassword = MQTTpassword;
                         gQnlinkingMQTTInstance = LinkMqttCreateInstance(&gQnlinkingMQTTOpt);
@@ -210,4 +210,13 @@ void QnlinkingMQTT_SendLog(int nLevel, const char * pLog)
         }
         SendMessage(gQnlinkingMQTTLog.pQueue, pMessage);
         return;
+}
+
+bool QnlinkingMQTT_Status()
+{
+        if (!gQnlinkingMQTTInstance) {
+                return false;
+        }
+        struct MqttInstance *instance = gQnlinkingMQTTInstance;
+        return instance->connected;
 }
