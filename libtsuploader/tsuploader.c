@@ -207,7 +207,7 @@ static void resizeQueueSize(KodoUploader * pKodoUploader, int nCurLen, int64_t n
                 return;
         }
         
-        if (nCurLen > 1152 * 1024) {
+        if (nCurLen > 1280 * 1024) {
                 pKodoUploader->nInitItemCount = 1536 * 1024 / pKodoUploader->nMaxItemLen;
         } else if (nCurLen > 896 * 1024) {
                 pKodoUploader->nInitItemCount = 1152 * 1024 / pKodoUploader->nMaxItemLen;
@@ -1037,7 +1037,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return LINK_THREAD_ERROR;
         }
         pKodoUploader->isThreadStarted_ = 1;
-        pKodoUploader->isAdjustQueueSize = 1;
+        pKodoUploader->isAdjustQueueSize = 0;
         
         *_pUploader = (LinkTsUploader*)pKodoUploader;
         
@@ -1056,6 +1056,13 @@ void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput
         pKodoUploader->pOutputUserArg = pUserArg;
         pKodoUploader->mediaArg = mediaArg;
         
+        return;
+}
+
+void LinkSetTsCacheBufferInitSize(IN LinkTsUploader * _pUploader, int nSize, int isFix) {
+        KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
+        pKodoUploader->nInitItemCount = nSize / pKodoUploader->nMaxItemLen;
+        pKodoUploader->isAdjustQueueSize = !isFix;
         return;
 }
 

@@ -742,7 +742,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 av_strerror(errcode, msg, sizeof(msg))
 
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        return 640*1024;
+        return 1280*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
@@ -1509,6 +1509,14 @@ void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
         *_pTsMuxUploader = NULL;
         return;
+}
+
+int LinkSetTsBufferInitSize(IN LinkTsMuxUploader *pTsMuxUploader, int nSize, int isFix) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxUploader);
+        if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
+                LinkSetTsCacheBufferInitSize(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, nSize, isFix);
+        }
+        return LINK_SUCCESS;
 }
 
 static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) {
