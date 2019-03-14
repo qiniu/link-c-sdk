@@ -23,7 +23,7 @@ int static test_qnlinking(const char * pDak, int nDakLen, const char * pDsk, int
                         tm_now = localtime(&t);
                         strftime(test_buf, 64, "[%Y-%m-%d %H:%M:%S]\n", tm_now);
                         QnlinkingMQTT_SendLog(1, test_buf);
-                        printf("%s Link status: %s", test_buf, QnlinkingMQTT_Status());
+                        printf("%s Link status: %d\n", test_buf, QnlinkingMQTT_Status());
                         memset(test_buf, 0, sizeof(test_buf));
                         sleep(1);
                 }
