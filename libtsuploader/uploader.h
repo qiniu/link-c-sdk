@@ -37,32 +37,32 @@
 #define LINK_SUCCESS         0          /**< 返回成功 */
 #define LINK_ERROR           -1         /**< 返回失败 */
 
-typedef enum {
+typedef enum _LinkMediaType {
         LINK_MEDIA_AUDIO = 1,
         LINK_MEDIA_VIDEO = 2,
 }LinkMediaType;
 
-typedef enum {
+typedef enum _LinkVideoFormat {
         LINK_VIDEO_NONE = 0,
         LINK_VIDEO_H264 = 1,
         LINK_VIDEO_H265 = 2
 }LinkVideoFormat;
 
-typedef enum {
+typedef enum _LinkAudioFormat {
         LINK_AUDIO_NONE = 0,
         LINK_AUDIO_PCMU = 1,
         LINK_AUDIO_PCMA = 2,
         LINK_AUDIO_AAC = 3
 }LinkAudioFormat;
 
-typedef enum {
+typedef enum _LinkUploadKind {
         LINK_UPLOAD_TS = 1,
         LINK_UPLOAD_PIC = 2,
         LINK_UPLOAD_SEG = 3,
         LINK_UPLOAD_MOVE_SEG = 4
 } LinkUploadKind;
 
-typedef enum {
+typedef enum _LinkUploadResult {
         LINK_UPLOAD_RESULT_OK = 1,
         LINK_UPLOAD_RESULT_FAIL = 2
 } LinkUploadResult;
@@ -124,7 +124,7 @@ int LinkNewUploader(LinkTsMuxUploader **pTsMuxUploader,
                     LinkUploadArg *pUserUploadArg
                     );
 
-typedef struct {
+typedef struct _LinkSessionMeta{
         const char **keys;
         int *keylens;
         const char **values;
@@ -142,7 +142,7 @@ typedef struct _LinkMediaArg{
 } LinkMediaArg;
 
 
-typedef struct {
+typedef struct _LinkMediaInfo {
         int64_t startTime;
         int64_t endTime;
         LinkMediaArg media[2];

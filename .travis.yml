@@ -11,5 +11,5 @@ branches:
     - develop
 
 script:
-  - cmake .
+  - cmake . -DWITH_DEMO=On
   - make
