@@ -293,6 +293,7 @@ int _TsUploaderSdkInit( StreamChannel ch )
     memset( &userUploadArg, 0, sizeof(userUploadArg) );
 
 
+    userUploadArg.nTsMaxSize = 1572864;
     userUploadArg.pUpStatCb = ReportUploadStatistic;
     if ( ch == STREAM_MAIN ) {
         userUploadArg.getPictureCallback = GetPicCallback;
