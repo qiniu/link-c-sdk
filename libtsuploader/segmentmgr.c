@@ -419,7 +419,7 @@ int LinkInitSegmentMgr() {
         }
         
         LinkCircleQueue *pQueue;
-        int ret = LinkNewCircleQueue(&pQueue, 1, TSQ_FIX_LENGTH, sizeof(SegInfo), 32);
+        int ret = LinkNewCircleQueue(&pQueue, 1, TSQ_FIX_LENGTH, sizeof(SegInfo), 32, NULL);
         if (ret != LINK_SUCCESS) {
                 pthread_mutex_unlock(&segMgrMutex);
                 return ret;
