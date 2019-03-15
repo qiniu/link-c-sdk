@@ -1049,6 +1049,9 @@ int linkNewTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader, const LinkMediaArg
         pFFTsMuxUploader->uploadArgBak.pUploadStatisticCb = _pUserUploadArg->pUploadStatisticCb;
         pFFTsMuxUploader->uploadArgBak.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         pFFTsMuxUploader->uploadArgBak.nTsMaxSize = _pUserUploadArg->nTsMaxSize;
+        if (pFFTsMuxUploader->uploadArgBak.nTsMaxSize <= 0) {
+                pFFTsMuxUploader->uploadArgBak.nTsMaxSize = getBufferSize(pFFTsMuxUploader);
+        }
         pFFTsMuxUploader->pConfigRequestUrl = (char *)(pFFTsMuxUploader) + sizeof(FFTsMuxUploader);
         if (pFFTsMuxUploader->pConfigRequestUrl) {
                 memcpy(pFFTsMuxUploader->pConfigRequestUrl, _pUserUploadArg->pConfigRequestUrl, _pUserUploadArg->nConfigRequestUrlLen);
