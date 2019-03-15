@@ -742,7 +742,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 av_strerror(errcode, msg, sizeof(msg))
 
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        return 1280*1024;
+        return 1440*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
