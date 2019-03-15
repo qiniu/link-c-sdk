@@ -23,11 +23,16 @@ typedef struct _CircleQueueImp{
         int nIsAvailableAfterTimeout;
         int nCount;
         int isWait;
+        int shouldFree;
+        LinkQueueMem mem;
 }CircleQueueImp;
 
 static int queueAppendPush(LinkCircleQueue *_pQueue, char *pData_, int nDataLen) {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)_pQueue;
         if (nDataLen + pQueueImp->nLen_  > pQueueImp->nCap_) {
+                if (pQueueImp->policy == TSQ_APPEND_FIX) {
+                        return 0;
+                }
                 int newLen = pQueueImp->nCap_ * 3 / 2;
                 char *pTmp = (char *)realloc(pQueueImp->pData_, newLen);
                 if (pTmp == NULL) {
@@ -70,7 +75,7 @@ static int PushQueue(LinkCircleQueue *_pQueue, char *pData_, int nDataLen)
                 return LINK_NO_PUSH;
         }
         
-        if (pQueueImp->policy == TSQ_APPEND) {
+        if (pQueueImp->policy == TSQ_APPEND || pQueueImp->policy == TSQ_APPEND_FIX) {
                 int ret = queueAppendPush(_pQueue, pData_, nDataLen);
                 
                 pthread_mutex_unlock(&pQueueImp->mutex_);
@@ -289,27 +294,44 @@ CircleQueuePolicy getQueueType(LinkCircleQueue *_pQueue) {
         return pQueueImp->policy;
 }
 
-int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount)
+int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy _policy, int _nMaxItemLen, int _nInitItemCount, LinkQueueMem *pMem)
 {
         if (NULL ==_pQueue || _nMaxItemLen < 1 || _nInitItemCount < 1) {
                     return LINK_ERROR;
         }
         int ret;
         CircleQueueImp *pQueueImp = (CircleQueueImp *)malloc(sizeof(CircleQueueImp));
-        
-        char *pData = (char *)malloc((_nMaxItemLen + sizeof(int)) * _nInitItemCount);
         if (pQueueImp == NULL) {
                 return LINK_NO_MEMORY;
         }
         memset(pQueueImp, 0, sizeof(CircleQueueImp));
+        char *pData = NULL;
+        if (pMem != NULL) {
+                pData = pMem->pMem;
+                pQueueImp->mem = *pMem;
+                pQueueImp->shouldFree = 0;
+        } else {
+                pData = (char *)malloc((_nMaxItemLen + sizeof(int)) * _nInitItemCount);
+                if (pQueueImp == NULL) {
+                        free(pQueueImp);
+                        return LINK_NO_MEMORY;
+                }
+                pQueueImp->shouldFree = 1;
+        }
 
         ret = pthread_mutex_init(&pQueueImp->mutex_, NULL);
         if (ret != 0){
+                if (pMem == NULL)
+                        free(pData);
+                free(pQueueImp);
                 return LINK_MUTEX_ERROR;
         }
         ret = pthread_cond_init(&pQueueImp->condition_, NULL);
         if (ret != 0){
                 pthread_mutex_destroy(&pQueueImp->mutex_);
+                if (pMem == NULL)
+                        free(pData);
+                free(pQueueImp);
                 return LINK_COND_ERROR;
         }
         
@@ -327,8 +349,8 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
         pQueueImp->circleQueue.GetType = getQueueType;
         pQueueImp->nCount = 1;
         
-        if (TSQ_APPEND == _policy) {
-                pQueueImp->nCap_ = pQueueImp->nLenInByte_;
+        if (TSQ_APPEND == _policy || TSQ_APPEND_FIX == _policy) {
+                pQueueImp->nCap_ = _nMaxItemLen * _nInitItemCount;
         }
         
         *_pQueue = (LinkCircleQueue*)pQueueImp;
@@ -337,7 +359,7 @@ int LinkNewCircleQueue(LinkCircleQueue **_pQueue, int nIsAvailableAfterTimeout, 
 
 int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen) {
         CircleQueueImp *pQueueImp = (CircleQueueImp *)pQueue;
-        if (pQueueImp->policy != TSQ_APPEND) {
+        if (pQueueImp->policy != TSQ_APPEND && pQueueImp->policy != TSQ_APPEND_FIX) {
                 return LINK_Q_WRONGSTATE;
         }
 
@@ -391,8 +413,12 @@ int LinkDestroyQueue(LinkCircleQueue **_pQueue)
         pthread_mutex_destroy(&pQueueImp->mutex_);
         pthread_cond_destroy(&pQueueImp->condition_);
 
-        if (pQueueImp->pData_)
+        if (pQueueImp->pData_ && pQueueImp->shouldFree)
                 free(pQueueImp->pData_);
+        else {
+                if (pQueueImp->mem.freeMem && pQueueImp->mem.pMem)
+                        pQueueImp->mem.freeMem(pQueueImp->mem.pMem);
+        }
         free(pQueueImp);
         *_pQueue = NULL;
         return LINK_SUCCESS;

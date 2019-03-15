@@ -10,8 +10,14 @@ typedef enum _CircleQueuePolicy{
         TSQ_FIX_LENGTH,
         TSQ_FIX_LENGTH_CAN_OVERWRITE,
         TSQ_VAR_LENGTH,
-        TSQ_APPEND
+        TSQ_APPEND,
+        TSQ_APPEND_FIX,
 } CircleQueuePolicy;
+
+typedef struct {
+        char *pMem;
+        void (*freeMem)(char *pMem);
+} LinkQueueMem;
 
 typedef struct _LinkCircleQueue LinkCircleQueue;
 
@@ -40,7 +46,7 @@ typedef struct _LinkCircleQueue{
         CircleQueuePolicy (*GetType)(LinkCircleQueue *pQueue);
 }LinkCircleQueue;
 
-int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount);
+int LinkNewCircleQueue(LinkCircleQueue **pQueue, int nIsAvailableAfterTimeout, CircleQueuePolicy policy, int nMaxItemLen, int nInitItemCount, LinkQueueMem *pMem);
 int LinkGetQueueBuffer(LinkCircleQueue *pQueue, char ** pBuf, int *nBufLen); //just in append mode
 void LinkQueueIncRefCount(LinkCircleQueue *_pQueue);
 void LinkQueueDecRefCount(LinkCircleQueue *_pQueue);

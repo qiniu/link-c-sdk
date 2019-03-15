@@ -120,6 +120,7 @@ int LinkNewUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUp
         userUploadArg.nDeviceSkLen = _pUserUploadArg->nDeviceSkLen;
         userUploadArg.pUploadStatisticCb = (UploadStatisticCallback)_pUserUploadArg->pUpStatCb;
         userUploadArg.pUploadStatArg = _pUserUploadArg->pUpStatCbUserArg;
+        userUploadArg.nTsMaxSize = _pUserUploadArg->nTsMaxSize;
         
         LinkTsMuxUploader *pTsMuxUploader;
         int ret = LinkNewTsMuxUploaderWillPicAndSeg(&pTsMuxUploader, &avArg, &userUploadArg, &picArg);

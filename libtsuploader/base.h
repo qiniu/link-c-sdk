@@ -97,6 +97,7 @@ typedef struct _LinkUserUploadArg{
         size_t nMaxUploadThreadNum;
         UploadStatisticCallback pUploadStatisticCb;
         void *pUploadStatArg;
+        int nTsMaxSize;
 }LinkUserUploadArg;
 
 

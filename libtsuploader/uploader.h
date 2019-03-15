@@ -89,6 +89,7 @@ typedef struct _LinkUploadArg {
         void *pGetPictureCallbackUserData;      /**< 图片上传回调函数 */
         UploadStatisticCallback *pUpStatCb;     /*上传结果回调*/
         void *pUpStatCbUserArg;                 /*作为上传结果回调的第一个参数*/
+        int nTsMaxSize;                         /*ts切片的最大大小*/
 
         void * reserved1;                       /**< 预留1 */
         void * reserved2;                       /**< 预留2 */

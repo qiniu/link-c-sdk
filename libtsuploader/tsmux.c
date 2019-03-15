@@ -151,6 +151,7 @@ static int makeTsPacket(LinkTsMuxerContext* _pMuxCtx, int _nPid, int64_t _nPts, 
         int nCount = 0;
         int nKeyFrameLen = 0;
         int nKeyframePos = _pMuxCtx->nCurrentPos;
+        int ok = 1;
         do {
                 int nRet = 0;
                 nReadLen = LinkGetPESData(&_pMuxCtx->pes, 0, _nPid, _pMuxCtx->tsPacket, 188);
@@ -160,15 +161,18 @@ static int makeTsPacket(LinkTsMuxerContext* _pMuxCtx, int _nPid, int64_t _nPts, 
                         nRet = _pMuxCtx->arg.output(_pMuxCtx->arg.pOpaque, _pMuxCtx->tsPacket, 188);
                         if (nRet < 0) {
                                 return nRet;
+                        } else if (nRet > 0) {
+                                _pMuxCtx->nCurrentPos += 188;
+                                nKeyFrameLen += 188;
+                        } else {
+                                ok = 0;
+                                _pMuxCtx->nCurrentPos = nKeyframePos;
                         }
-                        
-                        _pMuxCtx->nCurrentPos += 188;
-                        nKeyFrameLen += 188;
                 }
                 
         }while(nReadLen != 0);
         
-        if (_nIsKeyframe) {
+        if (_nIsKeyframe && ok) {
                 LinkKeyFrameMetaInfo metaInfo;
                 metaInfo.nLength = nKeyFrameLen;
                 metaInfo.nOffset = nKeyframePos;

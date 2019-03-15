@@ -47,6 +47,7 @@ typedef struct _KodoUploader{
         CircleQueuePolicy policy;
         int nMaxItemLen;
         int nInitItemCount;
+        int nCap;
         
         pthread_mutex_t uploadMutex_;
         int nTsCacheNum;
@@ -112,6 +113,51 @@ typedef struct _TsUploaderCommand {
 static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestamp, int isForceNewSession, int64_t nCurTsDuration, int shouldReport);
 static void restoreDuration (KodoUploader * pKodoUploader);
 static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTime, int fromInteral);
+
+pthread_mutex_t tsMemCache;
+char *pTsMem = NULL;
+char *pTsItem[4];
+char *pTsItemUsedFlag[4];
+char * allocTs(int itemLen) {
+        pthread_mutex_lock(&tsMemCache);
+        int i = 0;
+        if (pTsMem == NULL) {
+                LinkLogInfo("alloc ts mem pool:%d", itemLen * 4);
+                pTsMem = (char *)malloc(itemLen * 4);
+                if(pTsMem==NULL) {
+                        LinkLogError("cannot alloc ts mem");
+                        pthread_mutex_unlock(&tsMemCache);
+                        return NULL;
+                }
+                for(i = 0; i < 4; i++) {
+                        pTsItem[i] = pTsMem + i * itemLen;
+                }
+        }
+        for(i = 0; i < 4; i++) {
+                if (pTsItemUsedFlag[i] == 0) {
+                        pTsItemUsedFlag[i] = 1;
+                        pthread_mutex_unlock(&tsMemCache);
+                        return pTsItem[i];
+                }
+        }
+        
+        pthread_mutex_unlock(&tsMemCache);
+        LinkLogError("cannot be here");
+        return NULL;
+}
+
+void freeTs(char *pMem) {
+        pthread_mutex_lock(&tsMemCache);
+        int i = 0;
+        for(i = 0; i < 4; i++) {
+                if (pTsItem[i] == pMem) {
+                        pTsItemUsedFlag[i] = 0;
+                        break;
+                }
+        }
+        pthread_mutex_unlock(&tsMemCache);
+        return;
+}
 
 // ts pts 33bit, max value 8589934592, 10 numbers, bcd need 5byte to store
 static void inttoBCD(int64_t m, char *buf)
@@ -370,8 +416,8 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd) {
                 } else {
                         getUploadParamOk = 1;
                 }
-                if (pKodoUploader->isAdjustQueueSize)
-                        resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
+                //if (pKodoUploader->isAdjustQueueSize)
+                //        resizeQueueSize(pKodoUploader, lenOfBufData, tsDuration);
                 if (getUploadParamOk) {
                         char startTs[14]={0};
                         char endTs[14]={0};
@@ -498,10 +544,21 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         }
         memset(pKodoUploader->pUpMeta, 0, sizeof(TsUploaderMeta));
         
+        char *pMem = allocTs(pKodoUploader->nCap);
+        if (pMem == NULL) {
+                free(pKodoUploader->pUpMeta);
+                pKodoUploader->pUpMeta = NULL;
+                LinkLogError("alloc ts error");
+                return LINK_NO_MEMORY;
+        }
+        LinkQueueMem mem;
+        memset(&mem, 0, sizeof(mem));
+        mem.pMem = pMem;
+        mem.freeMem = freeTs;
         if (pKodoUploader->pUpMeta != NULL) {
                 pKodoUploader->pQueue_ = NULL;
                 int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 1, pKodoUploader->policy,
-                                             pKodoUploader->nMaxItemLen, pKodoUploader->nInitItemCount);
+                                             pKodoUploader->nMaxItemLen, pKodoUploader->nInitItemCount, &mem);
                 if (ret != 0) {
                         free(pKodoUploader->pUpMeta);
                         pKodoUploader->pUpMeta = NULL;
@@ -823,6 +880,7 @@ static void * tsCbWorker(void *_pOpaque) {
                         case LINK_DROP_TS:
                         case LINK_TSU_END_TIME:
                         case LINK_TSU_UPLOAD:
+                                LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
                                 if (cmd.ts.pData && (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)cmd.ts.pData, &bufData, &lenOfBufData)) > 0) {
                                         doTsOutput(pKodoUploader, lenOfBufData, bufData, cmd.time._nReserved , cmd.time.nSystimestamp,
                                                    pSMeta, NULL); // 得不到准确的session id
@@ -847,8 +905,6 @@ static void * tsCbWorker(void *_pOpaque) {
                         if (cmd.ts.pUpMeta)
                                 free(cmd.ts.pUpMeta);
                 }
-                        
-                LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
         }
         if (pSMeta) {
                 free(pSMeta);
@@ -980,6 +1036,7 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
         pKodoUploader->policy = _policy;
         pKodoUploader->nMaxItemLen = _nMaxItemLen;
         pKodoUploader->nInitItemCount = _nInitItemCount;
+        pKodoUploader->nCap = _pArg->nTsMaxSize;
 
         int ret = allocDataQueueAndUploadMeta(pKodoUploader);
         if (ret != LINK_SUCCESS) {
@@ -987,14 +1044,14 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 return ret;
         }
         
-        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 1, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 96);
+        ret = LinkNewCircleQueue(&pKodoUploader->pCommandQueue_, 1, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 96, NULL);
         if (ret != 0) {
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 free(pKodoUploader);
                 free(pKodoUploader->pUpMeta);
                 return ret;
         }
-        ret = LinkNewCircleQueue(&pKodoUploader->pTsCbQueue_, 1, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 24);
+        ret = LinkNewCircleQueue(&pKodoUploader->pTsCbQueue_, 1, TSQ_FIX_LENGTH, sizeof(TsUploaderCommand), 24, NULL);
         if (ret != 0) {
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
@@ -1063,6 +1120,7 @@ void LinkSetTsCacheBufferInitSize(IN LinkTsUploader * _pUploader, int nSize, int
         KodoUploader * pKodoUploader = (KodoUploader *)(_pUploader);
         pKodoUploader->nInitItemCount = nSize / pKodoUploader->nMaxItemLen;
         pKodoUploader->isAdjustQueueSize = !isFix;
+        pKodoUploader->nCap = nSize;
         return;
 }
 

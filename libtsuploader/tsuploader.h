@@ -19,6 +19,7 @@ typedef struct _LinkTsUploadArg {
         void *pUploadStatArg;
         int64_t nSegSeqNum;
         int64_t nLastCheckTime;
+        int nTsMaxSize;
 }LinkTsUploadArg;
 
 typedef struct _LinkReportTimeInfo {

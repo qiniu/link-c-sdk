@@ -54,7 +54,7 @@ int LinkStartMgr()
                 return LINK_SUCCESS;
         }
         
-        int ret = LinkNewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100);
+        int ret = LinkNewCircleQueue(&manager.pQueue_, 1, TSQ_FIX_LENGTH, sizeof(void *), 100, NULL);
         if (ret != 0){
                 return ret;
         }
