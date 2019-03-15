@@ -280,6 +280,7 @@ static void getStatInfo(LinkCircleQueue *_pQueue, LinkUploaderStatInfo *_pStatIn
         _pStatInfo->nLen_ = pQueueImp->nLen_;
         _pStatInfo->nDropped = pQueueImp->statInfo.nDropped;
         _pStatInfo->nIsReadOnly = pQueueImp->nQState_;
+        _pStatInfo->nCap = pQueueImp->nCap_;
         return;
 }
 

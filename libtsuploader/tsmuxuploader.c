@@ -742,7 +742,7 @@ static int waitToCompleUploadAndDestroyTsMuxContext(void *_pOpaque)
 av_strerror(errcode, msg, sizeof(msg))
 
 static int getBufferSize(FFTsMuxUploader *pFFTsMuxUploader) {
-        return 640*1024;
+        return 1280*1024;
 }
 
 static int newTsMuxContext(FFTsMuxContext ** _pTsMuxCtx, LinkMediaArg *_pAvArg, LinkTsUploadArg *_pUploadArg,
@@ -944,15 +944,13 @@ static int getUploaderBufferUsedSize(LinkTsMuxUploader* _pTsMuxUploader)
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
         LinkUploaderStatInfo info;
         pthread_mutex_lock(&pFFTsMuxUploader->muxUploaderMutex_);
-        int nUsed = 0;
         if (pFFTsMuxUploader->pTsMuxCtx) {
                 pFFTsMuxUploader->pTsMuxCtx->pTsUploader_->GetStatInfo(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, &info);
-                nUsed = info.nPushDataBytes_ - info.nPopDataBytes_;
         } else {
                 return 0;
         }
         pthread_mutex_unlock(&pFFTsMuxUploader->muxUploaderMutex_);
-        return nUsed + (nUsed/188) * 4;
+        return info.nCap;
 }
 
 static void freeRemoteConfig(RemoteConfig *pRc) {
@@ -1013,6 +1011,12 @@ static void updateRemoteConfig(FFTsMuxUploader *pFFTsMuxUploader) {
         pFFTsMuxUploader->tmpRemoteConfig = rc;
         pFFTsMuxUploader->remoteConfig.isValid = 1;
         
+        pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+}
+
+static void setRemoteConfigInvalid(FFTsMuxUploader *pFFTsMuxUploader) {
+        pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
+        pFFTsMuxUploader->remoteConfig.isValid = 0;
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
 }
 
@@ -1106,6 +1110,10 @@ static int uploadParamCallback(IN void *pOpaque, IN OUT LinkUploadParam *pParam,
         const char *pSrcToken = pFFTsMuxUploader->token_.pToken_.pData;
         int nSrcToken = pFFTsMuxUploader->token_.pToken_.nLen;
         if (pFFTsMuxUploader->token_.isCompatableMode && pFFTsMuxUploader->token_.pToken_.pData == NULL) {
+                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
+                return LINK_NOT_INITED;
+        }
+        if (!pFFTsMuxUploader->remoteConfig.isValid) {
                 pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
                 return LINK_NOT_INITED;
         }
@@ -1513,6 +1521,14 @@ void LinkDestroyTsMuxUploader(LinkTsMuxUploader **_pTsMuxUploader)
         return;
 }
 
+int LinkSetTsBuffer(IN LinkTsMuxUploader *pTsMuxUploader, int nSize, int isFix) {
+        FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(pTsMuxUploader);
+        if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
+                LinkSetTsCacheBufferInitSize(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, nSize, isFix);
+        }
+        return LINK_SUCCESS;
+}
+
 static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) {
         int nCpyLen = 0;
         cJSON * pNode = cJSON_GetObjectItem(pJsonRoot, pFieldname);
@@ -1549,7 +1565,7 @@ static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) 
         return LINK_JSON_FORMAT;
 }
 
-static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfigInterval) {
+static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfigInterval, int *isTtlGet) {
 
         RemoteConfig *pRc = &pFFTsMuxUploader->tmpRemoteConfig;
         
@@ -1585,12 +1601,13 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         if (pJsonRoot == NULL) {
                 return LINK_JSON_FORMAT;
         }
-        
+        *isTtlGet = 0;
         cJSON *pNode = cJSON_GetObjectItem(pJsonRoot, "ttl");
         if (pNode == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
         }
+        *isTtlGet = 1;
         pRc->updateConfigInterval = pNode->valueint;
         *pUpdateConfigInterval = pNode->valueint;
         
@@ -1835,14 +1852,17 @@ static void *linkTokenAndConfigThread(void * pOpaque) {
                 }
                 
                 int getRcOk = 0; // after getRemoteConfig success,must update token
+                int isTtlGet = 0;
                 if (param.nType == 2 || shouldUpdateRc || (ret == LINK_TIMEOUT && nRcTimeout)) {
                         getRcOk = 0;
-                        ret = getRemoteConfig(pFFTsMuxUploader, &nUpdateConfigInterval);
+                        ret = getRemoteConfig(pFFTsMuxUploader, &nUpdateConfigInterval, &isTtlGet);
                         now = (int)(LinkGetCurrentNanosecond() / 1000000000);
                         doCloudStorageStateCallback(pFFTsMuxUploader, ret == LINK_SUCCESS ?
                                 LinkCloudStorageStateOn : LinkCloudStorageStateOff);
                         if (ret != LINK_SUCCESS) {
-                          
+                                if (isTtlGet == 1) {
+                                        setRemoteConfigInvalid(pFFTsMuxUploader);
+                                }
                                 if (nNextTryRcTime > 16)
                                         nNextTryRcTime = 16;
                                 LinkLogInfo("sleep %d time to get remote config:%d", nNextTryRcTime, ret);

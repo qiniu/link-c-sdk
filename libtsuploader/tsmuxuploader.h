@@ -27,6 +27,15 @@ void LinkInitSn();
 int LinkGetUploadBufferUsedSize(IN LinkTsMuxUploader *pTsMuxUploader);
 
 /**
+ * 设置上传实例的缓存 buffer 大小
+ *
+ * @param[in] pTsMuxUploader 切片上传实例
+ * @param[nSize] 切片的初始化缓冲大小
+ * @param[isFix] nSize作为切片的固定初始化缓冲大小, 如果为0初始化缓冲大小动态调整，否则不动态调整
+ */
+int LinkSetTsBufferInitSize(IN LinkTsMuxUploader *pTsMuxUploader, int nSize, int isFix);
+
+/**
  * 创建并且启动一个切片上传实例
  *
  * 此函数不是线程安全函数。

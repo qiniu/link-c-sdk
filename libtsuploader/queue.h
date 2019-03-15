@@ -28,6 +28,7 @@ typedef struct _UploaderStatInfo {
         int nOverwriteCnt;
         int nIsReadOnly;
 	int nDropped;
+        int nCap;
 }LinkUploaderStatInfo;
 
 typedef struct _LinkCircleQueue{
