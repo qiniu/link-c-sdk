@@ -129,6 +129,7 @@ char * allocTs(int itemLen) {
                         pthread_mutex_unlock(&tsMemCache);
                         return NULL;
                 }
+                memset(pTsMem, 1, itemLen * 4);
                 for(i = 0; i < 4; i++) {
                         pTsItem[i] = pTsMem + i * itemLen;
                 }
@@ -859,6 +860,7 @@ static void * tsCbWorker(void *_pOpaque) {
         LinkSessionMeta *pSMeta = NULL;
         
         int recvQuit = 0;
+        int isOneShot = 1;
         while(!(pKodoUploader->nQuit_ || recvQuit) || info.nLen_ != 0) {
                 TsUploaderCommand cmd = {0};
                 int ret = pKodoUploader->pTsCbQueue_->PopWithTimeout(pKodoUploader->pTsCbQueue_, (char *)(&cmd),
@@ -880,6 +882,10 @@ static void * tsCbWorker(void *_pOpaque) {
                         case LINK_DROP_TS:
                         case LINK_TSU_END_TIME:
                         case LINK_TSU_UPLOAD:
+                                if (pSMeta && isOneShot) {
+                                        free(pSMeta);
+                                        pSMeta = NULL;
+                                }
                                 LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
                                 if (cmd.ts.pData && (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)cmd.ts.pData, &bufData, &lenOfBufData)) > 0) {
                                         doTsOutput(pKodoUploader, lenOfBufData, bufData, cmd.time._nReserved , cmd.time.nSystimestamp,
@@ -891,11 +897,11 @@ static void * tsCbWorker(void *_pOpaque) {
                                 if (pSMeta)
                                         free(pSMeta);
                                 pSMeta = cmd.pSessionMeta;
+                                isOneShot = 0;
                                 break;
                         case LINK_TSU_CLR_META:
                                 if (pSMeta) {
-                                        free(pSMeta);
-                                        pSMeta = NULL;
+                                        isOneShot = 1;
                                 }
                                 break;
                         default:
