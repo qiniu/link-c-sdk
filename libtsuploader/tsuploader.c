@@ -91,6 +91,11 @@ typedef struct _KodoUploader{
         LinkPicture picture;
         
         int64_t nTsLastStartTime;
+        
+        pthread_mutex_t tsMemMutex;
+        char *pTsMem;
+        char *pTsItem[4];
+        char *pTsItemUsedFlag[4];
 }KodoUploader;
 
 typedef struct _TsUploaderCommandTs {
@@ -114,49 +119,47 @@ static int handleSessionCheck(KodoUploader * pKodoUploader, int64_t nSysTimestam
 static void restoreDuration (KodoUploader * pKodoUploader);
 static void handleSegTimeReport(KodoUploader * pKodoUploader, int64_t nCurSysTime, int fromInteral);
 
-pthread_mutex_t tsMemCache;
-char *pTsMem = NULL;
-char *pTsItem[4];
-char *pTsItemUsedFlag[4];
-char * allocTs(int itemLen) {
-        pthread_mutex_lock(&tsMemCache);
+char * allocTs(KodoUploader * pKodoUploader) {
+        pthread_mutex_lock(&pKodoUploader->tsMemMutex);
         int i = 0;
-        if (pTsMem == NULL) {
-                LinkLogInfo("alloc ts mem pool:%d", itemLen * 4);
-                pTsMem = (char *)malloc(itemLen * 4);
-                if(pTsMem==NULL) {
+        if (pKodoUploader->pTsMem == NULL) {
+                LinkLogInfo("alloc ts mem pool:%d", pKodoUploader->nCap * 4);
+                pKodoUploader->pTsMem = (char *)malloc(pKodoUploader->nCap * 4);
+                if(pKodoUploader->pTsMem==NULL) {
                         LinkLogError("cannot alloc ts mem");
-                        pthread_mutex_unlock(&tsMemCache);
+                        pthread_mutex_unlock(&pKodoUploader->tsMemMutex);
                         return NULL;
                 }
-                memset(pTsMem, 1, itemLen * 4);
+                memset(pKodoUploader->pTsMem, 1, pKodoUploader->nCap * 4);
                 for(i = 0; i < 4; i++) {
-                        pTsItem[i] = pTsMem + i * itemLen;
+                        pKodoUploader->pTsItem[i] = pKodoUploader->pTsMem + i * pKodoUploader->nCap;
                 }
         }
         for(i = 0; i < 4; i++) {
-                if (pTsItemUsedFlag[i] == 0) {
-                        pTsItemUsedFlag[i] = 1;
-                        pthread_mutex_unlock(&tsMemCache);
-                        return pTsItem[i];
+                if (pKodoUploader->pTsItemUsedFlag[i] == 0) {
+                        pKodoUploader->pTsItemUsedFlag[i] = 1;
+                        pthread_mutex_unlock(&pKodoUploader->tsMemMutex);
+                        return pKodoUploader->pTsItem[i];
                 }
         }
         
-        pthread_mutex_unlock(&tsMemCache);
+        pthread_mutex_unlock(&pKodoUploader->tsMemMutex);
         LinkLogError("cannot be here");
         return NULL;
 }
 
-void freeTs(char *pMem) {
-        pthread_mutex_lock(&tsMemCache);
+void freeTs(void *pPaque) {
+        LinkQueueMem *mem = (LinkQueueMem*)pPaque;
+        KodoUploader * pKodoUploader = (KodoUploader *)mem->pUser;
+        pthread_mutex_lock(&pKodoUploader->tsMemMutex);
         int i = 0;
         for(i = 0; i < 4; i++) {
-                if (pTsItem[i] == pMem) {
-                        pTsItemUsedFlag[i] = 0;
+                if (pKodoUploader->pTsItem[i] == mem->pMem) {
+                        pKodoUploader->pTsItemUsedFlag[i] = 0;
                         break;
                 }
         }
-        pthread_mutex_unlock(&tsMemCache);
+        pthread_mutex_unlock(&pKodoUploader->tsMemMutex);
         return;
 }
 
@@ -545,7 +548,7 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         }
         memset(pKodoUploader->pUpMeta, 0, sizeof(TsUploaderMeta));
         
-        char *pMem = allocTs(pKodoUploader->nCap);
+        char *pMem = allocTs(pKodoUploader);
         if (pMem == NULL) {
                 free(pKodoUploader->pUpMeta);
                 pKodoUploader->pUpMeta = NULL;
@@ -556,6 +559,7 @@ static int allocDataQueueAndUploadMeta(KodoUploader * pKodoUploader) {
         memset(&mem, 0, sizeof(mem));
         mem.pMem = pMem;
         mem.freeMem = freeTs;
+        mem.pUser = pKodoUploader;
         if (pKodoUploader->pUpMeta != NULL) {
                 pKodoUploader->pQueue_ = NULL;
                 int ret = LinkNewCircleQueue(&pKodoUploader->pQueue_, 1, pKodoUploader->policy,
@@ -1073,11 +1077,23 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 free(pKodoUploader->pUpMeta);
                 return ret;
         }
+        
+        ret = pthread_mutex_init(&pKodoUploader->tsMemMutex, NULL);
+        if (ret != 0){
+                LinkDestroyQueue(&pKodoUploader->pQueue_);
+                LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
+                LinkDestroyQueue(&pKodoUploader->pTsCbQueue_);
+                free(pKodoUploader->pUpMeta);
+                free(pKodoUploader);
+                return LINK_MUTEX_ERROR;
+        }
+        
         ret = pthread_mutex_init(&pKodoUploader->uploadMutex_, NULL);
         if (ret != 0){
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
                 LinkDestroyQueue(&pKodoUploader->pTsCbQueue_);
+                pthread_mutex_destroy(&pKodoUploader->tsMemMutex);
                 free(pKodoUploader->pUpMeta);
                 free(pKodoUploader);
                 return LINK_MUTEX_ERROR;
@@ -1088,6 +1104,8 @@ int LinkNewTsUploader(LinkTsUploader ** _pUploader, const LinkTsUploadArg *_pArg
                 LinkDestroyQueue(&pKodoUploader->pQueue_);
                 LinkDestroyQueue(&pKodoUploader->pCommandQueue_);
                 LinkDestroyQueue(&pKodoUploader->pTsCbQueue_);
+                pthread_mutex_destroy(&pKodoUploader->tsMemMutex);
+                pthread_mutex_destroy(&pKodoUploader->uploadMutex_);
                 free(pKodoUploader->pUpMeta);
                 free(pKodoUploader);
                 return LINK_THREAD_ERROR;
@@ -1184,6 +1202,10 @@ void LinkDestroyTsUploader(LinkTsUploader ** _pUploader)
                 free((void *)pKodoUploader->picture.pFilename);
         pthread_mutex_destroy(&pKodoUploader->uploadMutex_);
 
+        pthread_mutex_destroy(&pKodoUploader->tsMemMutex);
+        if (pKodoUploader->pTsMem != NULL) {
+                free(pKodoUploader->pTsMem);
+        }
         free(pKodoUploader);
         * _pUploader = NULL;
         return;
