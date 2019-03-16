@@ -124,7 +124,7 @@ void * LinkMqttThread(void* _pData)
                                  if (nReconectPeriod > 1) {
                                          sleep(rand() % nReconectPeriod);
                                  }
-                                 nReconectPeriod = (nReconectPeriod < 128) ? nReconectPeriod * 2 : nReconectPeriod;
+                                 nReconectPeriod = (nReconectPeriod < 64) ? nReconectPeriod * 2 : nReconectPeriod;
                                  /* connect do */
                                  rc = LinkMqttConnect(pInstance);
                          }
