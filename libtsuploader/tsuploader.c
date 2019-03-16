@@ -880,17 +880,25 @@ static void * tsCbWorker(void *_pOpaque) {
                                 recvQuit = 1;
                                 continue;
                         case LINK_DROP_TS:
-                        case LINK_TSU_END_TIME:
                         case LINK_TSU_UPLOAD:
                                 if (pSMeta && isOneShot) {
                                         free(pSMeta);
                                         pSMeta = NULL;
                                 }
-                                LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
                                 if (cmd.ts.pData && (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)cmd.ts.pData, &bufData, &lenOfBufData)) > 0) {
+                                        int64_t outStart = LinkGetCurrentMillisecond();
                                         doTsOutput(pKodoUploader, lenOfBufData, bufData, cmd.time._nReserved , cmd.time.nSystimestamp,
                                                    pSMeta, NULL); // 得不到准确的session id
+                                        int64_t outTake = LinkGetCurrentMillisecond() - outStart;
+                                        if (outTake > 1000)
+                                                LinkLogInfo("output take:%"PRId64" ms", outTake);
                                         LinkDestroyQueue((LinkCircleQueue **)(&cmd.ts.pData));
+                                        if (cmd.nCommandType == LINK_DROP_TS) {
+                                                if (cmd.ts.pData == NULL)
+                                                        LinkLogInfo("2drop ts file due to ts cache reach max limit:%lld", cmd.time.nSystimestamp/1000000);
+                                                else
+                                                        LinkLogError("not release");
+                                        }
                                 }
                                 break;
                         case LINK_TSU_SET_META:
