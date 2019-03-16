@@ -9,13 +9,11 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake" ${CMAKE_MODULE_PATH})
 include(Utilities)
 include(GNUInstallDirs)
 
-project (link-c-sdk)
-
 # ------------------------------------------------------------------------------
 # Cross compile
 # ------------------------------------------------------------------------------
 
-if(CROSS_COMPILE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+if(CROSS_COMPILE)
   set(CMAKE_C_COMPILER ${CROSS_COMPILE}-gcc)
   set(CMAKE_CXX_COMPILER ${CROSS_COMPILE}-g++)
   set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
@@ -23,6 +21,12 @@ if(CROSS_COMPILE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
   set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 endif()
+
+# ------------------------------------------------------------------------------
+# Project
+# ------------------------------------------------------------------------------
+
+project (link-c-sdk)
 
 # ------------------------------------------------------------------------------
 # Get and Display infomation
