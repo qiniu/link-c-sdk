@@ -2,6 +2,7 @@
 #define __HTTP_TOOLS__
 
 #include "base.h"
+#include "uploader.h"
 
 /**
  * 简单的http get

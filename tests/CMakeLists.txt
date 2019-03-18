@@ -62,7 +62,7 @@ set(SRCS_${TEST_TARGET_3} libtsuploader_test.c)
 aux_source_directory(${DEPENDS_DIRS}/flag SRCS_${TEST_TARGET_3})
 
 add_executable(${TEST_TARGET_3} ${SRCS_${TEST_TARGET_3}})
-target_compile_options(${TEST_TARGET_3} PRIVATE -std=c99)
+target_compile_options(${TEST_TARGET_3} PRIVATE -std=gnu99)
 #libtsuploader
 target_link_libraries(${TEST_TARGET_3} tsuploader pthread m)
 if(NOT APPLE)

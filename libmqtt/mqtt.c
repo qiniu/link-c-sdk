@@ -5,6 +5,7 @@
 #include "mos_mqtt.h"
 #endif
 #include "mqtt.h"
+#include "log/log.h"
 #include "mqtt_internal.h"
 
 static void MallocAndStrcpy(char** des, const char* src)
@@ -120,15 +121,16 @@ void * LinkMqttThread(void* _pData)
                          pInstance->status = STATUS_CONNECTING;
                          rc = ClientOptSet(pInstance, pInstance->options.userInfo);
                          if (rc == MQTT_SUCCESS) {
+                                 if (nReconectPeriod > 1) {
+                                         sleep(rand() % nReconectPeriod);
+                                 }
+                                 nReconectPeriod = (nReconectPeriod < 128) ? nReconectPeriod * 2 : nReconectPeriod;
+                                 /* connect do */
                                  rc = LinkMqttConnect(pInstance);
                          }
                          if (rc != MQTT_SUCCESS) {
                                  OnEventCallback(pInstance, rc, "STATUS_CONNECT_ERROR");
                                  pInstance->status = STATUS_CONNECT_ERROR;
-                                 sleep(nReconectPeriod);
-                                 nReconectPeriod = nReconectPeriod >= 512 ? nReconectPeriod : nReconectPeriod * 2;
-                         } else {
-                                 nReconectPeriod = 1;
                          }
                 } else if (pInstance->status == STATUS_CONNECTING) {
                          sleep(1);
@@ -136,11 +138,15 @@ void * LinkMqttThread(void* _pData)
                         /* Process */
                         rc = LinkMqttLoop(pInstance);
                         if (rc >= MQTT_ERR_NOMEM) {
-                                 sleep(1);
+                                if (nReconectPeriod > 1) {
+                                        sleep(rand() % nReconectPeriod);
+                                }
                         }
                         if (rc == MQTT_ERR_CONN_LOST) {
                                 ReConnect(pInstance, MQTT_ERR_CONN_LOST);
-                                sleep(3);
+                                if (nReconectPeriod > 1) {
+                                        sleep(rand() % nReconectPeriod);
+                                }
                         }
                 }
         } while (!pInstance->isDestroying);

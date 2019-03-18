@@ -65,7 +65,7 @@ endforeach()
 
 add_executable(demo-tsupload ${SOURCE_LIST} ${DEV_FILE})
 add_dependencies(demo-tsupload lib)
-target_compile_options(demo-tsupload PRIVATE -std=c99)
+target_compile_options(demo-tsupload PRIVATE -std=gnu99)
 #libtsuploader
 target_link_libraries(demo-tsupload tsuploader pthread m)
 #libghttp
