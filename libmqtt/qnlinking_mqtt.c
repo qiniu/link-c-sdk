@@ -193,6 +193,11 @@ void QnlinkingMQTT_SendLog(int nLevel, const char * pLog)
         if (!pLog) {
                 return;
         }
+
+        if (gQnlinkingMQTTLog.pQueue->nSize == gQnlinkingMQTTLog.pQueue->nCapacity) {
+                return;
+        }
+
         int nLogLen = (strlen(pLog) <= MAX_LOG_LEN) ? strlen(pLog) : MAX_LOG_LEN;
 
         Message *pMessage = (Message *) malloc(sizeof(Message));
