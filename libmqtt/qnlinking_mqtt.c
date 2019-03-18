@@ -206,6 +206,8 @@ void QnlinkingMQTT_SendLog(int nLevel, const char * pLog)
         pMessage->pMessage = message;
 
         if (gQnlinkingMQTTLog.pQueue->nSize == gQnlinkingMQTTLog.pQueue->nCapacity) {
+                free(pMessage);
+                free(message);
                 return;
         }
         SendMessage(gQnlinkingMQTTLog.pQueue, pMessage);
