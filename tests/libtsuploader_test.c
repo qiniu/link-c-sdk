@@ -509,7 +509,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         metas.valuelens = valuelens;
                         
                         metas.isOneShot = 1;
-                        LinkSetTsType(pAvuploader->pTsMuxUploader, &metas);
+                        //LinkSetTsType(pAvuploader->pTsMuxUploader, &metas);
                 }
                 if (nIsKeyFrame && pAvuploader->nVideoKeyframeAccLen != 0) {
                         //printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);
@@ -588,6 +588,35 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
                 fflush(pTsFile);
         }
         return 0;
+}
+
+void *mimicSetType(void *p) {
+        LinkTsMuxUploader *_pTsMuxUploader = (LinkTsMuxUploader *)p;
+        int64_t c = 0;
+        LinkSessionMeta metas = {0};
+        metas.len = 1;
+        char *keys[1] = {"type"};
+        metas.keys = (const char **)keys;
+        int keylens[1] = {4};
+        metas.keylens = keylens;
+        
+        char *values[1] = {"move"};
+        metas.values = (const char **)values;
+        int valuelens[1] = {4};
+        metas.valuelens = valuelens;
+        while(1) {
+                if(c % 2 == 0) {
+                        sleep(60);
+                        fprintf(stderr, "set move");
+                        LinkSetTsType(_pTsMuxUploader, &metas);
+                        sleep(10);
+                        fprintf(stderr, "clear move");
+                } else {
+                        LinkClearTsType(_pTsMuxUploader);
+                }
+                c++;
+        }
+        return NULL;
 }
 
 static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg) {
@@ -790,6 +819,7 @@ int main(int argc, const char** argv)
 
         int ret = 0;
 
+        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);
@@ -835,6 +865,10 @@ int main(int argc, const char** argv)
                 return ret;
         }
         cmdArg.pFirstUploader = avuploader.pTsMuxUploader;
+        //LinkSetLogCallback(logCb);
+        
+        pthread_t setType;
+        pthread_create(&setType, NULL, mimicSetType, avuploader.pTsMuxUploader);
         
 
         avuploader.pAFile = pAFile;
