@@ -417,7 +417,7 @@ int LinkDestroyQueue(LinkCircleQueue **_pQueue)
                 free(pQueueImp->pData_);
         else {
                 if (pQueueImp->mem.freeMem && pQueueImp->mem.pMem)
-                        pQueueImp->mem.freeMem(pQueueImp->mem.pMem);
+                        pQueueImp->mem.freeMem(&pQueueImp->mem);
         }
         free(pQueueImp);
         *_pQueue = NULL;

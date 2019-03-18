@@ -16,7 +16,8 @@ typedef enum _CircleQueuePolicy{
 
 typedef struct {
         char *pMem;
-        void (*freeMem)(char *pMem);
+        void (*freeMem)(void *p);
+        void *pUser;
 } LinkQueueMem;
 
 typedef struct _LinkCircleQueue LinkCircleQueue;
