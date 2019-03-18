@@ -1357,11 +1357,11 @@ static int dupSessionMeta(LinkSessionMeta *metas, LinkSessionMeta **pDst) {
 }
 
 void LinkUploaderSetTsOutputCallback(IN LinkTsMuxUploader *_pTsMuxUploader,
-                               IN LinkTsOutput _pTsDataCb, IN void * _pUserArg) {
+                               IN LinkTsOutput _pTsDataCb, IN void * _userCtx) {
         
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         if (pFFTsMuxUploader->pTsMuxCtx) {
-                LinkTsUploaderSetTsCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, _pTsDataCb, _pUserArg, pFFTsMuxUploader->avArg);
+                LinkTsUploaderSetTsCallback(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_, _pTsDataCb, _userCtx, pFFTsMuxUploader->avArg);
         }
         return;
 }
