@@ -176,7 +176,7 @@ typedef enum {
         LinkCloudStorageStateOff = 2
 }LinkCloudStorageState;
 
-typedef void(*LinkCloudStorageStateCallback)(void *pOpaue, LinkCloudStorageState state);
+typedef void(*LinkCloudStorageStateCallback)(void * userCtx, LinkCloudStorageState state);
 
 /**
  * 云存储状态回调函数
