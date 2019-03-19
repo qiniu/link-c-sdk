@@ -1550,7 +1550,7 @@ static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) 
                 
                 return LINK_SUCCESS;
         }
-        LinkLogInfo("not found %s in json", pFieldname);
+        LinkLogDebug("not found %s in json", pFieldname);
         return LINK_JSON_FORMAT;
 }
 
@@ -1727,17 +1727,17 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         
         int getTsToken = getJsonString(&bufTsToken, "tsToken", pJsonRoot);
         if (getTsToken == LINK_SUCCESS) {
-                LinkLogInfo("tsToken:%s", bufTsToken.pData);
+                LinkLogDebug("tsToken:%s", bufTsToken.pData);
         }
         
         int getFrameToken = getJsonString(&bufFrameToken, "frameToken", pJsonRoot);
         if (getFrameToken == LINK_SUCCESS) {
-                LinkLogInfo("frameToken:%s", bufFrameToken.pData);
+                LinkLogDebug("frameToken:%s", bufFrameToken.pData);
         }
         
         ret = getJsonString(&bufToken, "token", pJsonRoot);
         if (ret == LINK_SUCCESS) {
-                LinkLogInfo("token:%s", bufToken.pData);
+                LinkLogDebug("token:%s", bufToken.pData);
         } else if (ret == LINK_NO_MEMORY) {
                 if(getTsToken != LINK_SUCCESS || getFrameToken != LINK_SUCCESS)
                         goto END;
