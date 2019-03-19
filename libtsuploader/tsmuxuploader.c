@@ -973,12 +973,12 @@ static void freeRemoteConfig(RemoteConfig *pRc) {
 }
 
 void LinkSetCloudStorageStateCallback(LinkTsMuxUploader *_pTsMuxUploader,
-        LinkCloudStorageStateCallback cb, void *pOpaue) {
+        LinkCloudStorageStateCallback cb, void * userCtx) {
 
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
         pFFTsMuxUploader->pCloudStorageStateCb = cb;
-        pFFTsMuxUploader->pCloudStorageOpaue = pOpaue;
+        pFFTsMuxUploader->pCloudStorageOpaue = userCtx;
         pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
 }
 

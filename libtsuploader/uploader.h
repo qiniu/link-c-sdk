@@ -162,7 +162,7 @@ typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMed
  *
  * @param[out] pTsMuxUploader 切片上传实例
  * @param[in]  pTsDataCb 回调函数
- * @param[in]  userCtx 自定义参数，用于回调函数的自定义参数
+ * @param[in]  userCtx 自定义参数，作为 pTsDataCb 回调函数的第三个参数
  */
 void LinkUploaderSetTsOutputCallback(LinkTsMuxUploader *pTsMuxUploader,
                                      LinkTsOutput pTsDataCb,
@@ -183,11 +183,11 @@ typedef void(*LinkCloudStorageStateCallback)(void *pOpaue, LinkCloudStorageState
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] cb 回调函数
- * @param[in] pOpaque 用户参数，会在cb回调函数的第一个参数中返回
+ * @param[in] userCtx 用户自定义参数，作为 cb 回调函数的第一个参数
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 void LinkSetCloudStorageStateCallback(LinkTsMuxUploader *pTsMuxUploader,
-	LinkCloudStorageStateCallback cb, void *pOpaue);
+	LinkCloudStorageStateCallback cb, void * userCtx);
 
 /**
  * 发送图片上传信号
