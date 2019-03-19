@@ -137,4 +137,12 @@ extern int LinkMqttSubscribe(IN const void* _pInstance, IN const char* _pTopic);
  */
 extern int LinkMqttUnsubscribe(IN const void* _pInstance, IN const char* _pTopic);
 
+/**
+ * MQTT 连接状态
+ *
+ * @param[in] pInstance MQTT 实例
+ * @return true: 已连接; false: 未连接
+ */
+extern bool LinkMqttIsConnected(IN const void* pInstance);
+
 #endif
