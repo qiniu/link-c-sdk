@@ -199,3 +199,12 @@ void LinkMqttDestroy(IN const void* _pInstance)
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         pInstance->isDestroying = true;
 }
+
+bool LinkMqttIsConnected(IN const void* _pInstance)
+{
+        if (!_pInstance) {
+                return false;
+        }
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
+        return pInstance->connected;
+}
