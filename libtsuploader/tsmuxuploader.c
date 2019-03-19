@@ -1500,7 +1500,7 @@ int LinkTsMuxUploaderStart(LinkTsMuxUploader *_pTsMuxUploader)
 
 void LinkFlushUploader(IN LinkTsMuxUploader *_pTsMuxUploader) {
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader *)(_pTsMuxUploader);
-        if (pFFTsMuxUploader->queueType_ != TSQ_APPEND) {
+        if (pFFTsMuxUploader->queueType_ != TSQ_APPEND_FIX) {
                 return;
         }
         
