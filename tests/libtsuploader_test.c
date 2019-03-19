@@ -611,9 +611,9 @@ void *mimicSetType(void *p) {
                         sleep(60);
                         fprintf(stderr, "set move");
                         LinkSetTsType(_pTsMuxUploader, &metas);
-                        sleep(10);
-                        fprintf(stderr, "clear move");
                 } else {
+                        sleep(20);
+                        fprintf(stderr, "clear move");
                         LinkClearTsType(_pTsMuxUploader);
                 }
                 c++;
