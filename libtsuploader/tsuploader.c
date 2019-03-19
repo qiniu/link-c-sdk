@@ -408,9 +408,16 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd, int isDrop) {
         LinkLogDebug("upload prepared:[%"PRId64"] %s q:%p  len:%d up:%d",LinkGetCurrentNanosecond()/1000000, key, pDataQueue, lenOfBufData, shouldUpload);
         if (shouldUpload) {
                 if (pKodoUploader->picture.pFilename) {
+                        int picResult = 0;
                         snprintf((char *)pKodoUploader->picture.pFilename + pKodoUploader->picture.nFilenameLen-4, LINK_MAX_SESSION_ID_LEN+5,
                                  "-%s.jpg", pKodoUploader->session.sessionId);
-                        LinkUploadPicture(&pKodoUploader->picture, &upPicParam);
+                        picResult = LinkUploadPicture(&pKodoUploader->picture, &upPicParam);
+                        LinkUploadResult picUploadResult = picResult == 0 ? LINK_UPLOAD_RESULT_OK : LINK_UPLOAD_RESULT_FAIL;
+                        if (pKodoUploader->uploadArg.pUploadStatisticCb) {
+                                pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
+                                                                            LINK_UPLOAD_PIC, picUploadResult);
+                        }
+                        
                         pKodoUploader->picture.pFilename = NULL;
                 }
                 
@@ -459,11 +466,6 @@ static void * bufferUpload(TsUploaderCommand *pUploadCmd, int isDrop) {
                 }
         } else {
                 LinkLogDebug("not upload:getbuffer:%d, meta:%p param:%d", getBufDataRet, pKodoUploader->pSessionMeta, getUploadParamOk);
-        }
-
-        if (pKodoUploader->uploadArg.pUploadStatisticCb) {
-                pKodoUploader->uploadArg.pUploadStatisticCb(pKodoUploader->uploadArg.pUploadStatArg,
-                                                                        LINK_UPLOAD_TS, uploadResult);
         }
         
         if (pKodoUploader->isSegStartReport && reportType & 0x4) {
