@@ -901,10 +901,6 @@ static void * tsCbWorker(void *_pOpaque) {
                                 continue;
                         case LINK_DROP_TS:
                         case LINK_TSU_UPLOAD:
-                                if (pSMeta && isOneShot) {
-                                        free(pSMeta);
-                                        pSMeta = NULL;
-                                }
                                 if (cmd.ts.pData && (getBufRet = LinkGetQueueBuffer((LinkCircleQueue *)cmd.ts.pData, &bufData, &lenOfBufData)) > 0) {
                                         int64_t outStart = LinkGetCurrentMillisecond();
                                         doTsOutput(pKodoUploader, lenOfBufData, bufData, cmd.time._nReserved , cmd.time.nSystimestamp,
@@ -919,6 +915,10 @@ static void * tsCbWorker(void *_pOpaque) {
                                                 else
                                                         LinkLogError("not release");
                                         }
+                                }
+                                if (pSMeta && isOneShot) {
+                                        free(pSMeta);
+                                        pSMeta = NULL;
                                 }
                                 break;
                         case LINK_TSU_SET_META:
