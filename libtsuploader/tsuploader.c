@@ -883,7 +883,10 @@ static void * tsCbWorker(void *_pOpaque) {
                 int ret = pKodoUploader->pTsCbQueue_->PopWithTimeout(pKodoUploader->pTsCbQueue_, (char *)(&cmd),
                                                                         sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pTsCbQueue_, &info);
-                LinkLogDebug("ts cbqueue:%d cmd:%d", info.nLen_, cmd.nCommandType);
+                if (info.nLen_ > 12)
+                        LinkLogWarn("ts cbqueue:%d cmd:%d", info.nLen_, cmd.nCommandType);
+                else
+                        LinkLogDebug("ts cbqueue:%d cmd:%d", info.nLen_, cmd.nCommandType);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("tscmd queue error. pop:%d", ret);
@@ -953,7 +956,10 @@ static void * listenTsUpload(void *_pOpaque)
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
                                                                       sizeof(TsUploaderCommand), 24 * 60 * 60 * 1000000LL);
                 pKodoUploader->pCommandQueue_->GetStatInfo(pKodoUploader->pCommandQueue_, &info);
-                LinkLogDebug("ts queue:%d cmd:%d", info.nLen_, cmd.nCommandType);
+                if (info.nLen_ > 72)
+                        LinkLogWarn("ts queue:%d cmd:%d", info.nLen_, cmd.nCommandType);
+                else
+                        LinkLogDebug("ts queue:%d cmd:%d", info.nLen_, cmd.nCommandType);
                 if (ret <= 0) {
                         if (ret != LINK_TIMEOUT) {
                                 LinkLogError("tscmd queue error. pop:%d", ret);
@@ -993,6 +999,12 @@ static void * listenTsUpload(void *_pOpaque)
                                 handleTsEndTimeReport(pKodoUploader, &cmd.time);
                                 break;
                         case LINK_TSU_SEG_TIME:
+                                if (pKodoUploader->pSessionMeta->isOneShot) {
+                                        // 强制切片是先发送end，在发送seg, 所以如果先clear，在强制切片
+                                        // claer->end->seg->start, 导致pSessionMeta会把start那个切片也上传
+                                        free(pKodoUploader->pSessionMeta);
+                                        pKodoUploader->pSessionMeta = NULL;
+                                }
                                 checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 handleSegTimeReport(pKodoUploader, cmd.time.nSystimestamp, 0);
                                 break;
