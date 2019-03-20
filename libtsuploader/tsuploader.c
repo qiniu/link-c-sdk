@@ -1014,6 +1014,17 @@ static void * listenTsUpload(void *_pOpaque)
                                 }
                                 checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 handleSegTimeReport(pKodoUploader, cmd.time.nSystimestamp, 0);
+                     
+                                if (pKodoUploader->bakSession.nAccSessionDuration > 0) {
+                                        LinkLogDebug("=========================4>%s %"PRId64"", pKodoUploader->bakSession.sessionId, pKodoUploader->bakSession.nAccSessionVideoDuration);
+                                        
+                                        pKodoUploader->bakSession.nSessionEndTime = pKodoUploader->bakSession.nLastTsEndTime;
+                                        pKodoUploader->bakSession.isNewSessionStarted = 0;
+                                        pKodoUploader->bakSession.nSessionEndResonCode = pKodoUploader->session.nSessionEndResonCode;
+                                        LinkUpdateSegment(pKodoUploader->bakSession.segHandle, &pKodoUploader->bakSession, pKodoUploader->pSessionMeta);
+                                        pKodoUploader->isSegStartReport = 0;
+                                        memset(&pKodoUploader->bakSession, 0, sizeof(pKodoUploader->bakSession));
+                                }
                                 break;
                         case LINK_TSU_SET_META:
                                 isClr = 0;
