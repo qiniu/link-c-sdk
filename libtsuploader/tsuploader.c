@@ -994,7 +994,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 }
                                 break;
                         case LINK_TSU_START_TIME:
-                                if (isClr && pKodoUploader->pSessionMeta->isOneShot) {
+                                if (isClr && pKodoUploader->pSessionMeta && pKodoUploader->pSessionMeta->isOneShot) {
                                         // 在最后一帧，和下一个切片关键帧之间clear
                                         free(pKodoUploader->pSessionMeta);
                                         pKodoUploader->pSessionMeta = NULL;
@@ -1006,7 +1006,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 handleTsEndTimeReport(pKodoUploader, &cmd.time);
                                 break;
                         case LINK_TSU_SEG_TIME:
-                                if (pKodoUploader->pSessionMeta->isOneShot) {
+                                if (pKodoUploader->pSessionMeta && pKodoUploader->pSessionMeta->isOneShot) {
                                         // 强制切片是先发送end，在发送seg, 所以如果先clear，在强制切片
                                         // claer->end->seg->start, 导致pSessionMeta会把start那个切片也上传
                                         free(pKodoUploader->pSessionMeta);
