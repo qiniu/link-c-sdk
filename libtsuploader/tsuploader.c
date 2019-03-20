@@ -951,6 +951,7 @@ static void * listenTsUpload(void *_pOpaque)
         pKodoUploader->isSegStartReport = 1;
         LinkUploaderStatInfo info = {0};
         int recvQuit = 0;
+        unsigned char isClr = 0;
         while(!(pKodoUploader->nQuit_ || recvQuit)|| info.nLen_ != 0) {
                 TsUploaderCommand cmd;
                 int ret = pKodoUploader->pCommandQueue_->PopWithTimeout(pKodoUploader->pCommandQueue_, (char *)(&cmd),
@@ -993,6 +994,12 @@ static void * listenTsUpload(void *_pOpaque)
                                 }
                                 break;
                         case LINK_TSU_START_TIME:
+                                if (isClr && pKodoUploader->pSessionMeta->isOneShot) {
+                                        // 在最后一帧，和下一个切片关键帧之间clear
+                                        free(pKodoUploader->pSessionMeta);
+                                        pKodoUploader->pSessionMeta = NULL;
+                                        isClr = 0;
+                                }
                                 handleTsStartTimeReport(pKodoUploader, &cmd.time);
                                 break;
                         case LINK_TSU_END_TIME:
@@ -1009,6 +1016,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 handleSegTimeReport(pKodoUploader, cmd.time.nSystimestamp, 0);
                                 break;
                         case LINK_TSU_SET_META:
+                                isClr = 0;
                                 checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 if (pKodoUploader->pSessionMeta) {
                                         free(pKodoUploader->pSessionMeta);
@@ -1033,6 +1041,7 @@ static void * listenTsUpload(void *_pOpaque)
                                 pKodoUploader->pSessionMeta = cmd.pSessionMeta;
                                 break;
                         case LINK_TSU_CLR_META:
+                                isClr = 1;
                                 checkAndSetFirstSessionPicReportedStatus(pKodoUploader);
                                 if (pKodoUploader->pSessionMeta) {
                                         pKodoUploader->pSessionMeta->isOneShot = 1;
