@@ -874,7 +874,7 @@ static int updateSegmentId(void *_pOpaque, LinkSession* pSession,int64_t nTsStar
                 pFFTsMuxUploader->pUpdateQueue_->Push(pFFTsMuxUploader->pUpdateQueue_, (char *)&upparam, sizeof(SessionUpdateParam));
 
                 LinkLogDebug("=========================11>%s", pSession->sessionId);
-                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession);
+                LinkUpdateSegment(pFFTsMuxUploader->segmentHandle, pSession, NULL);
    
                 pSession->isNewSessionStarted = 0;
                 
@@ -1373,20 +1373,7 @@ int LinkSetTsType(IN LinkTsMuxUploader *_pTsMuxUploader, IN LinkSessionMeta *met
         
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        
-        LinkSessionMeta *pDup = NULL;
-        int ret = dupSessionMeta(metas, &pDup);
-        if (ret != LINK_SUCCESS) {
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return ret;
-        }
-        ret = LinkUpdateSegmentMeta(pFFTsMuxUploader->segmentHandle, pDup);
-        if (ret != LINK_SUCCESS) {
-                free(pDup);
-                pthread_mutex_unlock(&pFFTsMuxUploader->tokenMutex_);
-                return ret;
-        }
-        
+        int ret = 0;
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
                 LinkSessionMeta *pDup2 = NULL, *pDup3 = NULL;
                 ret = dupSessionMeta(metas, &pDup2);
@@ -1415,11 +1402,6 @@ void LinkClearTsType(IN LinkTsMuxUploader *_pTsMuxUploader) {
         
         FFTsMuxUploader * pFFTsMuxUploader = (FFTsMuxUploader *)_pTsMuxUploader;
         pthread_mutex_lock(&pFFTsMuxUploader->tokenMutex_);
-        int ret = LinkClearSegmentMeta(pFFTsMuxUploader->segmentHandle);
-        if (ret != LINK_SUCCESS) {
-                LinkLogError("LinkClearSegmentMeta fail:%d", ret);
-                return;
-        }
         
         if (pFFTsMuxUploader->pTsMuxCtx && pFFTsMuxUploader->pTsMuxCtx->pTsUploader_) {
                 LinkClearSessionMeta(pFFTsMuxUploader->pTsMuxCtx->pTsUploader_);
@@ -1568,7 +1550,7 @@ static int getJsonString(Buffer *buf, const char *pFieldname, cJSON *pJsonRoot) 
                 
                 return LINK_SUCCESS;
         }
-        LinkLogInfo("not found %s in json", pFieldname);
+        LinkLogDebug("not found %s in json", pFieldname);
         return LINK_JSON_FORMAT;
 }
 
@@ -1745,17 +1727,17 @@ static int updateToken(FFTsMuxUploader* pFFTsMuxUploader, int* pDeadline, Sessio
         
         int getTsToken = getJsonString(&bufTsToken, "tsToken", pJsonRoot);
         if (getTsToken == LINK_SUCCESS) {
-                LinkLogInfo("tsToken:%s", bufTsToken.pData);
+                LinkLogDebug("tsToken:%s", bufTsToken.pData);
         }
         
         int getFrameToken = getJsonString(&bufFrameToken, "frameToken", pJsonRoot);
         if (getFrameToken == LINK_SUCCESS) {
-                LinkLogInfo("frameToken:%s", bufFrameToken.pData);
+                LinkLogDebug("frameToken:%s", bufFrameToken.pData);
         }
         
         ret = getJsonString(&bufToken, "token", pJsonRoot);
         if (ret == LINK_SUCCESS) {
-                LinkLogInfo("token:%s", bufToken.pData);
+                LinkLogDebug("token:%s", bufToken.pData);
         } else if (ret == LINK_NO_MEMORY) {
                 if(getTsToken != LINK_SUCCESS || getFrameToken != LINK_SUCCESS)
                         goto END;
