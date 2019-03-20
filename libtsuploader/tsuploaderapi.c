@@ -168,6 +168,7 @@ int LinkGetUploadBufferUsedSize(LinkTsMuxUploader *_pTsMuxUploader)
 void LinkFreeUploader(LinkTsMuxUploader **pTsMuxUploader)
 {
         LinkDestroyTsMuxUploader(pTsMuxUploader);
+        LinkUninitSegmentMgr();
 }
 
 int LinkIsProcStatusQuit()

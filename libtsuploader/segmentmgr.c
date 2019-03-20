@@ -506,5 +506,7 @@ void LinkUninitSegmentMgr() {
         
         pthread_join(segmentMgr.segMgrThread_, NULL);
         LinkDestroyQueue(&segmentMgr.pSegQueue_);
+        memset(&segmentMgr, 0, sizeof(segmentMgr));
+        segMgrStarted = 0;
         return;
 }

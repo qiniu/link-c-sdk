@@ -1249,7 +1249,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         //LinkTsMuxUploader *pTsMuxUploader
         ret = linkNewTsMuxUploader(_pTsMuxUploader, _pAvArg, _pUserUploadArg, 1);
         if (ret != LINK_SUCCESS) {
-                LinkUninitSegmentMgr();
                 return ret;
         }
         FFTsMuxUploader *pFFTsMuxUploader = (FFTsMuxUploader*)(*_pTsMuxUploader);
@@ -1263,7 +1262,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         arg.pUploadStatArg = _pUserUploadArg->pUploadStatArg;
         ret = LinkNewSegmentHandle(&segHandle, &arg);
         if (ret != LINK_SUCCESS) {
-                LinkUninitSegmentMgr();
                 LinkDestroyTsMuxUploader(_pTsMuxUploader);
                 LinkLogError("LinkInitSegmentMgr fail:%d", ret);
                 return ret;
@@ -1280,7 +1278,6 @@ int LinkNewTsMuxUploaderWillPicAndSeg(LinkTsMuxUploader **_pTsMuxUploader, const
         PictureUploader *pPicUploader;
         ret = LinkNewPictureUploader(&pPicUploader, &fullArg);
         if (ret != LINK_SUCCESS) {
-                LinkUninitSegmentMgr();
                 LinkDestroyTsMuxUploader(_pTsMuxUploader);
                 LinkLogError("LinkNewPictureUploader fail:%d", ret);
                 return ret;
