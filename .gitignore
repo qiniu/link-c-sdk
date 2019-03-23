@@ -2,3 +2,5 @@ build*/
 output*/
 doc/html/
 libs/
+*.swp
+tags
