@@ -316,14 +316,26 @@ void LinkMqttDinit(struct MqttInstance* _pInstance)
                 return;
         }
         struct MQTTCtx *mqtt_ctx = (struct MQTTCtx*)(_pInstance->mosq);
-        if (mqtt_ctx->tx_buf)
+        if (mqtt_ctx->tx_buf) {
                 free(mqtt_ctx->tx_buf);
-        if (mqtt_ctx->rx_buf)
+                mqtt_ctx->tx_buf = NULL;
+        }
+
+        if (mqtt_ctx->rx_buf) {
                 free(mqtt_ctx->rx_buf);
-        if (mqtt_ctx->message)
+                mqtt_ctx->rx_buf = NULL;
+        }
+
+        if (mqtt_ctx->message) {
                 free(mqtt_ctx->message);
+                mqtt_ctx->message = NULL;
+        }
+
         MqttClientNet_DeInit(&mqtt_ctx->net);
-        free(_pInstance->mosq);
+        if (mqtt_ctx->message) {
+                free(_pInstance->mosq);
+                _pInstance->mosq = NULL;
+        }
 }
 
 MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
