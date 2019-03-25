@@ -143,7 +143,7 @@ void * LinkMqttThread(void* _pData)
                                 }
                         }
                         if (rc == MQTT_ERR_CONN_LOST) {
-                                ReConnect(pInstance, MQTT_ERR_CONN_LOST);
+                                LinkLogError("mqtt ping ack timeout.");
                                 if (nReconectPeriod > 1) {
                                         sleep(rand() % nReconectPeriod);
                                 }
