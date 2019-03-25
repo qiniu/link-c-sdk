@@ -175,6 +175,10 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
                 (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
         LinkMqttDisconnect(pInstance);
+        if(!pInstance->isDestroying) {
+                LinkMqttDinit(pInstance);
+                LinkMqttInit(pInstance);
+        }
         pInstance->connected = false;
         if (error_code == MQTT_CODE_SUCCESS) {
                 pInstance->status = STATUS_IDLE;
@@ -182,21 +186,9 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         else {
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
-        if (!pInstance->isDestroying) {
-                LinkMqttDinit(pInstance);
-                LinkMqttInit(pInstance);
-        }
         return 0;
 }
 
-int ReConnect(struct MqttInstance *instance, int error_code)
-{
-        struct MQTTCtx *mqttCtx = instance->mosq;
-        pthread_mutex_lock(&instance->listMutex);
-        int ret = OnDisconnectCallback(&mqttCtx->client, MQTT_CODE_ERROR_NETWORK, NULL);
-        pthread_mutex_unlock(&instance->listMutex);
-        return ret;
-}
 
 static int RecoverSub(IN struct MqttInstance *_pInstance)
 {
