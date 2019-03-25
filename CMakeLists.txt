@@ -59,11 +59,11 @@ endif()
 
 # Default C / CXX flags
 if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall ")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -ggdb -O0 -Wall")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -ggdb -O0 -Wall -fstack-protector-all")
 set(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -Wall -DNDEBUG")
