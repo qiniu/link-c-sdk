@@ -163,22 +163,33 @@ int LinkMqttLibCleanup()
 
 static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
 {
+
         struct MqttInstance *pInstance = client->ctx;
         if (error_code == MQTT_CODE_ERROR_TIMEOUT) {
                 return 0;
         }
         if (pInstance == NULL) {
-                 return 0;
+                return 0;
+        }
+        if(pInstance->connected == false) {
+                LinkLogInfo("OnDisconnectCallback processing;");
+                return 0;
         }
         LinkLogInfo("OnDisconnectCallback result %d %p", error_code, pInstance);
         OnEventCallback(pInstance,
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
                 (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
-
+        pthread_mutex_lock(&pInstance->netMutex);
+        if(pInstance->connected == false) {
+                LinkLogInfo("OnDisconnectCallback processing;");
+                pthread_mutex_unlock(&pInstance->netMutex);
+                return 0;
+        }
         if(!pInstance->isDestroying) {
                 LinkMqttDinit(pInstance);
                 LinkMqttInit(pInstance);
         }
+
         pInstance->connected = false;
         if (error_code == MQTT_CODE_SUCCESS) {
                 pInstance->status = STATUS_IDLE;
@@ -186,6 +197,7 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         else {
                 pInstance->status = STATUS_CONNECT_ERROR;
         }
+        pthread_mutex_unlock(&pInstance->netMutex);
         return 0;
 }
 
@@ -345,7 +357,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
-
+        pthread_mutex_lock(&_pInstance->netMutex);
         LinkLogInfo("MqttConnect host %s port %d keepalive %d", _pInstance->options.userInfo.pHostname, _pInstance->options.userInfo.nPort, _pInstance->options.nKeepalive);
         int rc = 0;
         MqttMessage lwt_msg;
@@ -382,6 +394,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
         if (rc != MQTT_CODE_SUCCESS) {
             sleep(1);
             LinkLogError("EstablishConnect failed rc %d %s \n", rc, MqttClient_ReturnCodeToString(rc));
+            pthread_mutex_unlock(&_pInstance->netMutex);
             return MqttErrorStatusChange(rc);
         }
         /* Send Connect and wait for Connect Ack */
@@ -393,6 +406,7 @@ MQTT_ERR_STATUS LinkMqttConnect(struct MqttInstance* _pInstance)
                 _pInstance->status = STATUS_CONNACK_RECVD;
         }
         usleep(100000);
+        pthread_mutex_unlock(&_pInstance->netMutex);
         OnEventCallback(_pInstance,
                (rc == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(rc),
                (rc == 0) ? "on connect success" : MqttClient_ReturnCodeToString(rc));
@@ -408,6 +422,7 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
         }
         struct MQTTCtx* ctx = (struct MQTTCtx*)(_pInstance->mosq);
         MqttClient* client = &ctx->client;
+        pthread_mutex_lock(&_pInstance->netMutex);
 #ifdef WITH_WOLFSSL
         if (client->tls.ctx) {
                 wolfSSL_CTX_free(client->tls.ctx);
@@ -419,6 +434,7 @@ void LinkMqttDisconnect(struct MqttInstance* _pInstance)
                 LinkLogError("MQTT Disconnect: %s (%d)\n", MqttClient_ReturnCodeToString(rc), rc);
         }
         _pInstance->connected = false;
+        pthread_mutex_unlock(&_pInstance->netMutex);
 }
 
 MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
