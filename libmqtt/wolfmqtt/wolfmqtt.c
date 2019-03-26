@@ -174,7 +174,7 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
         OnEventCallback(pInstance,
                 (error_code == MQTT_CODE_SUCCESS) ? MQTT_SUCCESS : MqttErrorStatusChange(error_code),
                 (error_code == 0) ? "on disconnect success" : MqttClient_ReturnCodeToString(error_code));
-        LinkMqttDisconnect(pInstance);
+
         if(!pInstance->isDestroying) {
                 LinkMqttDinit(pInstance);
                 LinkMqttInit(pInstance);
