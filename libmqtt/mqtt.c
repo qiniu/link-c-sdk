@@ -99,6 +99,7 @@ static void LinkMqttInstanceInit(struct MqttInstance* _pInstance, const struct M
         _pInstance->isDestroying = false;
         _pInstance->pSubsribeList.pNext = NULL;
         pthread_mutex_init(&_pInstance->listMutex, NULL);
+        pthread_mutex_init(&_pInstance->netMutex, NULL);
 }
 
 void * LinkMqttThread(void* _pData)
@@ -174,6 +175,7 @@ void LinkMqttDestroyInstance(IN const void* _pInstance)
         SafeFree(pInstance->options.userInfo.pCertfile);
         SafeFree(pInstance->options.userInfo.pKeyfile);
         pthread_mutex_destroy(&pInstance->listMutex);
+        pthread_mutex_destroy(&pInstance->netMutex);
         if (pInstance) free(pInstance);
 }
 
