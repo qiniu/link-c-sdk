@@ -81,7 +81,6 @@ int LinkMqttPublish(IN const void* _pInstance, IN const char* _pTopic, IN int _n
         publish.buffer = (byte *)_pPayload;
         publish.total_len = (word16)_nPayloadlen;
         pthread_mutex_lock(&pInstance->listMutex);
-        pthread_mutex_lock(&pInstance->netMutex);
         if (!pInstance->connected) {
                 rc = MQTT_CODE_ERROR_NETWORK;
                 goto err;
@@ -92,7 +91,6 @@ err:
         if (rc != MQTT_CODE_SUCCESS) {
                 LinkLogError("MQTT Publish fail, %s(%d)", MqttClient_ReturnCodeToString(rc), rc);
         }
-        pthread_mutex_unlock(&pInstance->netMutex);
         pthread_mutex_unlock(&pInstance->listMutex);
         usleep(1000);
         return MqttErrorStatusChange(rc);
@@ -194,12 +192,11 @@ static int OnDisconnectCallback(MqttClient* client, int error_code, void* ctx)
                 pthread_mutex_unlock(&pInstance->netMutex);
                 return 0;
         }
+        pInstance->connected = false;
         if(!pInstance->isDestroying) {
                 LinkMqttDinit(pInstance);
                 LinkMqttInit(pInstance);
         }
-
-        pInstance->connected = false;
         if (error_code == MQTT_CODE_SUCCESS) {
                 pInstance->status = STATUS_IDLE;
         }
@@ -461,12 +458,9 @@ MQTT_ERR_STATUS LinkMqttLoop(struct MqttInstance* _pInstance)
                 if (ctx->nWaitTimeoutCount * DEFAULT_CON_TIMEOUT_MS >= ctx->connect.keep_alive_sec * 1000) {
                         /* MQTT ping operation */
                         for ( ; ctx->nPingTimeoutCount * DEFAULT_CON_TIMEOUT_MS < ctx->connect.keep_alive_sec * 1000; ++ ctx->nPingTimeoutCount) {
-                                pthread_mutex_lock(&_pInstance->netMutex);
                                 if (_pInstance->connected) {
                                         rc = MqttClient_Ping(&client);
-                                        pthread_mutex_unlock(&_pInstance->netMutex);
                                 } else {
-                                        pthread_mutex_unlock(&_pInstance->netMutex);
                                         break;
                                 }
                                 if (rc == MQTT_CODE_SUCCESS) {
