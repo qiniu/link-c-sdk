@@ -144,11 +144,9 @@ int AlarmCallback( int alarm, void *data )
         gIpc.detectMoving = alarm;
         if ( gIpc.stream[STREAM_MAIN].uploader ) {
             LinkClearTsType(gIpc.stream[STREAM_MAIN].uploader);
-            LinkFlushUploader( gIpc.stream[STREAM_MAIN].uploader );
         }
         if ( gIpc.stream[STREAM_SUB].uploader ) {
             LinkClearTsType(gIpc.stream[STREAM_SUB].uploader);
-            LinkFlushUploader( gIpc.stream[STREAM_SUB].uploader );
         }
     } else if ( alarm == ALARM_JPEG_CAPTURED ) {
         void *pBuf = NULL;
