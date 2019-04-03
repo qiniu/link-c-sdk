@@ -175,7 +175,7 @@ int LinkNewPictureUploader(PictureUploader **_pPicUploader, LinkPicUploadFullArg
         }
         memset(pPicUploader, 0, sizeof(PicUploader));
         
-        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 64);
+        int ret = LinkNewCircleQueue(&pPicUploader->pSignalQueue_, 1, TSQ_FIX_LENGTH, sizeof(LinkPicUploadSignal) + sizeof(int), 64, NULL);
         if (ret != 0) {
                 free(pPicUploader);
                 return ret;

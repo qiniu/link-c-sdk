@@ -42,6 +42,7 @@ struct MqttInstance
         bool isDestroying;
         Node pSubsribeList;
         pthread_mutex_t listMutex;
+        pthread_mutex_t netMutex;
 }MqttInstance;
 
 int LinkMqttInit(struct MqttInstance* pInstance);

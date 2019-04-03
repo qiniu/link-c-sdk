@@ -99,6 +99,7 @@ static void LinkMqttInstanceInit(struct MqttInstance* _pInstance, const struct M
         _pInstance->isDestroying = false;
         _pInstance->pSubsribeList.pNext = NULL;
         pthread_mutex_init(&_pInstance->listMutex, NULL);
+        pthread_mutex_init(&_pInstance->netMutex, NULL);
 }
 
 void * LinkMqttThread(void* _pData)
@@ -124,7 +125,7 @@ void * LinkMqttThread(void* _pData)
                                  if (nReconectPeriod > 1) {
                                          sleep(rand() % nReconectPeriod);
                                  }
-                                 nReconectPeriod = (nReconectPeriod < 128) ? nReconectPeriod * 2 : nReconectPeriod;
+                                 nReconectPeriod = (nReconectPeriod < 64) ? nReconectPeriod * 2 : nReconectPeriod;
                                  /* connect do */
                                  rc = LinkMqttConnect(pInstance);
                          }
@@ -143,7 +144,7 @@ void * LinkMqttThread(void* _pData)
                                 }
                         }
                         if (rc == MQTT_ERR_CONN_LOST) {
-                                ReConnect(pInstance, MQTT_ERR_CONN_LOST);
+                                LinkLogError("mqtt ping ack timeout.");
                                 if (nReconectPeriod > 1) {
                                         sleep(rand() % nReconectPeriod);
                                 }
@@ -174,6 +175,7 @@ void LinkMqttDestroyInstance(IN const void* _pInstance)
         SafeFree(pInstance->options.userInfo.pCertfile);
         SafeFree(pInstance->options.userInfo.pKeyfile);
         pthread_mutex_destroy(&pInstance->listMutex);
+        pthread_mutex_destroy(&pInstance->netMutex);
         if (pInstance) free(pInstance);
 }
 
@@ -198,4 +200,13 @@ void LinkMqttDestroy(IN const void* _pInstance)
 {	
         struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
         pInstance->isDestroying = true;
+}
+
+bool LinkMqttIsConnected(IN const void* _pInstance)
+{
+        if (!_pInstance) {
+                return false;
+        }
+        struct MqttInstance* pInstance = (struct MqttInstance*)(_pInstance);
+        return pInstance->connected;
 }

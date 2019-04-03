@@ -89,6 +89,7 @@ typedef struct _LinkUploadArg {
         void *pGetPictureCallbackUserData;      /**< 图片上传回调函数 */
         UploadStatisticCallback *pUpStatCb;     /*上传结果回调*/
         void *pUpStatCbUserArg;                 /*作为上传结果回调的第一个参数*/
+        int nTsMaxSize;                         /*ts切片的最大大小*/
 
         void * reserved1;                       /**< 预留1 */
         void * reserved2;                       /**< 预留2 */
@@ -161,11 +162,11 @@ typedef int (*LinkTsOutput)(const char *buffer, int size, void *userCtx, LinkMed
  *
  * @param[out] pTsMuxUploader 切片上传实例
  * @param[in]  pTsDataCb 回调函数
- * @param[in]  pUserArg 作为pTsDataCb函数的userCtx参数，返回给用户
+ * @param[in]  userCtx 自定义参数，作为 pTsDataCb 回调函数的第三个参数
  */
 void LinkUploaderSetTsOutputCallback(LinkTsMuxUploader *pTsMuxUploader,
                                      LinkTsOutput pTsDataCb,
-                                     void * pUserArg
+                                     void * userCtx
                                      );
 
 
@@ -175,27 +176,27 @@ typedef enum {
         LinkCloudStorageStateOff = 2
 }LinkCloudStorageState;
 
-typedef void(*LinkCloudStorageStateCallback)(void *pOpaue, LinkCloudStorageState state);
+typedef void(*LinkCloudStorageStateCallback)(void * userCtx, LinkCloudStorageState state);
 
 /**
  * 云存储状态回调函数
  *
  * @param[in] pTsMuxUploader 切片上传实例
  * @param[in] cb 回调函数
- * @param[in] pOpaque 用户参数，会在cb回调函数的第一个参数中返回
+ * @param[in] userCtx 用户自定义参数，作为 cb 回调函数的第一个参数
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 void LinkSetCloudStorageStateCallback(LinkTsMuxUploader *pTsMuxUploader,
-	LinkCloudStorageStateCallback cb, void *pOpaue);
+	LinkCloudStorageStateCallback cb, void * userCtx);
 
 /**
  * 发送图片上传信号
  *
  * @param[in] pTsMuxUploader 切片上传实例
- * @param[in] pOpaque
- * @param[in] pBuf 上传类型是文件时为图片本地文件名，上传类型是缓存时为缓存指针
- * @param[in] nBuflen 缓存长度或者文件名长度
- * @param[in] type 上传类型，文件上传 或者 缓存上传
+ * @param[in] pFilename 图片文件名
+ * @param[in] nFilenameLen 图片文件名长度
+ * @param[in] pBuf 图片内容
+ * @param[in] nBuflen 图片内容长度
  * @return LINK_SUCCESS 成功; 其它值 失败
  */
 int LinkPushPicture(LinkTsMuxUploader *pTsMuxUploader,

@@ -19,6 +19,7 @@ typedef struct _LinkTsUploadArg {
         void *pUploadStatArg;
         int64_t nSegSeqNum;
         int64_t nLastCheckTime;
+        int nTsMaxSize;
 }LinkTsUploadArg;
 
 typedef struct _LinkReportTimeInfo {
@@ -52,7 +53,7 @@ void LinkSetSessionMeta(IN LinkTsUploader * _pUploader, LinkSessionMeta *pSessio
 void LinkClearSessionMeta(IN LinkTsUploader * _pUploader);
 int LinkTsUploaderPushPic(IN LinkTsUploader * _pUploader, LinkPicture pic);
 void LinkTsUploaderSetPlanType(IN LinkTsUploader * _pUploader, LinkPlanType planType);
-
+void LinkSetTsCacheBufferInitSize(IN LinkTsUploader * _pUploader, int nSize, int isFix);
 void LinkTsUploaderSetTsCallback(IN LinkTsUploader * _pUploader, IN LinkTsOutput, IN void * pUserArg, IN LinkMediaArg mediaArg);
 
 #endif

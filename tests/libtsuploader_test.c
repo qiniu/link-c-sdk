@@ -35,10 +35,12 @@ typedef struct {
         int64_t nRolloverTestBase;
         const char *pAFilePath;
         const char *pVFilePath;
+        const char *pPicPath;
         const char *pConfigUrl;
         const char *pDak;
         const char *pDsk;
         bool IsFileLoop;
+        bool IsLogToConsole;
         int  nLoopSleeptime;
         int nRoundCount;
         bool IsQuit;
@@ -509,7 +511,7 @@ static int dataCallback(void *opaque, void *pData, int nDataLen, int nFlag, int6
                         metas.valuelens = valuelens;
                         
                         metas.isOneShot = 1;
-                        LinkSetTsType(pAvuploader->pTsMuxUploader, &metas);
+                        //LinkSetTsType(pAvuploader->pTsMuxUploader, &metas);
                 }
                 if (nIsKeyFrame && pAvuploader->nVideoKeyframeAccLen != 0) {
                         //printf("nVideoKeyframeAccLen:%d\n", nVideoKeyframeAccLen);
@@ -588,6 +590,35 @@ int tsToFile(const char *buffer, int size, void *userCtx, LinkMediaInfo info) {
                 fflush(pTsFile);
         }
         return 0;
+}
+
+void *mimicSetType(void *p) {
+        LinkTsMuxUploader *_pTsMuxUploader = (LinkTsMuxUploader *)p;
+        int64_t c = 0;
+        LinkSessionMeta metas = {0};
+        metas.len = 1;
+        char *keys[1] = {"type"};
+        metas.keys = (const char **)keys;
+        int keylens[1] = {4};
+        metas.keylens = keylens;
+        
+        char *values[1] = {"move"};
+        metas.values = (const char **)values;
+        int valuelens[1] = {4};
+        metas.valuelens = valuelens;
+        while(1) {
+                if(c % 2 == 0) {
+                        sleep(60);
+                        fprintf(stderr, "set move");
+                        LinkSetTsType(_pTsMuxUploader, &metas);
+                } else {
+                        sleep(20);
+                        fprintf(stderr, "clear move");
+                        LinkClearTsType(_pTsMuxUploader);
+                }
+                c++;
+        }
+        return NULL;
 }
 
 static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader, LinkUploadArg *_pUserUploadArg) {
@@ -706,6 +737,7 @@ int main(int argc, const char** argv)
         flag_bool(&cmdArg.IsTestTimestampRollover, "rollover", "will set start pts to 95437000. ts will roll over about 6.x second laetr.only effect for not input from ffmpeg");
         flag_bool(&cmdArg.IsDropFirstKeyFrame, "drop_first_keyframe", "drop first keyframe");
         flag_bool(&cmdArg.IsFileLoop, "fileloop", "in file mode and only one upload, will loop to push file");
+        flag_bool(&cmdArg.IsLogToConsole, "logconsole", "log print to console");
 
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
@@ -713,6 +745,7 @@ int main(int argc, const char** argv)
 
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
+        flag_str(&cmdArg.pPicPath, "picpath", "set picture file path.like /root/a.aac");
         flag_str(&cmdArg.pConfigUrl, "confurl", "url where to get config");
         flag_str(&cmdArg.pDak, "dak", "device access token");
         flag_str(&cmdArg.pDsk, "dsk", "device secret token");
@@ -756,7 +789,11 @@ int main(int argc, const char** argv)
 
         checkCmdArg(argv[0]);
         
-        const char *file = MATERIAL_PATH"3c.jpg";
+        const char *file = NULL;
+        if (cmdArg.pPicPath == NULL)
+                file = MATERIAL_PATH"3c.jpg";
+        else
+                file = cmdArg.pPicPath;
         if (gpPictureBuf == NULL) {
                 int ret = readFileToBuf(file, &gpPictureBuf, &gnPictureBufLen);
                 if (ret != 0) {
@@ -790,6 +827,7 @@ int main(int argc, const char** argv)
 
         int ret = 0;
 
+        LinkSetLogLevel(LINK_LOG_LEVEL_DEBUG);
         LinkSetLogCallback(logCb);
         signal(SIGINT, signalHander);
         signal(SIGQUIT, signalHander);
@@ -835,6 +873,11 @@ int main(int argc, const char** argv)
                 return ret;
         }
         cmdArg.pFirstUploader = avuploader.pTsMuxUploader;
+        if (cmdArg.IsLogToConsole)
+                LinkSetLogCallback(logCb);
+        
+        pthread_t setType;
+        pthread_create(&setType, NULL, mimicSetType, avuploader.pTsMuxUploader);
         
 
         avuploader.pAFile = pAFile;
@@ -862,6 +905,5 @@ int main(int argc, const char** argv)
         }
         LinkCleanup();
         LinkLogInfo("should total:%d\n", avuploader.nByteCount);
-
         return 0;
 }

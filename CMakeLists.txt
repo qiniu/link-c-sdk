@@ -9,13 +9,11 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/CMake" ${CMAKE_MODULE_PATH})
 include(Utilities)
 include(GNUInstallDirs)
 
-project (link-c-sdk)
-
 # ------------------------------------------------------------------------------
 # Cross compile
 # ------------------------------------------------------------------------------
 
-if(CROSS_COMPILE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
+if(CROSS_COMPILE)
   set(CMAKE_C_COMPILER ${CROSS_COMPILE}-gcc)
   set(CMAKE_CXX_COMPILER ${CROSS_COMPILE}-g++)
   set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
@@ -23,6 +21,12 @@ if(CROSS_COMPILE AND "${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
   set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
   set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 endif()
+
+# ------------------------------------------------------------------------------
+# Project
+# ------------------------------------------------------------------------------
+
+project (link-c-sdk)
 
 # ------------------------------------------------------------------------------
 # Get and Display infomation
@@ -55,11 +59,11 @@ endif()
 
 # Default C / CXX flags
 if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall ")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -ggdb -O0 -Wall")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g -ggdb -O0 -Wall -fstack-protector-all")
 set(CMAKE_CXX_FLAGS_DEBUG ${CMAKE_C_FLAGS_DEBUG})
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -Wall -DNDEBUG")
@@ -81,7 +85,7 @@ endif()
 
 set(LINK_C_SDK_VERSION_MAJOR 1)
 set(LINK_C_SDK_VERSION_MINOR 0)
-set(LINK_C_SDK_VERSION_PATCH 3)
+set(LINK_C_SDK_VERSION_PATCH 4)
 set(LINK_C_SDK_RELEASE_VERSION ${LINK_C_SDK_VERSION_MAJOR}.${LINK_C_SDK_VERSION_MINOR}.${LINK_C_SDK_VERSION_PATCH})
 message(STATUS "link-c-sdk release version: " ${LINK_C_SDK_RELEASE_VERSION})
 
@@ -233,14 +237,15 @@ add_subdirectory(tests)
 if(WITH_DEMO)
 	add_subdirectory(demo)
 endif()
+add_subdirectory( sample )
 
 # ------------------------------------------------------------------------------
 # Sample
 # ------------------------------------------------------------------------------
 
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/sample/
-  DESTINATION sample
-  )
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/tests/material
-  DESTINATION sample
-  )
+#install(DIRECTORY ${PROJECT_SOURCE_DIR}/sample/
+#  DESTINATION sample
+#  )
+#install(DIRECTORY ${PROJECT_SOURCE_DIR}/tests/material
+#  DESTINATION sample
+#  )
