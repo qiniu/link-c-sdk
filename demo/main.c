@@ -210,8 +210,12 @@ static int CaptureDevInit( )
     if ( gIpc.config.audioType ) {
         if ( strcmp( gIpc.config.audioType, "aac" ) == 0 ) {
             audioType = AUDIO_AAC;
+        } else if ( strcmp( gIpc.config.audioType, "g711a" ) == 0 ) {
+            audioType = AUDIO_G711A;
+        } else if( strcmp( gIpc.config.audioType, "g711u") == 0 ) {
+            audioType = AUDIO_G711U;
         } else {
-            audioType = AUDIO_G711;
+            audioType = AUDIO_AAC;
         }
     }
     gIpc.dev->init( audioType, gIpc.config.multiChannel, VideoGetFrameCb, AudioGetFrameCb );
@@ -299,9 +303,15 @@ int _TsUploaderSdkInit( StreamChannel ch )
     if ( gIpc.audioType == AUDIO_AAC ) {
         userUploadArg.nAudioFormat = LINK_AUDIO_AAC;
         userUploadArg.nSampleRate = 16000;
-    } else {
+    } else if ( gIpc.audioType == AUDIO_G711U ){
         userUploadArg.nAudioFormat = LINK_AUDIO_PCMU;
         userUploadArg.nSampleRate = 8000;
+    } else if ( gIpc.audioType == AUDIO_G711A ) {
+        userUploadArg.nAudioFormat = LINK_AUDIO_PCMA;
+        userUploadArg.nSampleRate = 16000;
+    } else {
+        LOGE("get audio type error\n");
+        return -1;
     }
     if ( STREAM_MAIN == ch ) {
         sprintf( gIpc.stream[ch].devId, "%s%s", gIpc.devId, "a" );
@@ -434,6 +444,7 @@ char *GetAacFile()
     return gIpc.config.aac_file;
 }
 
+void SdkLogCallback(int nLogLevel, char *log );
 int main()
 {
     char *logFile = NULL;
@@ -480,6 +491,7 @@ int main()
     CaptureDevStartStream();
     StartUpgradeTask();
 
+    //LinkSetLogCallback( SdkLogCallback );
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
