@@ -1,4 +1,4 @@
-// Last Update:2019-01-30 16:49:42
+// Last Update:2019-04-03 10:05:03
 /**
  * @file dev_core.h
  * @brief 
@@ -24,7 +24,8 @@ typedef enum {
 
 typedef enum {
     AUDIO_AAC,
-    AUDIO_G711
+    AUDIO_G711U,
+    AUDIO_G711A,
 } AudioType;
 
 typedef int (*VideoFrameCb) ( char *_pFrame, 
