@@ -21,7 +21,7 @@ char *gpPictureBuf = NULL;
 int gnPictureBufLen = 0;
 
 typedef struct {
-        bool IsTestAAC;
+        const char * IsTestAAC;
         bool IsTestAACWithoutAdts;
         bool IsTestTimestampRollover;
         bool IsTestH265;
@@ -31,6 +31,7 @@ typedef struct {
         bool IsWriteVideoFrame;
         bool IsEnableTsCb;
         int nSleeptime;
+        int nAudioSampleRate;
         int nFirstFrameSleeptime;
         int64_t nRolloverTestBase;
         const char *pAFilePath;
@@ -293,9 +294,12 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
         int IsFirst = 1;
         int64_t aacFrameCount = 0;
         if (bAudioOk) {
-                if (cmdArg.IsTestAAC)
+                if (memcmp(cmdArg.IsTestAAC, "aac", 3) == 0)
                         isAAC = 1;
         }
+	int audioFrameLen = 160;
+	if (cmdArg.nAudioSampleRate == 16000)
+		audioFrameLen = 320;
         while (!cmdArg.IsQuit && (bAudioOk || bVideoOk)) {
                 if (bVideoOk && nNow+1 > nNextVideoTime) {
                         
@@ -426,13 +430,13 @@ int start_file_test(const char * _pAudioFile, const char * _pVideoFile, DataCall
                                         bAudioOk = 0;
                                 }
                         } else {
-                                if(audioOffset+160 <= nAudioDataLen) {
-                                        cbRet = callback(opaque, pAudioData + audioOffset, 160, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
+                                if(audioOffset+audioFrameLen<= nAudioDataLen) {
+                                        cbRet = callback(opaque, pAudioData + audioOffset, audioFrameLen, THIS_IS_AUDIO, nNextAudioTime-nSysTimeBase+cmdArg.nRolloverTestBase, 0);
                                         if (cbRet != 0  && cbRet != LINK_PAUSED) {
                                                 bAudioOk = 0;
                                                 continue;
                                         }
-                                        audioOffset += 160;
+                                        audioOffset += audioFrameLen;
                                         nNextAudioTime += 20;
                                 } else {
                                         bAudioOk = 0;
@@ -648,7 +652,7 @@ static int wrapLinkCreateAndStartAVUploader(LinkTsMuxUploader **_pTsMuxUploader,
 static void checkCmdArg(const char * name)
 {
         if (cmdArg.IsTestAACWithoutAdts)
-                cmdArg.IsTestAAC = true;
+                cmdArg.IsTestAAC = "aac";
 
         if (cmdArg.IsTestMove) {
                 if (cmdArg.nSleeptime == 0) {
@@ -726,7 +730,7 @@ extern const char *gVersionAgent;
 int main(int argc, const char** argv)
 {
         // default test v: H.264  a: G711
-        flag_bool(&cmdArg.IsTestAAC, "testaac", "input aac audio");
+        flag_str(&cmdArg.IsTestAAC, "afmt", "audio format. (pcmu/pcma/aac)");
         flag_bool(&cmdArg.IsTestAACWithoutAdts, "noadts", "input aac audio without adts. will set --testaac");
         flag_bool(&cmdArg.IsTestH265, "testh265", "input h264 video");
 
@@ -742,6 +746,7 @@ int main(int argc, const char** argv)
         flag_int(&cmdArg.nLoopSleeptime, "csleeptime", "next round sleeptime");
         flag_int(&cmdArg.nSleeptime, "sleeptime", "sleep time(milli) used by testmove.default(2s) if testmove is enable");
         flag_int(&cmdArg.nFirstFrameSleeptime, "fsleeptime", "first video key frame sleep time(milli)");
+        flag_int(&cmdArg.nAudioSampleRate, "ar", "sample rate(8000)");
 
         flag_str(&cmdArg.pAFilePath, "afpath", "set audio file path.like /root/a.aac");
         flag_str(&cmdArg.pVFilePath, "vfpath", "set video file path.like /root/a.h264");
@@ -777,8 +782,12 @@ int main(int argc, const char** argv)
                         exit(EXIT_FAILURE);
                 }
         }
+        if (cmdArg.nAudioSampleRate <= 0)
+                cmdArg.nAudioSampleRate = 8000;
+        if (!cmdArg.IsTestAAC)
+                cmdArg.IsTestAAC = "pcmu";
 
-        printf("cmdArg.IsTestAAC=%d\n", cmdArg.IsTestAAC);
+        printf("cmdArg.IsTestAAC=%s\n", cmdArg.IsTestAAC);
         printf("cmdArg.IsTestAACWithoutAdts=%d\n", cmdArg.IsTestAACWithoutAdts);
         printf("cmdArg.IsTestH265=%d\n", cmdArg.IsTestH265);
         printf("cmdArg.pAFilePath=%s\n", cmdArg.pAFilePath);
@@ -805,10 +814,12 @@ int main(int argc, const char** argv)
         const char *pVFile = NULL;
         const char *pAFile = NULL;
 
-        if(cmdArg.IsTestAAC) {
+        if(memcmp(cmdArg.IsTestAAC, "aac", 3) == 0) {
                 pAFile = MATERIAL_PATH"h265_aac_1_16000_a.aac";
-	} else {
+	} else if(memcmp(cmdArg.IsTestAAC, "pcmu", 4) == 0) {
                 pAFile = MATERIAL_PATH"h265_aac_1_16000_pcmu_8000.mulaw";
+        } else if(memcmp(cmdArg.IsTestAAC, "pcma", 4) == 0) {
+                pAFile = MATERIAL_PATH"h265_aac_1_16000_pcma_16000.alaw";
         }
         if(cmdArg.IsTestH265) {
                 pVFile = MATERIAL_PATH"h265_aac_1_16000_v.h265";
@@ -837,12 +848,15 @@ int main(int argc, const char** argv)
         memset(&avuploader, 0, sizeof(avuploader));
         avuploader.userUploadArg.nChannels = 1;
         if (!cmdArg.IsNoAudio) {
-                if(cmdArg.IsTestAAC) {
+                if(memcmp(cmdArg.IsTestAAC, "aac", 3) == 0) {
                         avuploader.userUploadArg.nAudioFormat = LINK_AUDIO_AAC;
                         avuploader.userUploadArg.nSampleRate = 16000;
-                } else {
+ 	        } else if(memcmp(cmdArg.IsTestAAC, "pcmu", 4) == 0) {
                         avuploader.userUploadArg.nAudioFormat = LINK_AUDIO_PCMU;
-                        avuploader.userUploadArg.nSampleRate = 8000;
+                        avuploader.userUploadArg.nSampleRate = cmdArg.nAudioSampleRate;
+                } else if(memcmp(cmdArg.IsTestAAC, "pcma", 4) == 0) {
+                        avuploader.userUploadArg.nAudioFormat = LINK_AUDIO_PCMA;
+                        avuploader.userUploadArg.nSampleRate = cmdArg.nAudioSampleRate;
                 }
         }
 

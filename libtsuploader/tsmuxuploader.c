@@ -1597,15 +1597,15 @@ static int getRemoteConfig(FFTsMuxUploader* pFFTsMuxUploader, int *pUpdateConfig
         pRc->updateConfigInterval = pNode->valueint;
         *pUpdateConfigInterval = pNode->valueint;
         
-        pNode = cJSON_GetObjectItem(pJsonRoot, "uploadMode");
-        if (pNode != NULL) {
-                pRc->planType = pNode->valueint;
-        }
-        
         cJSON *pSeg = cJSON_GetObjectItem(pJsonRoot, "segment");
         if (pSeg == NULL) {
                 cJSON_Delete(pJsonRoot);
                 return LINK_JSON_FORMAT;
+        }
+        
+        pNode = cJSON_GetObjectItem(pSeg, "uploadMode");
+        if (pNode != NULL) {
+                pRc->planType = pNode->valueint;
         }
         
         ret = getJsonString(&pRc->upHostUrl, "uploadUrl", pSeg);
