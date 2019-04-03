@@ -491,7 +491,7 @@ int main()
     CaptureDevStartStream();
     StartUpgradeTask();
 
-    LinkSetLogCallback( SdkLogCallback );
+    //LinkSetLogCallback( SdkLogCallback );
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );
