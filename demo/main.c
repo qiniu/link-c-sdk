@@ -449,6 +449,7 @@ int main()
 {
     char *logFile = NULL;
     char used[1024] = { 0 };
+    char *output = NULL;
 
     gIpc.version = "v00.00.07";
     gIpc.running = 1;
@@ -491,7 +492,10 @@ int main()
     CaptureDevStartStream();
     StartUpgradeTask();
 
-    //LinkSetLogCallback( SdkLogCallback );
+    output = getenv( "TSUPLOADER_SDK_LOG_OUTPUT" );
+    if ( output && strcmp( output, "local") == 0 ) {
+        LinkSetLogCallback( SdkLogCallback );
+    }
     DBG_LOG("compile time : %s %s \n", __DATE__, __TIME__ );
     DBG_LOG("gIpc.version : %s\n", gIpc.version );
     DBG_LOG("commit id : %s dev_id : %s \n", CODE_VERSION, gIpc.devId );

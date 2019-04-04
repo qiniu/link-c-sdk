@@ -5,6 +5,11 @@
 - 运行程序之前需要先将demo/ipc.conf下的文件写入正确的配置，然后拷贝到/tmp/ipc.conf目录下，程序才能够正常执行，ipc.conf有几个选项是必须要设置的
 - 关于ipc.conf如何进行配置详细见文件demo/ipc.conf，里面对每一个选项有详细的介绍
 
+### 运行时参数
+- 通过设置TSUPLOADER_SDK_LOG_OUTPUT环境变量确定tsuploader sdk日志的输出方式
+    - **local** 本地日志输出
+    - **mqtt** 通过mqtt输出日志
+
 ### 代码说明
 - main.c - 程序入口，初始化ts切片sdk，初始化模拟的ipc设备
 - dev_core.c - 对于ipc的一个抽象层，提供通用的接口，来屏蔽ipc的细节。一个新的ipc平台如果想跑起来，只需要实现它的接口就可以。
