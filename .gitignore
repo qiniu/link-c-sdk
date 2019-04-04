@@ -4,3 +4,4 @@ doc/html/
 libs/
 *.swp
 tags
+cscope*
