@@ -307,7 +307,8 @@ void InitConfig()
 
 void LoadConfig()
 {
-    if (cfg_load(gIpc.cfg,"/tmp/oem/app/ipc.conf") < 0) {
+    if ( cfg_load(gIpc.cfg, "/tmp/oem/app/ipc.conf") < 0
+        && cfg_load(gIpc.cfg, "/mnt/nand/qnlinking.conf") < 0 ) {
         fprintf(stderr,"Unable to load ipc.conf\n");
     }
 }
