@@ -42,3 +42,21 @@ void LinkLog(int nLevel, char * pFmt, ...)
                 }
         }
 }
+
+void DbgDumpBuf( int line, const char *func, char *buf, int size )
+{
+    int i = 0;
+    int j = 0;
+
+    if ( size > 192 )
+        size = 192;
+
+    printf("[ %s %d ] size : %d the buffer  is : \n[%02d] ",  func, line, size,  j++  );
+    for ( i=0; i<size; i++ ) {
+        printf("0x%02x, ", (unsigned char)buf[i] );
+        if ( (i+1)%16 == 0 ) {
+            printf("\n[%02d] ", j++ );
+        }
+    }
+    printf("\n");
+}

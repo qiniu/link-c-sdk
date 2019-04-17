@@ -238,6 +238,7 @@ if(WITH_DEMO)
 	add_subdirectory(demo)
 endif()
 add_subdirectory( sample )
+add_subdirectory(libfastrtmp)
 
 # ------------------------------------------------------------------------------
 # Sample

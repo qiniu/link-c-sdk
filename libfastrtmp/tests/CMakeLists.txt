@@ -1,0 +1,25 @@
+cmake_minimum_required (VERSION 2.8)
+
+if(WITH_WOLFSSL)
+  link_directories(${WOLFSSL_LIBRARIES})
+  include_directories($WOLFSSL_INCLUDE_DIRS)
+  set(TESTWSS_OPTLIB "wolfssl")
+endif()
+link_directories(${LIBGHTTP_LIBRARIES})
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../flv )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../fastrtmp )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../wss )
+include_directories( ${CMAKE_CURRENT_SOURCE_DIR}/../sample/devices)
+
+AUX_SOURCE_DIRECTORY( ${CMAKE_CURRENT_SOURCE_DIR}/../tools DIR_SRCS_FLV)
+ADD_EXECUTABLE( testflv ${DIR_SRCS_FLV} ./testflv.c ../sample/devices/dev_core.c ../sample/devices/ipc_simulator.c  )
+target_link_libraries( testflv fastrtmp_STATIC pthread )
+
+AUX_SOURCE_DIRECTORY( ${CMAKE_CURRENT_SOURCE_DIR}/../tools DIR_SRCS_WSS)
+ADD_EXECUTABLE( testwss ${DIR_SRCS_WSS} ./testwss.c )
+target_link_libraries( testwss fastrtmp_STATIC ghttp ${TESTWSS_OPTLIB} pthread m)
+
+ADD_EXECUTABLE( testrtmp ${DIR_SRCS_RTMP} ./testfastrtmp.c ../sample/devices/dev_core.c )
+target_link_libraries( testrtmp fastrtmp_STATIC ghttp ${TESTWSS_OPTLIB} pthread m)
+add_dependencies(testwss fastrtmp_STATIC )
+add_dependencies(testrtmp fastrtmp_STATIC )

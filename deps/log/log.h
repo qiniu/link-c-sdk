@@ -54,5 +54,8 @@ void LinkLog(IN int nLevel, IN char * pFmt, ...);
 #define LinkLogError(fmt,...) \
         LinkLog(LINK_LOG_LEVEL_ERROR, "[E]" __PROJECT__ __FILE_NAME__ __FILE_LINE__ " " fmt "\n", ##__VA_ARGS__)
 
+#define DUMPBUF( buf, size ) DbgDumpBuf( __LINE__, __FUNCTION__, buf, size )
+void DbgDumpBuf( int line, const char *func, char *buf, int size );
+
 #endif //__LINK_LOG_H__
 
