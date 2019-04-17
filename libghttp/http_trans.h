@@ -97,7 +97,7 @@ void
 http_trans_buf_clip(http_trans_conn *a_conn, char *a_clip_to);
 
 int
-http_trans_connect(http_trans_conn *a_conn);
+http_trans_connect(http_trans_conn *a_conn, int ctype);
 
 int
 http_trans_conn_set_ssl(http_trans_conn * a_conn, int USE_SSL);

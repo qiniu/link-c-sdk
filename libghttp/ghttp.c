@@ -52,6 +52,7 @@ struct _ghttp_request
   char               *proxy_authtoken;
   int                 secure_uri;
   int                 nTimeoutInSecond;
+  int                 isWs;
 #if defined(WITH_OPENSSL) || defined(WITH_WOLFSSL)
   ghttp_ssl_cert_cb   cert_cb;
   void               *cert_cb_data;
@@ -440,6 +441,82 @@ ghttp_prepare(ghttp_request *a_request)
   return 0;
 }
 
+static int get_fix_random_str(char *buf, int bufLen, int len) {
+        int i = 0, val = 0;
+        const char *base = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789==========++++++++++";
+        int base_len = 82;
+        
+        srand((unsigned int) time(NULL));
+        
+        len = bufLen - 1 >= len ? len : bufLen - 1;
+        for (; i < len; i++) {
+                val = 1 + (int) ((float) (base_len - 1) * rand() / (RAND_MAX + 1.0));
+                buf[i] = base[val];
+        }
+        return len;
+}
+
+ghttp_status
+ghttp_process_upgrade_websocket(ghttp_request *a_request) {
+        char key[21];
+        memset(key, 0, sizeof(key));
+        get_fix_random_str(key, sizeof(key), sizeof(key) - 1);
+        ghttp_set_type(a_request, ghttp_type_get);
+        ghttp_set_header(a_request, "Connection", "Upgrade");
+        ghttp_set_header(a_request, "Sec-WebSocket-Version", "13");
+        ghttp_set_header(a_request, "Upgrade", "websocket");
+        ghttp_set_header(a_request, "Sec-WebSocket-Key", key);
+        a_request->isWs = 1;
+        int ret = ghttp_prepare(a_request);
+        if (ret != 0)
+                return ret;
+        return ghttp_process(a_request);
+}
+
+void mask(unsigned char* original, int len, unsigned char* maskKey) {
+        int i = 0;
+        for (i = 0; i < len; i++) {
+                original[i] = (unsigned char) (original[i] ^ maskKey[i % 4]);
+        }
+        return;
+}
+
+int ghttp_websocket_send(ghttp_request *a_request, char *data, int len) {
+        unsigned char wh[16];
+        memset(wh, 0, sizeof(wh));
+        int i = 0;
+        wh[i++] = 0x82;// fin, binary
+        if (len < 126) {
+                wh[i++] = len | 0x80;
+        } else if (len < 65536) {
+                wh[i++] = 126 | 0x80;
+                wh[i++] = len/256;
+                wh[i++] = len%256;
+        } else {
+                wh[i++] = 127 | 0x80;
+                wh[i++] = 0;
+                wh[i++] = 0;
+                wh[i++] = 0;
+                wh[i++] = 0;
+                wh[i++] = len>>24;
+                wh[i++] = len>>16;
+                wh[i++] = len>>8;
+                wh[i++] = len;
+        }
+        int r;
+        get_fix_random_str((char*)(&r), sizeof(int), sizeof(int));
+        memcpy(wh+i, &r, sizeof(int));
+        i+=4;
+        
+        memcpy(data-i, wh, i);
+        mask((unsigned char*)data, len, (unsigned char *)(&r));
+        return http_req_send_websocket(a_request->req, a_request->conn, data-i, len+i);
+}
+
+int  ghttp_websocket_recv(ghttp_request *a_request, char * msg, int len) {
+        return http_req_read_websocket(a_request->req, a_request->conn, msg, len);
+}
+
 ghttp_status
 ghttp_process (ghttp_request *a_request)
 {
@@ -451,7 +528,7 @@ ghttp_process (ghttp_request *a_request)
     {
       if (a_request->connected == 0)
 	{
-	  if (http_trans_connect(a_request->conn) < 0)
+	  if (http_trans_connect(a_request->conn, a_request->isWs) < 0)
 	    {
 	      if (a_request->conn->error_type == http_trans_err_type_errno)
 		a_request->errstr = strerror(a_request->conn->error);
@@ -518,6 +595,8 @@ ghttp_process (ghttp_request *a_request)
 	return ghttp_not_done;
       if (l_rv == HTTP_TRANS_DONE)
 	{
+                if (a_request->isWs)
+                        return ghttp_not_done;
 	  a_request->proc = ghttp_proc_response;
 	  if (a_request->conn->sync == HTTP_TRANS_ASYNC)
 	    return ghttp_not_done;

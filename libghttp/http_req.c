@@ -311,3 +311,141 @@ http_req_send(http_req *a_req, http_trans_conn *a_conn)
     }
   return HTTP_TRANS_DONE;
 }
+
+int
+http_req_send_websocket(http_req *a_req, http_trans_conn *a_conn, char *data,int len) {
+        
+        http_trans_conn bakConn = *a_conn;
+        
+        int remain, offset, l, l_rv;
+        remain = len;
+        offset = 0;
+        a_conn->nRemainMilliTime = a_conn->nTimeoutInSecond * 1000;
+        while (data && remain > 0) {
+                l = remain;
+                a_conn->io_buf = (char *)data+offset;
+                a_conn->io_buf_len = l;
+                a_conn->io_buf_alloc = l;
+                a_conn->io_buf_io_left = l;
+                a_conn->io_buf_io_done = 0;
+                do {
+                        l_rv = http_trans_write_buf(a_conn);
+                        if (l_rv == HTTP_TRANS_ERR) {
+                                restoreConn(a_conn, &bakConn);
+                                return HTTP_TRANS_ERR;
+                        } else {
+                                if ((l_rv == HTTP_TRANS_DONE) && (a_conn->last_read == 0)) {
+                                        restoreConn(a_conn, &bakConn);
+                                        return HTTP_TRANS_ERR;
+                                }
+                                if (a_conn->error == EAGAIN || a_conn->error == EWOULDBLOCK) {
+                                        restoreConn(a_conn, &bakConn);
+                                        return HTTP_TRANS_ERR;
+                                }
+                        }
+                } while (l_rv == HTTP_TRANS_NOT_DONE);
+                remain -= l;
+                offset += l;
+        }
+        
+        restoreConn(a_conn, &bakConn);
+        a_conn->nRemainMilliTime = a_conn->nTimeoutInSecond * 1000;
+        return 0;
+}
+
+static void set_rcv_timeout(int fd, int tm) {
+        struct timeval tv;
+        if (tm <= 0) {
+                tv.tv_sec = 0;
+                tv.tv_usec = 2000;
+        } else {
+                tv.tv_sec = tm/1000;
+                tv.tv_usec = (tm%1000)*1000;
+        }
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+}
+
+static inline int64_t reqCurMilliSec() {
+        struct  timeval    tv;
+        gettimeofday(&tv, NULL);
+        return tv.tv_sec*(int64_t)(1000)+tv.tv_usec/(int64_t)(1000);
+}
+
+int http_req_read_websocket(http_req *a_req, http_trans_conn *a_conn, char * msg, int len) {
+        
+        unsigned char mask[4];
+        int i = 0;
+        a_conn->nRemainMilliTime = 1000;
+        set_rcv_timeout(a_conn->sock, a_conn->nRemainMilliTime);
+        
+        int64_t startT = reqCurMilliSec();
+        a_conn->io_buf_io_left = 2;
+        a_conn->io_buf_alloc = 0;
+        int ret = http_trans_read_into_buf(a_conn);
+        if (ret != HTTP_TRANS_DONE)
+                return -1;
+        int64_t endT = reqCurMilliSec();
+        
+        int isMask = a_conn->io_buf[1] & 0x80;
+        if (isMask) {
+                isMask = 4;
+        }
+        
+        int lenLen = 0;
+        int payloadLen = a_conn->io_buf[1] & 0x7F;
+        if (payloadLen == 126) {
+                payloadLen = 0;
+                lenLen = 2;
+        } else if (payloadLen == 127) {
+                payloadLen = 0;
+                lenLen = 8;
+        }
+        
+        a_conn->nRemainMilliTime -= (endT - startT);
+        if (a_conn->nRemainMilliTime <= 0)
+                a_conn->nRemainMilliTime = 10;
+        set_rcv_timeout(a_conn->sock, a_conn->nRemainMilliTime);
+        
+        if (lenLen + isMask > 0) {
+                startT = reqCurMilliSec();
+                
+                a_conn->io_buf_io_left = lenLen + isMask;
+                a_conn->io_buf_alloc = 0;
+                
+                ret = http_trans_read_into_buf(a_conn);
+                if (ret != HTTP_TRANS_DONE)
+                        return -2;
+                endT = reqCurMilliSec();
+                if (isMask)
+                        memcpy(mask, a_conn->io_buf+lenLen, isMask);
+                
+                for(i = 0; i < lenLen; i++) {
+                        payloadLen = payloadLen << 8;
+                        payloadLen += (unsigned char)a_conn->io_buf[i];
+                }
+                
+                a_conn->nRemainMilliTime -= (endT - startT);
+                if (a_conn->nRemainMilliTime <= 0)
+                        a_conn->nRemainMilliTime = 10;
+                set_rcv_timeout(a_conn->sock, a_conn->nRemainMilliTime);
+        }
+        
+        a_conn->io_buf_io_left = (int)payloadLen;
+        a_conn->io_buf_alloc = 0;
+        ret = http_trans_read_into_buf(a_conn);
+        if (ret != HTTP_TRANS_DONE)
+                return -3;
+        
+        int t = len - 1;
+        if ((int)payloadLen < t)
+                t = (int)payloadLen;
+        if (isMask) {
+                for (i = 0; i < t; i++) {
+                        msg[i] = (unsigned char) (a_conn->io_buf[i] ^ mask[i % 4]);
+                }
+        } else {
+                memcpy(msg, a_conn->io_buf, t);
+        }
+        msg[len - 1] = 0;
+        return 0;
+}

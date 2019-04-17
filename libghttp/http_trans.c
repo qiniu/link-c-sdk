@@ -33,6 +33,7 @@
 #include "http_global.h"
 #include "qupload.h"
 #include <stdio.h>
+#include "timeoutconn.h"
 
 #ifdef WITH_OPENSSL
 #include <openssl/crypto.h>
@@ -48,7 +49,6 @@ static SSL_CTX    * ssl_context = NULL;
 #elif defined (WITH_WOLFSSL)
 #include <wolfssl/options.h>
 #include <wolfssl/ssl.h>
-#include "timeoutconn.h"
 
 static int          ssl_initialized = 0;
 static WOLFSSL_METHOD * ssl_method = NULL;
@@ -68,15 +68,18 @@ static inline int64_t getCurMilliSec() {
 
 void ghttp_set_global_cert_file_path(const char *file, const char *path)
 {
-    int lenf = strlen(file);
-    int lenp = strlen(path);
-    assert(lenf < sizeof(cert_file));
-    assert(lenp < sizeof(cert_path));
-    memcpy(cert_file, file, lenf);
-    cert_file[lenf] = 0;
-    memcpy(cert_path, path, lenp);
-    cert_path[lenp] = 0;
-    return;
+        int lenf = strlen(file);
+        assert(lenf < sizeof(cert_file));
+        
+        memcpy(cert_file, file, lenf);
+        cert_file[lenf] = 0;
+        if (path) {
+                int lenp = strlen(path);
+                assert(lenp < sizeof(cert_path));
+                memcpy(cert_path, path, lenp);
+                cert_path[lenp] = 0;
+        }
+        return;
 }
 
 static void set_rcv_timeout(int fd, int tm) {
@@ -217,7 +220,7 @@ static int get_host_by_name_from_cache(const char *host, struct sockaddr_in *sin
 }
 
 int
-http_trans_connect(http_trans_conn *a_conn)
+http_trans_connect(http_trans_conn *a_conn, int ctype)
 {
   int dnserr = 0;
   a_conn->nStartTime = getCurMilliSec();
@@ -313,6 +316,9 @@ http_trans_connect(http_trans_conn *a_conn)
       goto ec;
      }
     }
+    if(ctype == 1)
+        a_conn->nRemainMilliTime = a_conn->nTimeoutInSecond * 1000 - (connEndTime - a_conn->nStartTime);
+    else
         a_conn->nRemainMilliTime = (a_conn->nTimeoutInSecond+5) * 1000 - (connEndTime - a_conn->nStartTime);
         if (a_conn->nRemainMilliTime < 0) {
                 a_conn->error_type = http_trans_err_type_errno;
