@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
-#include "uploader.h"
+#include "tsuploader/uploader.h"
 #include "ipc.h"
 #include "dbg.h"
 
@@ -17,8 +17,6 @@ typedef struct {
 static app_t app;
 
 #define REQUEST_URL "http://linking-device.qiniuapi.com/v1/device/config"
-#define DAK "2uIeqlkrA6nJLttWOv5P5VJu0SViAS9gzLk3LbIE"
-#define DSK "n84XTQbi8MWjLnKuSJ1rXU5Ec7uCFNVLqR_oV0EO"
 
 /*截图的回调函数, 主要用于将一个切片截一个图出来，上传到云存储，用于预览 */
 void GetPictureCb(void *pUserData, const char *pFilename, int nFilenameLen )
@@ -46,7 +44,7 @@ int TsFileSave2SDCardCb( const char *buffer, int size, void *userCtx, LinkMediaI
     char ts_name[16] = { 0 };
     FILE *fp = NULL;
 
-    sprintf( ts_name, "./%03d.ts", app.ts_index++ );
+    sprintf( ts_name, "./output/%03d.ts", app.ts_index++ );
     LOGI("save ts : %s\n", ts_name );
     fp = fopen( ts_name, "w+" );
     if ( !fp ) {
@@ -90,7 +88,7 @@ int IpcEventCallBack( int event, void *data )
             int valuelens[3] = {6, 7, 8};
             metas.valuelens = valuelens;
 
-            metas.isOneShot = 1;
+            metas.isOneShot = 0;
             LinkSetTsType( app.uploader, &metas );
         }
         break;
@@ -144,6 +142,20 @@ void LogCb( int level,  char *log )
 
 int main()
 {
+    char * DAK = NULL;
+    char * DSK = NULL;
+    //获取 dak dsk
+    DAK = getenv("LINK_TEST_DAK");
+    if (!DAK) {
+        printf("No DAK specified.\n");
+        exit(EXIT_FAILURE);
+    }
+    DSK = getenv("LINK_TEST_DSK");
+    if (!DSK) {
+        printf("No DSK specified.\n");
+        exit(EXIT_FAILURE);
+    }
+
     LinkUploadArg arg =
     {
         .nAudioFormat = LINK_AUDIO_AAC,
@@ -168,9 +180,9 @@ int main()
     ipc_param_t param = 
     {
         .audio_type = AUDIO_AAC,
-        .video_file = "./video.h264",
-        .audio_file = "./audio.aac",
-        .pic_file = "./pic.jpg",
+        .video_file = "./material/video.h264",
+        .audio_file = "./material/audio.aac",
+        .pic_file = "./material/picture.jpg",
         .video_cb = VideoFrameCallBack,
         .audio_cb = AudioFrameCallBack,
         /* 摄像头事件回调函数，当摄像头发生如下事件时，通知app
